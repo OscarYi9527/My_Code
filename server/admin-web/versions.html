@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>版本管理 - AI Editor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e1e1e;color:#ccc;display:flex;min-height:100vh}
+nav{width:220px;background:#252526;padding:20px 0;border-right:1px solid #3c3c3c}
+nav h2{font-size:16px;padding:0 20px 16px;color:#fff}
+nav a{display:block;padding:8px 20px;color:#ccc;text-decoration:none;font-size:13px}
+nav a:hover,nav a.active{background:#37373d;color:#fff}
+main{flex:1;padding:24px}
+h1{font-size:20px;margin-bottom:20px;color:#fff}
+.card{background:#252526;border:1px solid #3c3c3c;border-radius:6px;padding:20px;margin-bottom:20px}
+.card h2{font-size:15px;color:#fff;margin-bottom:12px}
+.form-row{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;color:#999}
+.form-group input,.form-group select,.form-group textarea{padding:8px 10px;border:1px solid #3c3c3c;border-radius:4px;background:#1e1e1e;color:#ccc;font-size:13px}
+.form-group textarea{min-height:80px;resize:vertical}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-size:13px;cursor:pointer}
+.btn-primary{background:#007acc;color:#fff}
+.btn-primary:hover{background:#005a9e}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #3c3c3c;font-size:13px}
+th{background:#2d2d2d;color:#999}
+.version-latest{color:#4caf50;font-weight:600}
+</style></head>
+<body>
+<nav>
+  <h2>AI Editor</h2>
+  <a href="dashboard.html">仪表盘</a>
+  <a href="invitations.html">邀请码</a>
+  <a href="versions.html" class="active">版本管理</a>
+  <a href="marketplace.html">Skill 市场</a>
+</nav>
+<main>
+  <h1>版本管理</h1>
+  <div class="card">
+    <h2>推送新版本</h2>
+    <div class="form-row">
+      <div class="form-group"><label>版本号</label><input type="text" id="version" placeholder="1.0.0" style="width:100px"></div>
+      <div class="form-group"><label>平台</label><select id="platform"><option value="win32">Windows</option><option value="darwin">macOS</option></select></div>
+      <div class="form-group" style="flex:1;min-width:300px"><label>下载地址</label><input type="text" id="downloadUrl" placeholder="https://..." style="width:100%"></div>
+    </div>
+    <div class="form-group" style="margin-top:12px"><label>更新日志</label><textarea id="releaseNotes" placeholder="本次更新内容..."></textarea></div>
+    <button class="btn btn-primary" id="pushBtn" style="margin-top:12px">推送更新</button>
+    <div id="pushMsg" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <h2>推送历史</h2>
+    <div id="versionList">加载中...</div>
+  </div>
+</main>
+<script>
+const token=localStorage.getItem('token')
+if(!token) location.href='login.html'
+async function api(path,opt={}){const r=await fetch('/api/admin'+path,{...opt,headers:{...opt.headers,'Authorization':'Bearer '+token}});return r.ok?r.json():Promise.reject(await r.text())}
+
+function loadVersions(){api('/versions').then(d=>{if(!d.data.length){document.getElementById('versionList').innerHTML='暂无版本';return}
+  document.getElementById('versionList').innerHTML='<table><tr><th>版本</th><th>平台</th><th>推送时间</th></tr>'+d.data.map(v=>`<tr><td>${v.version}</td><td>${v.platform}</td><td>${new Date(v.pushedAt).toLocaleString()}</td></tr>`).join('')+'</table>'
+}).catch(()=>document.getElementById('versionList').innerHTML='加载失败')}
+
+document.getElementById('pushBtn').addEventListener('click',async()=>{
+  const body={version:document.getElementById('version').value,platform:document.getElementById('platform').value,downloadUrl:document.getElementById('downloadUrl').value,releaseNotes:document.getElementById('releaseNotes').value}
+  try{await api('/versions',{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}})
+  document.getElementById('pushMsg').innerHTML='<span style="color:#4caf50">推送成功!</span>';loadVersions()}catch(e){document.getElementById('pushMsg').innerHTML='<span style="color:#f44336">推送失败: '+e+'</span>'}
+})
+loadVersions()
+</script></body></html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Skill 市场审核 - AI Editor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e1e1e;color:#ccc;display:flex;min-height:100vh}
+nav{width:220px;background:#252526;padding:20px 0;border-right:1px solid #3c3c3c}
+nav h2{font-size:16px;padding:0 20px 16px;color:#fff}
+nav a{display:block;padding:8px 20px;color:#ccc;text-decoration:none;font-size:13px}
+nav a:hover,nav a.active{background:#37373d;color:#fff}
+main{flex:1;padding:24px}
+h1{font-size:20px;margin-bottom:20px;color:#fff}
+.card{background:#252526;border:1px solid #3c3c3c;border-radius:8px;margin-bottom:16px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#2d2d2d}
+.card-body{padding:14px 16px}
+.card-title{font-size:15px;color:#fff}.card-version{font-size:12px;color:#888;margin-left:8px}
+.card-desc{font-size:13px;color:#bbb;margin:8px 0}
+.card-meta{font-size:11px;color:#666}.card-actions{display:flex;gap:8px;margin-top:12px}
+.btn{padding:6px 14px;border:none;border-radius:4px;font-size:12px;cursor:pointer}
+.btn-approve{background:#4caf50;color:#fff}.btn-approve:hover{background:#388e3c}
+.btn-reject{background:#c50f1f;color:#fff}.btn-reject:hover{background:#a00d18}
+.status-pending{color:#ff9800}.status-approved{color:#4caf50}.status-rejected{color:#f44336}
+.tabs{display:flex;gap:4px;margin-bottom:16px}
+.tab{background:#252526;border:1px solid #3c3c3c;color:#999;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px}
+.tab.active{background:#007acc;color:#fff;border-color:#007acc}
+.empty{text-align:center;color:#666;padding:40px}
+</style></head>
+<body>
+<nav>
+  <h2>AI Editor</h2>
+  <a href="dashboard.html">仪表盘</a>
+  <a href="invitations.html">邀请码</a>
+  <a href="versions.html">版本管理</a>
+  <a href="marketplace.html" class="active">Skill 市场</a>
+</nav>
+<main>
+  <h1>Skill 市场审核</h1>
+  <div class="tabs">
+    <button class="tab active" data-filter="pending">待审核</button>
+    <button class="tab" data-filter="approved">已通过</button>
+    <button class="tab" data-filter="rejected">已拒绝</button>
+  </div>
+  <div id="submissionList">加载中...</div>
+</main>
+<script>
+const token=localStorage.getItem('token')
+if(!token) location.href='login.html'
+let currentFilter='pending'
+
+async function api(path,opt={}){const r=await fetch('/api/admin'+path,{...opt,headers:{...opt.headers,'Authorization':'Bearer '+token}});return r.ok?r.json():Promise.reject(await r.text())}
+
+function renderList(data){
+  const list=document.getElementById('submissionList')
+  if(!data.length){list.innerHTML='<div class="empty">暂无提交</div>';return}
+  list.innerHTML=data.map(s=>`
+    <div class="card">
+      <div class="card-header"><span><span class="card-title">${s.name}</span><span class="card-version">v${s.version}</span></span><span class="status-${s.status}">${s.status==='pending'?'待审核':s.status==='approved'?'已通过':'已拒绝'}</span></div>
+      <div class="card-body"><div class="card-desc">${s.description||'无描述'}</div><div class="card-meta">提交者: ${s.author} | ${new Date(s.createdAt).toLocaleDateString()}</div>
+        ${s.status==='pending'?'<div class="card-actions"><button class="btn btn-approve" data-id="'+s.id+'" data-action="approve">通过</button><button class="btn btn-reject" data-id="'+s.id+'" data-action="reject">拒绝</button></div>':''}
+      </div>
+    </div>`).join('')
+  list.querySelectorAll('.btn-approve,.btn-reject').forEach(b=>b.addEventListener('click',async()=>{
+    const id=b.dataset.id,action=b.dataset.action
+    try{await api('/marketplace/submissions/'+id+'/review',{method:'POST',body:JSON.stringify({action}),headers:{'Content-Type':'application/json'}})
+    loadSubmissions(currentFilter)}catch(e){alert('操作失败: '+e)}
+  }))
+}
+
+function loadSubmissions(status){api('/marketplace/submissions?status='+status).then(d=>renderList(d.data)).catch(()=>document.getElementById('submissionList').innerHTML='<div class="empty">加载失败</div>')}
+
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',function(){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'))
+  this.classList.add('active')
+  currentFilter=this.dataset.filter
+  loadSubmissions(currentFilter)
+}))
+loadSubmissions('pending')
+</script></body></html>

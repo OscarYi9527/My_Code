@@ -1,0 +1,16 @@
+{
+  "name": "dual-mode-editor-server",
+  "private": true,
+  "dependencies": {
+    "express": "^4.18.0",
+    "jsonwebtoken": "^9.0.0",
+    "cookie-parser": "^1.4.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/cookie-parser": "^1.4.0",
+    "supertest": "^6.3.0",
+    "@types/supertest": "^6.0.0"
+  }
+}

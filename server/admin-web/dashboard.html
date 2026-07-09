@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>管理后台 - AI Editor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e1e1e;color:#ccc;display:flex;min-height:100vh}
+nav{width:220px;background:#252526;padding:20px 0;border-right:1px solid #3c3c3c}
+nav h2{font-size:16px;padding:0 20px 16px;color:#fff}
+nav a{display:block;padding:8px 20px;color:#ccc;text-decoration:none;font-size:13px}
+nav a:hover,nav a.active{background:#37373d;color:#fff}
+main{flex:1;padding:24px}
+h1{font-size:20px;margin-bottom:20px;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat{background:#252526;padding:20px;border-radius:6px;border:1px solid #3c3c3c}
+.stat-label{font-size:12px;color:#999;margin-bottom:8px}
+.stat-value{font-size:24px;color:#fff;font-weight:600}
+table{width:100%;border-collapse:collapse;background:#252526;border-radius:6px;overflow:hidden}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #3c3c3c;font-size:13px}
+th{background:#2d2d2d;color:#999;font-weight:500}
+tr:hover{background:#37373d}
+</style></head>
+<body>
+<nav>
+  <h2>AI Editor</h2>
+  <a href="dashboard.html" class="active">仪表盘</a>
+  <a href="invitations.html">邀请码</a>
+  <a href="versions.html">版本管理</a>
+  <a href="marketplace.html">Skill 市场</a>
+</nav>
+<main>
+  <h1>仪表盘</h1>
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-label">总用户数</div><div class="stat-value" id="totalUsers">-</div></div>
+    <div class="stat"><div class="stat-label">今日活跃</div><div class="stat-value" id="activeToday">-</div></div>
+    <div class="stat"><div class="stat-label">AI 调用 (今日)</div><div class="stat-value" id="aiToday">-</div></div>
+    <div class="stat"><div class="stat-label">AI 调用 (总计)</div><div class="stat-value" id="aiTotal">-</div></div>
+  </div>
+  <h2 style="margin:20px 0 12px;font-size:16px;color:#fff">最近注册用户</h2>
+  <table><thead><tr><th>用户名</th><th>注册时间</th></tr></thead><tbody id="recentUsers"></tbody></table>
+</main>
+<script>
+async function load(){try{const r=await fetch('/api/admin/dashboard',{headers:{Authorization:'Bearer '+localStorage.getItem('token')}});
+if(!r.ok)return location.href='login.html';const d=await r.json();
+document.getElementById('totalUsers').textContent=d.totalUsers;
+document.getElementById('activeToday').textContent=d.activeUsersToday;
+document.getElementById('aiToday').textContent=d.aiCallCount.today;
+document.getElementById('aiTotal').textContent=d.aiCallCount.total;
+d.recentUsers.forEach(u=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${u.username}</td><td>${new Date(u.createdAt).toLocaleString()}</td>`;document.getElementById('recentUsers').appendChild(tr)})}catch(e){console.error(e)}}
+load()
+</script></body></html>

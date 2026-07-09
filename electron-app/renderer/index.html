@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI Editor</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src http://localhost:*; worker-src 'self' blob:; font-src 'self' data:; img-src 'self' data:">
+  <style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e1e1e;color:#ccc;overflow:hidden}
+  </style>
+</head>
+<body>
+  <div id="app"><div id="loading" style="display:flex;align-items:center;justify-content:center;height:100vh;color:#888">加载中...</div></div>
+  <script>
+    if (typeof CSS.escape !== 'function') {
+      Object.defineProperty(CSS, 'escape', {
+        value: function(value) {
+          value = String(value);
+          var result = '';
+          for (var i = 0; i < value.length; i++) {
+            var ch = value.charAt(i);
+            var code = ch.charCodeAt(0);
+            if (ch === '\0' || (code >= 0x0001 && code <= 0x001F) || code === 0x007F) {
+              result += '\\' + code.toString(16) + ' ';
+            } else if (i === 0 && code >= 0x0030 && code <= 0x0039) {
+              result += '\\' + code.toString(16) + ' ';
+            } else if (i === 1 && code >= 0x0030 && code <= 0x0039 && value.charCodeAt(0) === 0x002D) {
+              result += '\\' + code.toString(16) + ' ';
+            } else {
+              result += ch;
+            }
+          }
+          return result;
+        },
+        writable: true,
+        configurable: true
+      });
+    }
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

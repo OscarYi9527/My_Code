@@ -1,0 +1,21 @@
+{
+  "name": "dual-mode-editor-electron",
+  "version": "0.1.0",
+  "description": "Dual-mode AI Editor — standalone Electron wrapper",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
+    "dev": "tsc -p tsconfig.json && electron ."
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "electron@28.3.3": true
+  },
+  "dependencies": {
+    "monaco-editor": "^0.55.1"
+  }
+}

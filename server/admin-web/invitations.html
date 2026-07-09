@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>邀请码管理 - AI Editor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e1e1e;color:#ccc;display:flex;min-height:100vh}
+nav{width:220px;background:#252526;padding:20px 0;border-right:1px solid #3c3c3c}
+nav h2{font-size:16px;padding:0 20px 16px;color:#fff}
+nav a{display:block;padding:8px 20px;color:#ccc;text-decoration:none;font-size:13px}
+nav a:hover,nav a.active{background:#37373d;color:#fff}
+main{flex:1;padding:24px}
+h1{font-size:20px;margin-bottom:20px;color:#fff}
+.card{background:#252526;border:1px solid #3c3c3c;border-radius:6px;padding:20px;margin-bottom:20px}
+.card h2{font-size:15px;color:#fff;margin-bottom:12px}
+.form-row{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;color:#999}
+.form-group input,.form-group select{padding:8px 10px;border:1px solid #3c3c3c;border-radius:4px;background:#1e1e1e;color:#ccc;font-size:13px}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-size:13px;cursor:pointer}
+.btn-primary{background:#007acc;color:#fff}
+.btn-primary:hover{background:#005a9e}
+.btn-danger{background:#c50f1f;color:#fff}
+.codes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
+.code-card{background:#1e1e1e;border:1px solid #3c3c3c;border-radius:4px;padding:12px;font-family:'Consolas',monospace}
+.code-value{font-size:16px;color:#4daafc;margin-bottom:6px}
+.code-meta{font-size:11px;color:#888}
+.status-active{color:#4caf50}.status-used{color:#ff9800}.status-expired{color:#f44336}
+</style></head>
+<body>
+<nav>
+  <h2>AI Editor</h2>
+  <a href="dashboard.html">仪表盘</a>
+  <a href="invitations.html" class="active">邀请码</a>
+  <a href="versions.html">版本管理</a>
+  <a href="marketplace.html">Skill 市场</a>
+</nav>
+<main>
+  <h1>邀请码管理</h1>
+  <div class="card">
+    <h2>生成邀请码</h2>
+    <div class="form-row">
+      <div class="form-group"><label>数量</label><input type="number" id="count" value="1" min="1" max="50" style="width:70px"></div>
+      <div class="form-group"><label>最大使用次数</label><input type="number" id="maxUses" value="1" min="1" max="100" style="width:70px"></div>
+      <div class="form-group"><label>有效期（天，空=永久）</label><input type="number" id="expiresInDays" placeholder="永久" style="width:80px"></div>
+      <button class="btn btn-primary" id="generateBtn">生成</button>
+    </div>
+    <div class="codes-grid" id="codesGrid"></div>
+    <div id="genError" style="color:#f44336;margin-top:8px;display:none"></div>
+  </div>
+  <div class="card">
+    <h2>邀请码列表</h2>
+    <div id="codeList">加载中...</div>
+  </div>
+</main>
+<script>
+const token=localStorage.getItem('token')
+if(!token) location.href='login.html'
+async function api(path,opt={}){const r=await fetch('/api/admin'+path,{...opt,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token}});return r.ok?r.json():Promise.reject(await r.text())}
+
+document.getElementById('generateBtn').addEventListener('click',async()=>{
+  const body={count:Number(document.getElementById('count').value),maxUses:Number(document.getElementById('maxUses').value)}
+  const days=document.getElementById('expiresInDays').value
+  if(days) body.expiresInDays=Number(days)
+  try{
+    const res=await api('/invitations',{method:'POST',body:JSON.stringify(body)})
+    const g=document.getElementById('codesGrid')
+    res.codes.forEach(c=>{
+      const d=document.createElement('div')
+      d.className='code-card'
+      d.innerHTML=`<div class="code-value">${c.code}</div><div class="code-meta">最大使用: ${c.maxUses} | 状态: <span class="status-active">ACTIVE</span> | 过期: ${c.expiresAt?new Date(c.expiresAt).toLocaleDateString():'永久'}</div>`
+      g.insertBefore(d,g.firstChild)
+    })
+  }catch(e){document.getElementById('genError').textContent='生成失败: '+e;document.getElementById('genError').style.display='block'}
+})
+
+api('/invitations').then(d=>{
+  const list=document.getElementById('codeList')
+  if(!d.data.length){list.innerHTML='暂无邀请码';return}
+  list.innerHTML='<table style="width:100%;border-collapse:collapse"><tr><th>邀请码</th><th>状态</th><th>使用次数</th><th>过期</th><th>创建</th></tr>'+d.data.map(r=>`<tr><td>${r.code}</td><td><span class="status-${r.status}">${r.status}</span></td><td>${r.usedCount}/${r.maxUses}</td><td>${r.expiresAt?new Date(r.expiresAt).toLocaleDateString():'永久'}</td><td>${new Date(r.createdAt).toLocaleDateString()}</td></tr>`).join('')+'</table>'
+}).catch(()=>document.getElementById('codeList').innerHTML='加载失败')
+</script></body></html>
