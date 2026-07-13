@@ -11,7 +11,7 @@ import { hasKey } from '../../../base/common/types.js';
 import { URI } from '../../../base/common/uri.js';
 import { ILogService } from '../../log/common/log.js';
 import { AHPFileSystemProvider } from '../common/agentHostFileSystemProvider.js';
-import { AgentSession, type IAgentService, type IMcpNotification } from '../common/agentService.js';
+import { AgentSession, type AgentProvider, type IAgentService, type IMcpNotification } from '../common/agentService.js';
 import { isActionEnvelopeRelevantToSubscriptionUris } from '../common/state/agentSubscription.js';
 import type { CommandMap } from '../common/state/protocol/messages.js';
 import { ActionEnvelope, ActionType, INotification, isChatAction, isSessionAction, isTerminalAction, type ChatAction, type SessionAction, type TerminalAction, type IRootConfigChangedAction } from '../common/state/sessionActions.js';
@@ -1403,10 +1403,19 @@ export class ProtocolServerHandler extends Disposable {
 	 * protocol. Returns a Promise if the method was recognized, undefined
 	 * otherwise.
 	 */
-	private _handleExtensionRequest(method: string, _params: unknown): Promise<unknown> | undefined {
+	private _handleExtensionRequest(method: string, params: unknown): Promise<unknown> | undefined {
 		switch (method) {
 			case 'shutdown':
 				return this._agentService.shutdown();
+			case 'refreshModels': {
+				const provider = typeof params === 'object' && params !== null && 'provider' in params
+					? (params as { provider?: unknown }).provider
+					: undefined;
+				if (typeof provider !== 'string') {
+					return Promise.reject(new Error('refreshModels requires a provider'));
+				}
+				return this._agentService.refreshModels(provider as AgentProvider);
+			}
 			default:
 				return undefined;
 		}

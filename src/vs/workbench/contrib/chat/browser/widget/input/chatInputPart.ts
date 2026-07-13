@@ -2936,6 +2936,13 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		this.historyNavigationForewardsEnablement = historyNavigationForwardsEnablement;
 
 		const options: IEditorConstructionOptions = getSimpleEditorOptions(this.configurationService);
+		// Chromium EditContext does not reliably surface or position the
+		// Windows IME candidate window for this embedded, dynamically-sized
+		// editor. Keep chat input on Monaco's textarea edit context so Chinese
+		// and other composition-based input methods retain their native
+		// candidate UI. This is intentionally scoped to chat input; normal code
+		// editors continue to respect `editor.editContext`.
+		options.editContext = false;
 		options.overflowWidgetsDomNode = this.options.editorOverflowWidgetsDomNode;
 		options.pasteAs = EditorOptions.pasteAs.defaultValue;
 		options.readOnly = false;
@@ -3342,6 +3349,85 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		this.secondaryToolbar.getElement().classList.add('chat-secondary-input-toolbar');
 		this.secondaryToolbar.context = { widget } satisfies IChatExecuteActionContext;
 		dom.append(this.secondaryToolbarContainer, genericChipsContainer);
+
+		// Keep the frequently used input controls in the primary row and move
+		// the long, secondary chip lane into one grouped session-settings
+		// popover. This preserves the existing picker implementations and
+		// their live session-config subscriptions while making the input area
+		// substantially easier to scan.
+		const sessionSettingsPanel = dom.append(this.secondaryToolbarContainer, dom.$('.chat-session-settings-panel'));
+		sessionSettingsPanel.hidden = true;
+		sessionSettingsPanel.setAttribute('role', 'dialog');
+		sessionSettingsPanel.setAttribute('aria-label', localize('chat.sessionSettings.panel', "Session Settings"));
+
+		const executionSection = dom.append(sessionSettingsPanel, dom.$('.chat-session-settings-section'));
+		const executionHeading = dom.append(executionSection, dom.$('.chat-session-settings-heading'));
+		executionHeading.textContent = localize('chat.sessionSettings.execution', "Execution, Permissions, and Connection");
+		const executionBody = dom.append(executionSection, dom.$('.chat-session-settings-body'));
+		executionBody.append(this.secondaryToolbar.getElement());
+
+		const modelSection = dom.append(sessionSettingsPanel, dom.$('.chat-session-settings-section'));
+		const modelHeading = dom.append(modelSection, dom.$('.chat-session-settings-heading'));
+		modelHeading.textContent = localize('chat.sessionSettings.model', "Model and Security");
+		const modelBody = dom.append(modelSection, dom.$('.chat-session-settings-body'));
+		modelBody.append(genericChipsContainer);
+
+		const compactSettings = dom.$('.chat-session-settings-compact');
+		const providerSummary = dom.append(compactSettings, dom.$('span.chat-session-provider-summary'));
+		providerSummary.textContent = localize('chat.sessionSettings.codexProvider', "Codex");
+		const securitySummary = dom.append(compactSettings, dom.$('span.chat-session-security-summary'));
+		const settingsButton = dom.append(compactSettings, dom.$('button.chat-session-settings-button')) as HTMLButtonElement;
+		settingsButton.type = 'button';
+		settingsButton.textContent = localize('chat.sessionSettings.button', "Session Settings");
+		settingsButton.setAttribute('aria-haspopup', 'dialog');
+		settingsButton.setAttribute('aria-expanded', 'false');
+		this.secondaryToolbarContainer.prepend(compactSettings);
+
+		const updateSecuritySummary = () => {
+			const sandboxHost = sessionSettingsPanel.querySelector<HTMLElement>('[data-agent-host-config-property="codex.sandboxMode"]');
+			const networkHost = sessionSettingsPanel.querySelector<HTMLElement>('[data-agent-host-config-property="codex.networkAccessEnabled"]');
+			const sandboxValue = sandboxHost?.dataset.agentHostConfigValue;
+			const networkValue = networkHost?.dataset.agentHostConfigValue;
+
+			const sandboxLabel = sandboxValue === 'workspace-write'
+				? localize('chat.sessionSettings.workspaceWritable', "Workspace Writable")
+				: sandboxValue === 'danger-full-access'
+					? localize('chat.sessionSettings.fullAccess', "Full Access")
+					: localize('chat.sessionSettings.readOnly', "Read-Only");
+			const networkLabel = networkValue === 'true'
+				? localize('chat.sessionSettings.networkOn', "Network On")
+				: localize('chat.sessionSettings.networkOff', "Network Off");
+			securitySummary.textContent = localize('chat.sessionSettings.securitySummary', "{0} · {1}", sandboxLabel, networkLabel);
+			compactSettings.classList.toggle('warning', sandboxValue === 'danger-full-access' || networkValue === 'true');
+		};
+
+		const settingsObserver = new MutationObserver(updateSecuritySummary);
+		settingsObserver.observe(sessionSettingsPanel, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-agent-host-config-value'] });
+		this._register(toDisposable(() => settingsObserver.disconnect()));
+		updateSecuritySummary();
+
+		const setSettingsPanelVisible = (visible: boolean) => {
+			sessionSettingsPanel.hidden = !visible;
+			settingsButton.setAttribute('aria-expanded', String(visible));
+			settingsButton.classList.toggle('checked', visible);
+		};
+		this._register(dom.addStandardDisposableListener(settingsButton, dom.EventType.CLICK, e => {
+			e.preventDefault();
+			e.stopPropagation();
+			setSettingsPanelVisible(sessionSettingsPanel.hasAttribute('hidden'));
+		}));
+		this._register(dom.addStandardDisposableListener(dom.getWindow(this.container).document, dom.EventType.MOUSE_DOWN, e => {
+			const target = e.target;
+			if (!sessionSettingsPanel.hidden && target instanceof Node && !sessionSettingsPanel.contains(target) && !settingsButton.contains(target)) {
+				setSettingsPanelVisible(false);
+			}
+		}));
+		this._register(dom.addStandardDisposableListener(sessionSettingsPanel, dom.EventType.KEY_DOWN, e => {
+			if (e.keyCode === KeyCode.Escape) {
+				setSettingsPanelVisible(false);
+				settingsButton.focus();
+			}
+		}));
 		this._register(this.secondaryToolbar.onDidChangeMenuItems(() => {
 			// Update container reference for the pickers when the secondary toolbar hosts one.
 			// Only assign when found so we don't overwrite a valid primary container reference

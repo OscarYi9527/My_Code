@@ -4,10 +4,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { Event } from '../../../../base/common/event.js';
+import { RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
 
 export const IAiEditorModeService = createDecorator<IAiEditorModeService>('aiEditorModeService');
 export const AI_EDITOR_MODE_SETTING_ID = 'aiEditor.mode';
+export const AI_EDITOR_SIMPLE_MODE_CONTEXT = new RawContextKey<boolean>('aiEditorSimpleMode', false);
 
 export const enum AiEditorMode {
 	Dev = 'dev',

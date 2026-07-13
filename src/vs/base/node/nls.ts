@@ -43,24 +43,34 @@ export async function resolveNLSConfiguration({ userLocale, osLocale, userDataPa
 	mark('code/willGenerateNls');
 
 	if (
-		process.env['VSCODE_DEV'] ||
 		userLocale === 'pseudo' ||
 		userLocale.startsWith('en') ||
-		!commit ||
 		!userDataPath
 	) {
 		return defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
 	}
 
+	const embeddedFallback = async (): Promise<INLSConfiguration> =>
+		(await resolveEmbeddedLanguagePackConfiguration({ userLocale, osLocale, userDataPath, commit, nlsMetadataPath }))
+		?? defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
+
+	// Development launches do not carry a product commit and therefore
+	// cannot use the normal installed-language-pack cache. The distributable
+	// also needs a first-launch fallback before languagepacks.json has been
+	// generated. In both cases use the language pack shipped with Code.
+	if (process.env['VSCODE_DEV'] || !commit) {
+		return embeddedFallback();
+	}
+
 	try {
 		const languagePacks = await getLanguagePackConfigurations(userDataPath);
 		if (!languagePacks) {
-			return defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
+			return embeddedFallback();
 		}
 
 		const resolvedLanguage = resolveLanguagePackLanguage(languagePacks, userLocale);
 		if (!resolvedLanguage) {
-			return defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
+			return embeddedFallback();
 		}
 
 		const languagePack = languagePacks[resolvedLanguage];
@@ -72,7 +82,7 @@ export async function resolveNLSConfiguration({ userLocale, osLocale, userDataPa
 			typeof mainLanguagePackPath !== 'string' ||
 			!(await Promises.exists(mainLanguagePackPath))
 		) {
-			return defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
+			return embeddedFallback();
 		}
 
 		const languagePackId = `${languagePack.hash}.${resolvedLanguage}`;
@@ -157,7 +167,115 @@ export async function resolveNLSConfiguration({ userLocale, osLocale, userDataPa
 		console.error('Generating translation files failed.', error);
 	}
 
-	return defaultNLSConfiguration(userLocale, osLocale, nlsMetadataPath);
+	return embeddedFallback();
+}
+
+/**
+ * Resolves the Simplified Chinese language pack bundled under `extensions/`.
+ *
+ * A normal marketplace language pack is discovered after the extension
+ * scanner has populated languagepacks.json, which is too late for a localized
+ * first launch. Flattening the bundled pack here lets the main process select
+ * Chinese directly from the operating-system locale without hard-coding
+ * Chinese for users of other system languages.
+ */
+async function resolveEmbeddedLanguagePackConfiguration(context: IResolveNLSConfigurationContext): Promise<INLSConfiguration | undefined> {
+	const { userLocale, osLocale, userDataPath, commit, nlsMetadataPath } = context;
+	if (!['zh', 'zh-cn', 'zh-hans', 'zh-sg'].includes(userLocale)) {
+		return undefined;
+	}
+
+	const extensionRoot = join(nlsMetadataPath, '..', 'extensions', 'vscode-language-pack-zh-hans');
+	const packPath = join(extensionRoot, 'translations', 'main.i18n.json');
+	const manifestPath = join(extensionRoot, 'package.json');
+	if (!(await Promises.exists(packPath)) || !(await Promises.exists(manifestPath))) {
+		return undefined;
+	}
+
+	try {
+		// Product builds place NLS metadata next to main.js. Source launches
+		// normally omit it, but `core-ci` generates the same files under
+		// out-build; accepting that location makes localization verifiable in
+		// an isolated development instance without changing product behavior.
+		let metadataRoot = nlsMetadataPath;
+		if (!(await Promises.exists(join(metadataRoot, 'nls.keys.json')))) {
+			const buildMetadataRoot = join(nlsMetadataPath, '..', 'out-build');
+			if (!(await Promises.exists(join(buildMetadataRoot, 'nls.keys.json')))) {
+				return undefined;
+			}
+			metadataRoot = buildMetadataRoot;
+		}
+
+		const [
+			nlsDefaultKeys,
+			nlsDefaultMessages,
+			nlsPackdata,
+			manifest,
+		]: [
+			Array<[string, string[]]>,
+			string[],
+			{ contents: Record<string, Record<string, string>> },
+			{ contributes?: { localizations?: Array<{ languageId: string; translations?: Array<{ id: string; path: string }> }> } },
+		] = await Promise.all([
+			promises.readFile(join(metadataRoot, 'nls.keys.json'), 'utf-8').then(content => JSON.parse(content)),
+			promises.readFile(join(metadataRoot, 'nls.messages.json'), 'utf-8').then(content => JSON.parse(content)),
+			promises.readFile(packPath, 'utf-8').then(content => JSON.parse(content)),
+			promises.readFile(manifestPath, 'utf-8').then(content => JSON.parse(content)),
+		]);
+
+		const nlsResult: string[] = [];
+		let nlsIndex = 0;
+		for (const [moduleId, nlsKeys] of nlsDefaultKeys) {
+			const moduleTranslations = nlsPackdata.contents[moduleId];
+			for (const nlsKey of nlsKeys) {
+				nlsResult.push(moduleTranslations?.[nlsKey] || nlsDefaultMessages[nlsIndex]);
+				nlsIndex++;
+			}
+		}
+
+		const translations: Record<string, string> = {};
+		const localization = manifest.contributes?.localizations?.find(candidate => candidate.languageId === 'zh-cn');
+		for (const translation of localization?.translations ?? []) {
+			translations[translation.id] = join(extensionRoot, translation.path);
+		}
+
+		const languagePackId = 'embedded.zh-cn';
+		const globalLanguagePackCachePath = join(userDataPath, 'clp', languagePackId);
+		const commitLanguagePackCachePath = join(globalLanguagePackCachePath, commit ?? 'dev');
+		const languagePackMessagesFile = join(commitLanguagePackCachePath, 'nls.messages.json');
+		const translationsConfigFile = join(globalLanguagePackCachePath, 'tcf.json');
+		const languagePackCorruptMarkerFile = join(globalLanguagePackCachePath, 'corrupted.info');
+
+		await promises.mkdir(commitLanguagePackCachePath, { recursive: true });
+		await Promise.all([
+			promises.writeFile(languagePackMessagesFile, JSON.stringify(nlsResult), 'utf-8'),
+			promises.writeFile(translationsConfigFile, JSON.stringify(translations), 'utf-8'),
+		]);
+
+		mark('code/didGenerateNls');
+		return {
+			userLocale,
+			osLocale,
+			resolvedLanguage: 'zh-cn',
+			defaultMessagesFile: join(metadataRoot, 'nls.messages.json'),
+			languagePack: {
+				translationsConfigFile,
+				messagesFile: languagePackMessagesFile,
+				corruptMarkerFile: languagePackCorruptMarkerFile
+			},
+			locale: userLocale,
+			availableLanguages: { '*': 'zh-cn' },
+			_languagePackId: languagePackId,
+			_languagePackSupport: true,
+			_translationsConfigFile: translationsConfigFile,
+			_cacheRoot: globalLanguagePackCachePath,
+			_resolvedLanguagePackCoreLocation: commitLanguagePackCachePath,
+			_corruptedFile: languagePackCorruptMarkerFile
+		};
+	} catch (error) {
+		console.error('Generating embedded translation files failed.', error);
+		return undefined;
+	}
 }
 
 /**

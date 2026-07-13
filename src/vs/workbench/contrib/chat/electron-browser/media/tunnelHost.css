@@ -36,6 +36,22 @@
 	align-items: center;
 }
 
+.tunnel-host-toggle .tunnel-host-label {
+	display: none;
+	white-space: nowrap;
+	font-size: var(--vscode-agents-fontSize-label2, 11px);
+}
+
+.chat-session-settings-panel .monaco-action-bar .action-item.tunnel-host-toggle {
+	gap: 4px;
+	width: auto;
+	padding: 3px 6px;
+}
+
+.chat-session-settings-panel .tunnel-host-toggle .tunnel-host-label {
+	display: inline;
+}
+
 .tunnel-host-toggle.sharing .tunnel-host-icon .codicon {
 	color: var(--vscode-problemsWarningIcon-foreground) !important;
 }

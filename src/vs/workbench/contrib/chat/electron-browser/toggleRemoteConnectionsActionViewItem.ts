@@ -21,6 +21,7 @@ import { SHOW_TUNNEL_HOST_OUTPUT_ID } from './tunnelHostService.js';
 export class ToggleRemoteConnectionsActionViewItem extends BaseActionViewItem {
 
 	private _iconElement: HTMLElement | undefined;
+	private _labelElement: HTMLElement | undefined;
 	private _toastElement: HTMLElement | undefined;
 	private _hover: IManagedHover | undefined;
 	private _wasSharing = false;
@@ -52,6 +53,7 @@ export class ToggleRemoteConnectionsActionViewItem extends BaseActionViewItem {
 
 		this._iconElement = dom.append(this.element, dom.$('span.tunnel-host-icon'));
 		this._iconElement.append(...renderLabelWithIcons(`$(${Codicon.radioTower.id})`));
+		this._labelElement = dom.append(this.element, dom.$('span.tunnel-host-label'));
 
 		this._toastElement = dom.append(this.element, dom.$('span.tunnel-host-toast'));
 
@@ -76,6 +78,9 @@ export class ToggleRemoteConnectionsActionViewItem extends BaseActionViewItem {
 		this._hover?.update(this._getHoverContent());
 		this.element.setAttribute('aria-label', this._getAriaLabel());
 		this.element.setAttribute('aria-pressed', String(isSharing));
+		if (this._labelElement) {
+			this._labelElement.textContent = this._getAriaLabel();
+		}
 
 		if (isSharing && !this._wasSharing && !isConnecting) {
 			this._showToast();

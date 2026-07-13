@@ -6,11 +6,23 @@
 import assert from 'assert';
 import { join } from '../../../../../base/common/path.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
-import { codexBinaryTriple, codexPackageSuffix, resolveCodexDevSdkRoot } from '../../../node/codex/codexAgent.js';
+import { AgentHostCodexProxyModeEnvVar } from '../../../common/agentService.js';
+import { codexBinaryTriple, codexPackageSuffix, resolveCodexDevSdkRoot, usesExternalCodexProxy } from '../../../node/codex/codexAgent.js';
 
 suite('codex package paths', () => {
 
 	ensureNoDisposablesAreLeakedInTestSuite();
+
+	suite('usesExternalCodexProxy', () => {
+
+		test('only enables external routing for the explicit product mode', () => {
+			assert.deepStrictEqual([
+				usesExternalCodexProxy({}),
+				usesExternalCodexProxy({ [AgentHostCodexProxyModeEnvVar]: 'internal-copilot' }),
+				usesExternalCodexProxy({ [AgentHostCodexProxyModeEnvVar]: 'external-local-proxy' }),
+			], [false, false, true]);
+		});
+	});
 
 	suite('codexPackageSuffix', () => {
 

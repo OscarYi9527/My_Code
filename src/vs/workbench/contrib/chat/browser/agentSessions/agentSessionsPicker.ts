@@ -70,6 +70,8 @@ export function shouldShowSessionInPicker(session: IAgentSession, filter: IAgent
 
 export interface IAgentSessionsPickerOptions {
 	overrideSessionOpen?(session: IAgentSession, openOptions?: ISessionOpenOptions): Promise<void>;
+	readonly sessionTypes?: readonly string[];
+	readonly forceOpenInEditor?: boolean;
 }
 
 export class AgentSessionsPicker {
@@ -86,6 +88,9 @@ export class AgentSessionsPicker {
 	) { }
 
 	async pickAgentSession(): Promise<void> {
+		const sessionTypes = this.options?.sessionTypes;
+		await this.agentSessionsService.model.resolve(sessionTypes ? [...sessionTypes] : undefined);
+
 		const disposables = new DisposableStore();
 		const picker = disposables.add(this.quickInputService.createQuickPick<ISessionPickItem>({ useSeparators: true }));
 		const filter = disposables.add(this.instantiationService.createInstance(AgentSessionsFilter, {}));
@@ -99,7 +104,7 @@ export class AgentSessionsPicker {
 			const pick = picker.selectedItems[0];
 			if (pick) {
 				const openOptions: ISessionOpenOptions = {
-					sideBySide: e.inBackground,
+					sideBySide: this.options?.forceOpenInEditor || e.inBackground,
 					editorOptions: {
 						preserveFocus: e.inBackground,
 						pinned: e.inBackground
@@ -146,7 +151,9 @@ export class AgentSessionsPicker {
 	}
 
 	private createPickerItems(filter: AgentSessionsFilter): (ISessionPickItem | IQuickPickSeparator)[] {
+		const sessionTypes = this.options?.sessionTypes;
 		const sessions = this.agentSessionsService.model.sessions
+			.filter(session => !sessionTypes || sessionTypes.includes(session.providerType))
 			.filter(session => shouldShowSessionInPicker(session, filter))
 			.sort(this.sorter.compare.bind(this.sorter));
 		const items: (ISessionPickItem | IQuickPickSeparator)[] = [];

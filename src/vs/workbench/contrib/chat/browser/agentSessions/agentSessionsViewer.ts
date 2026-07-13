@@ -168,6 +168,7 @@ export interface IAgentSessionRendererOptions {
 	readonly disableHover?: boolean;
 	readonly hideSessionBadge?: boolean;
 	readonly useStatusOnlyIcons?: boolean;
+	readonly showCreatedTime?: boolean;
 	getHoverPosition(): HoverPosition;
 
 	isGroupedByRepository?(): boolean;
@@ -582,12 +583,14 @@ export class AgentSessionRenderer extends Disposable implements ICompressibleTre
 
 		const getStatusText = (session: IAgentSession) => {
 			let timeLabel: string | undefined;
-			if (session.status === AgentSessionStatus.InProgress && session.timing.lastRequestStarted) {
+			if (!this.options.showCreatedTime && session.status === AgentSessionStatus.InProgress && session.timing.lastRequestStarted) {
 				timeLabel = this.toDuration(session.timing.lastRequestStarted, Date.now(), false, false);
 			}
 
 			if (!timeLabel) {
-				const date = this.options.isSortedByUpdated?.()
+				const date = this.options.showCreatedTime
+					? session.timing.created
+					: this.options.isSortedByUpdated?.()
 					? session.timing.lastRequestEnded ?? session.timing.created
 					: session.timing.created;
 				const seconds = Math.round((new Date().getTime() - date) / 1000);
@@ -603,6 +606,9 @@ export class AgentSessionRenderer extends Disposable implements ICompressibleTre
 
 		// Time label
 		template.statusTime.textContent = getStatusText(session.element);
+		template.statusTime.title = this.options.showCreatedTime
+			? localize('agentSessionCreatedTime', "Created: {0}", new Date(session.element.timing.created).toLocaleString())
+			: '';
 		const timer = template.elementDisposable.add(new IntervalTimer());
 		timer.cancelAndSet(() => template.statusTime.textContent = getStatusText(session.element), session.element.status === AgentSessionStatus.InProgress ? 1000 /* every second */ : 60 * 1000 /* every minute */);
 

@@ -143,6 +143,22 @@ suite('AgentService (node dispatcher)', () => {
 			assert.throws(() => service.registerProvider(duplicate), /already registered/);
 		});
 
+		test('refreshes a provider model catalog and returns its new count', async () => {
+			const refreshable = copilotAgent as MockAgent & { refreshModels(): Promise<void> };
+			let refreshCalls = 0;
+			refreshable.refreshModels = async () => {
+				refreshCalls++;
+				refreshable.models.set([
+					{ provider: 'copilot', id: 'one', name: 'One', supportsVision: false },
+					{ provider: 'copilot', id: 'two', name: 'Two', supportsVision: false },
+				], undefined);
+			};
+			service.registerProvider(refreshable);
+
+			assert.strictEqual(await service.refreshModels('copilot'), 2);
+			assert.strictEqual(refreshCalls, 1);
+		});
+
 		test('maps progress events to protocol actions via onDidAction', async () => {
 			service.registerProvider(copilotAgent);
 			const session = await service.createSession({ provider: 'copilot' });

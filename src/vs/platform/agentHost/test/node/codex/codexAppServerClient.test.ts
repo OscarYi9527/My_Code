@@ -9,6 +9,7 @@ import { CancellationError } from '../../../../../base/common/errors.js';
 import { Emitter } from '../../../../../base/common/event.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import {
+	CodexAppServerRequestTimeoutError,
 	CodexAppServerClient,
 	JsonRpcError,
 	JsonRpcErrorCode,
@@ -169,10 +170,45 @@ suite('CodexAppServerClient', () => {
 		}
 	});
 
+	test('request deadline rejects and discards a late response', async () => {
+		const peer = makeFakePeer();
+		const logs: { level: string; message: string }[] = [];
+		const client = new CodexAppServerClient(peer.transport, (level, message) => {
+			if (level === 'warn') {
+				logs.push({ level, message });
+			}
+		});
+		try {
+			const responsePromise = client.request(
+				'getAuthStatus',
+				{ refreshToken: false, includeToken: false },
+				{ timeoutMs: 1 },
+			);
+			const sent = await readNextMessage(peer.outbound) as { id: number };
+			await assert.rejects(responsePromise, (err: unknown) => {
+				assert.ok(err instanceof CodexAppServerRequestTimeoutError);
+				assert.strictEqual(err.method, 'getAuthStatus');
+				assert.strictEqual(err.timeoutMs, 1);
+				return true;
+			});
+
+			peer.push({ id: sent.id, result: { authMode: 'apikey' } });
+			await new Promise(r => setImmediate(r));
+			assert.deepStrictEqual(logs, [{ level: 'warn', message: `unsolicited response id=${sent.id}` }]);
+		} finally {
+			client.dispose();
+			peer.dispose();
+		}
+	});
+
 	test('request response ids must match the numeric id exactly', async () => {
 		const peer = makeFakePeer();
 		const logs: { level: string; message: string }[] = [];
-		const client = new CodexAppServerClient(peer.transport, (level, message) => logs.push({ level, message }));
+		const client = new CodexAppServerClient(peer.transport, (level, message) => {
+			if (level === 'warn') {
+				logs.push({ level, message });
+			}
+		});
 		try {
 			const responsePromise = client.request<'getAuthStatus'>('getAuthStatus', { refreshToken: false, includeToken: false });
 			const sent = await readNextMessage(peer.outbound) as { id: number };
@@ -224,7 +260,11 @@ suite('CodexAppServerClient', () => {
 	test('unhandled server notification is dropped with a warning', async () => {
 		const peer = makeFakePeer();
 		const logs: { level: string; message: string }[] = [];
-		const client = new CodexAppServerClient(peer.transport, (level, message) => logs.push({ level, message }));
+		const client = new CodexAppServerClient(peer.transport, (level, message) => {
+			if (level === 'warn') {
+				logs.push({ level, message });
+			}
+		});
 		try {
 			let invoked = false;
 			const handle = client.onNotification('thread/started', () => { invoked = true; });

@@ -5,7 +5,9 @@
 
 import { localize } from '../../../../nls.js';
 import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
+import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
 import { IsMacNativeContext } from '../../../../platform/contextkey/common/contextkeys.js';
+import { AI_EDITOR_SIMPLE_MODE_CONTEXT } from '../../../services/aiEditorMode/common/aiEditorMode.js';
 
 MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 	submenu: MenuId.MenubarFileMenu,
@@ -14,6 +16,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'File',
 		mnemonicTitle: localize({ key: 'mFile', comment: ['&& denotes a mnemonic'] }, "&&File"),
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 1
 });
 
@@ -24,6 +27,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'Edit',
 		mnemonicTitle: localize({ key: 'mEdit', comment: ['&& denotes a mnemonic'] }, "&&Edit")
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 2
 });
 
@@ -34,6 +38,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'Selection',
 		mnemonicTitle: localize({ key: 'mSelection', comment: ['&& denotes a mnemonic'] }, "&&Selection")
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 3
 });
 
@@ -44,6 +49,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'View',
 		mnemonicTitle: localize({ key: 'mView', comment: ['&& denotes a mnemonic'] }, "&&View")
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 4
 });
 
@@ -54,6 +60,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'Go',
 		mnemonicTitle: localize({ key: 'mGoto', comment: ['&& denotes a mnemonic'] }, "&&Go")
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 5
 });
 
@@ -64,6 +71,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'Terminal',
 		mnemonicTitle: localize({ key: 'mTerminal', comment: ['&& denotes a mnemonic'] }, "&&Terminal")
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 7
 });
 
@@ -74,6 +82,7 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'Help',
 		mnemonicTitle: localize({ key: 'mHelp', comment: ['&& denotes a mnemonic'] }, "&&Help")
 	},
+	when: AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated(),
 	order: 8
 });
 
@@ -84,6 +93,6 @@ MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
 		original: 'Preferences',
 		mnemonicTitle: localize({ key: 'mPreferences', comment: ['&& denotes a mnemonic'] }, "&&Preferences")
 	},
-	when: IsMacNativeContext,
+	when: ContextKeyExpr.and(IsMacNativeContext, AI_EDITOR_SIMPLE_MODE_CONTEXT.toNegated()),
 	order: 9
 });

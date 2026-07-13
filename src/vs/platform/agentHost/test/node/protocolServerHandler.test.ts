@@ -138,6 +138,7 @@ class MockAgentService implements IAgentService {
 		this._stateManager.removeChat(session.toString(), chat.toString());
 	}
 	async listSessions(): Promise<IAgentSessionMetadata[]> { return this.listedSessions; }
+	async refreshModels(): Promise<number> { return 0; }
 	async subscribe(resource: URI, _clientId: string): Promise<IStateSnapshot> {
 		const snapshot = this._stateManager.getSnapshot(resource.toString());
 		if (!snapshot) {

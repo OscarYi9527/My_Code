@@ -225,11 +225,16 @@ export class AgentHostContribution extends Disposable implements IWorkbenchContr
 			name: agentId,
 			displayName: agent.displayName,
 			description: agent.description,
+			welcomeTitle: agent.provider === 'codex' ? localize('agentHostCodex.welcomeTitle', "Codex") : undefined,
+			welcomeMessage: agent.provider === 'codex'
+				? localize('agentHostCodex.welcomeMessage', "Use Codex in this workspace through your configured AI Proxy. AI responses may be inaccurate.")
+				: undefined,
+			inputPlaceholder: agent.provider === 'codex' ? localize('agentHostCodex.inputPlaceholder', "Chat with Codex") : undefined,
 			customAgentTarget: this._isSessionsWindow ? undefined : Target.GitHubCopilot,
 			canDelegate: true,
 			requiresCustomModels: true,
 			supportsAutoModel: agentHostProviderSupportsAutoModel(agent.provider),
-			requiresCopilotSignIn: true,
+			requiresCopilotSignIn: (agent.protectedResources ?? []).some(resource => resource.required !== false),
 			agentHostProviderId: agent.provider,
 			supportsDelegation: true,
 			capabilities: {

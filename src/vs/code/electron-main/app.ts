@@ -146,6 +146,8 @@ import { NativeWebContentExtractorService } from '../../platform/webContentExtra
 import { AgentNetworkFilterService, IAgentNetworkFilterService } from '../../platform/networkFilter/common/networkFilterService.js';
 import { ITerminalSandboxService, NullTerminalSandboxService } from '../../platform/sandbox/common/terminalSandboxService.js';
 import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetry.js';
+import { AI_EDITOR_PROXY_CHANNEL_NAME, IAiEditorProxyService } from '../../platform/aiEditorProxy/common/aiEditorProxy.js';
+import { AiEditorProxyMainService } from '../../platform/aiEditorProxy/electron-main/aiEditorProxyMainService.js';
 
 /**
  * The main VS Code application. There will only ever be one instance,
@@ -1132,6 +1134,9 @@ export class CodeApplication extends Disposable {
 		// Native Host
 		services.set(INativeHostMainService, new SyncDescriptor(NativeHostMainService, undefined, false /* proxied to other processes */));
 
+		// AI Editor Proxy
+		services.set(IAiEditorProxyService, new SyncDescriptor(AiEditorProxyMainService, undefined, false /* proxied to other processes */));
+
 		// Metered Connection
 		const meteredConnectionService = new MeteredConnectionMainService(this.configurationService);
 		services.set(IMeteredConnectionService, meteredConnectionService);
@@ -1328,6 +1333,10 @@ export class CodeApplication extends Disposable {
 		const nativeHostChannel = ProxyChannel.fromService(this.nativeHostMainService, disposables);
 		mainProcessElectronServer.registerChannel('nativeHost', nativeHostChannel);
 		sharedProcessClient.then(client => client.registerChannel('nativeHost', nativeHostChannel));
+
+		// AI Editor Proxy
+		const aiEditorProxyChannel = ProxyChannel.fromService(accessor.get(IAiEditorProxyService), disposables);
+		mainProcessElectronServer.registerChannel(AI_EDITOR_PROXY_CHANNEL_NAME, aiEditorProxyChannel);
 
 		// Web Content Extractor
 		const webContentExtractorChannel = ProxyChannel.fromService(accessor.get(IWebContentExtractorService), disposables);

@@ -122,11 +122,14 @@ registerListeners();
  */
 let nlsConfigurationPromise: Promise<INLSConfiguration> | undefined = undefined;
 
-// Use the most preferred OS language for language recommendation.
-// The API might return an empty array on Linux, such as when
-// the 'C' locale is the user's only configured locale.
-// No matter the OS, if the array is empty, default back to 'en'.
-const osLocale = processZhLocale((app.getPreferredSystemLanguages()?.[0] ?? 'en').toLowerCase());
+// Prefer the operating system's regional locale, then fall back to its
+// preferred UI language. On Windows these can differ: for example, the
+// system/region locale can be zh-CN while the preferred display-language
+// list starts with en-US. The product requirement is to follow the system
+// locale, and `Intl` reflects that regional setting on Windows and macOS.
+const regionalSystemLocale = Intl.DateTimeFormat().resolvedOptions().locale;
+const preferredSystemLocale = app.getPreferredSystemLanguages()?.[0];
+const osLocale = processZhLocale((regionalSystemLocale || preferredSystemLocale || 'en').toLowerCase());
 const userLocale = getUserDefinedLocale(argvConfig);
 if (userLocale) {
 	nlsConfigurationPromise = resolveNLSConfiguration({
@@ -147,7 +150,12 @@ if (userLocale) {
 // In that case, use `en` as the Electron locale.
 
 if (process.platform === 'win32' || process.platform === 'linux') {
-	const electronLocale = (!userLocale || userLocale === 'qps-ploc') ? 'en' : userLocale;
+	// Follow the operating-system language when the user has not selected an
+	// explicit locale. Falling back to English here caused `app.getLocale()`
+	// to report English after ready even when `getPreferredSystemLanguages()`
+	// had correctly detected Simplified Chinese, preventing the bundled
+	// language pack from being selected on first launch.
+	const electronLocale = userLocale === 'qps-ploc' ? 'en' : (userLocale ?? osLocale);
 	app.commandLine.appendSwitch('lang', electronLocale);
 }
 
@@ -693,8 +701,12 @@ async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 	// Try to use the app locale which is only valid
 	// after the app ready event has been fired.
 
-	let userLocale = app.getLocale();
-	if (!userLocale) {
+	// Prefer the explicit locale, then the first operating-system language
+	// captured before Electron startup. `app.getLocale()` can still report
+	// English on Windows even when the preferred system language list is
+	// Simplified Chinese, especially on a fresh profile.
+	let resolvedUserLocale = userLocale ?? osLocale ?? app.getLocale();
+	if (!resolvedUserLocale) {
 		return {
 			userLocale: 'en',
 			osLocale,
@@ -708,10 +720,10 @@ async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 	}
 
 	// See above the comment about the loader and case sensitiveness
-	userLocale = processZhLocale(userLocale.toLowerCase());
+	resolvedUserLocale = processZhLocale(resolvedUserLocale.toLowerCase());
 
 	return resolveNLSConfiguration({
-		userLocale,
+		userLocale: resolvedUserLocale,
 		osLocale,
 		commit: product.commit,
 		userDataPath,

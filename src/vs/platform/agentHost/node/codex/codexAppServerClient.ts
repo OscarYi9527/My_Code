@@ -67,6 +67,20 @@ export class JsonRpcError extends Error {
 	}
 }
 
+/**
+ * Error thrown when the app-server does not answer a request within the
+ * caller-provided deadline.
+ */
+export class CodexAppServerRequestTimeoutError extends Error {
+	constructor(
+		readonly method: string,
+		readonly timeoutMs: number,
+	) {
+		super(`Codex app-server request ${method} timed out after ${timeoutMs} ms`);
+		this.name = 'CodexAppServerRequestTimeoutError';
+	}
+}
+
 // #region Typed method projections
 //
 // Extract `<method>` → `params` / `result` for each direction. The
@@ -148,6 +162,7 @@ export interface ICodexAppServerClient extends IDisposable {
 	request<M extends ClientRequestMethod, R = unknown>(
 		method: M,
 		params: ClientRequestParams<M>,
+		options?: { readonly timeoutMs?: number },
 	): Promise<R>;
 
 	/**
@@ -189,6 +204,7 @@ interface IPendingRequest {
 	resolve(value: unknown): void;
 	reject(reason: unknown): void;
 	readonly method: string;
+	readonly timeout: ReturnType<typeof setTimeout> | undefined;
 }
 
 const GRACE_KILL_MS = 2_000;
@@ -263,6 +279,10 @@ export class CodexAppServerClient extends Disposable implements ICodexAppServerC
 				return;
 			}
 			this._pending.delete(id);
+			if (pending.timeout !== undefined) {
+				clearTimeout(pending.timeout);
+			}
+			this._log('info', `response id=${id} method=${pending.method}`);
 			if (hasKey(msg, { error: true }) && msg.error) {
 				pending.reject(new JsonRpcError(msg.error.code, msg.error.message, msg.error.data));
 			} else {
@@ -351,6 +371,9 @@ export class CodexAppServerClient extends Disposable implements ICodexAppServerC
 		this._exited = true;
 		const reason = `codex app-server exited (code=${e.code}, signal=${e.signal})`;
 		for (const [id, pending] of this._pending) {
+			if (pending.timeout !== undefined) {
+				clearTimeout(pending.timeout);
+			}
 			pending.reject(new JsonRpcError(JsonRpcErrorCode.InternalError, `${reason}; request id=${id} (${pending.method}) aborted`));
 		}
 		this._pending.clear();
@@ -360,6 +383,7 @@ export class CodexAppServerClient extends Disposable implements ICodexAppServerC
 	request<M extends ClientRequestMethod, R = unknown>(
 		method: M,
 		params: ClientRequestParams<M>,
+		options?: { readonly timeoutMs?: number },
 	): Promise<R> {
 		if (this._disposed) {
 			return Promise.reject(new CancellationError());
@@ -369,11 +393,24 @@ export class CodexAppServerClient extends Disposable implements ICodexAppServerC
 		}
 		const id = this._nextId++;
 		return new Promise<R>((resolve, reject) => {
-			this._pending.set(id, { method, resolve: resolve as (v: unknown) => void, reject });
+			const timeoutMs = options?.timeoutMs;
+			const timeout = timeoutMs === undefined ? undefined : setTimeout(() => {
+				if (!this._pending.delete(id)) {
+					return;
+				}
+				this._log('error', `timeout id=${id} method=${method} after=${timeoutMs}ms`);
+				reject(new CodexAppServerRequestTimeoutError(method, timeoutMs));
+			}, timeoutMs);
+			this._pending.set(id, { method, resolve: resolve as (v: unknown) => void, reject, timeout });
 			const ok = this._writeMessage({ id, method, params });
 			if (!ok) {
 				this._pending.delete(id);
+				if (timeout !== undefined) {
+					clearTimeout(timeout);
+				}
 				reject(new JsonRpcError(JsonRpcErrorCode.InternalError, 'write failed; transport closed'));
+			} else {
+				this._log('info', `request id=${id} method=${method}`);
 			}
 		});
 	}
@@ -425,6 +462,9 @@ export class CodexAppServerClient extends Disposable implements ICodexAppServerC
 		this._disposed = true;
 		// Reject anything still pending so callers don't hang.
 		for (const pending of this._pending.values()) {
+			if (pending.timeout !== undefined) {
+				clearTimeout(pending.timeout);
+			}
 			pending.reject(new CancellationError());
 		}
 		this._pending.clear();

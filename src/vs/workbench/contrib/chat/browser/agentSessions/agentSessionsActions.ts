@@ -14,9 +14,9 @@ import { IChatSessionsService } from '../../common/chatSessionsService.js';
 import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { ChatContextKeyExprs, ChatContextKeys } from '../../common/actions/chatContextKeys.js';
 import { LocalChatSessionUri } from '../../common/model/chatUri.js';
-import { IChatEditorOptions } from '../widgetHosts/editor/chatEditor.js';
+import { ChatEditor, IChatEditorOptions } from '../widgetHosts/editor/chatEditor.js';
 import { ChatViewId, IChatWidgetService } from '../chat.js';
-import { ACTIVE_GROUP, AUX_WINDOW_GROUP, PreferredGroup, SIDE_GROUP } from '../../../../services/editor/common/editorService.js';
+import { ACTIVE_GROUP, AUX_WINDOW_GROUP, IEditorService, PreferredGroup, SIDE_GROUP } from '../../../../services/editor/common/editorService.js';
 import { IViewDescriptorService, ViewContainerLocation } from '../../../../common/views.js';
 import { IWorkbenchLayoutService, Position } from '../../../../services/layout/browser/layoutService.js';
 import { IAgentSessionsService } from './agentSessionsService.js';
@@ -141,19 +141,42 @@ export class PickAgentSessionAction extends Action2 {
 				{
 					id: MenuId.EditorTitle,
 					when: ActiveEditorContext.isEqualTo(ChatEditorInput.EditorID),
+					group: 'navigation',
+					order: 0
 				}
 			],
 			category: AGENT_SESSIONS_CATEGORY,
 			icon: Codicon.history,
 			f1: true,
-			precondition: ChatContextKeys.enabled
+			precondition: ContextKeyExpr.or(
+				ChatContextKeys.enabled,
+				ActiveEditorContext.isEqualTo(ChatEditorInput.EditorID)
+			)
 		});
 	}
 
 	async run(accessor: ServicesAccessor): Promise<void> {
 		const instantiationService = accessor.get(IInstantiationService);
+		const editorService = accessor.get(IEditorService);
+		const activeEditor = editorService.activeEditor;
+		const activeEditorPane = editorService.activeEditorPane;
+		if (
+			activeEditor instanceof ChatEditorInput &&
+			activeEditor.getSessionType() === AgentSessionProviders.AgentHostCodex &&
+			activeEditorPane instanceof ChatEditor
+		) {
+			await activeEditorPane.toggleTaskHistory();
+			return;
+		}
 
-		const agentSessionsPicker = instantiationService.createInstance(AgentSessionsPicker, undefined, undefined);
+		const sessionTypes = activeEditor instanceof ChatEditorInput && activeEditor.getSessionType() === AgentSessionProviders.AgentHostCodex
+			? [AgentSessionProviders.AgentHostCodex]
+			: undefined;
+
+		const agentSessionsPicker = instantiationService.createInstance(AgentSessionsPicker, undefined, {
+			sessionTypes,
+			forceOpenInEditor: activeEditor instanceof ChatEditorInput
+		});
 		await agentSessionsPicker.pickAgentSession();
 	}
 }

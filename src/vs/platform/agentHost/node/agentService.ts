@@ -549,6 +549,18 @@ export class AgentService extends Disposable implements IAgentService {
 		return combined;
 	}
 
+	async refreshModels(providerId: AgentProvider): Promise<number> {
+		const provider = this._providers.get(providerId);
+		if (!provider) {
+			throw new Error(`No agent provider registered for: ${providerId}`);
+		}
+		if (!provider.refreshModels) {
+			throw new Error(`Agent provider does not support refreshing models: ${providerId}`);
+		}
+		await provider.refreshModels();
+		return provider.models.get().length;
+	}
+
 	async createSession(config?: IAgentCreateSessionConfig): Promise<URI> {
 		const providerId = config?.provider ?? this._defaultProvider;
 		const provider = providerId ? this._providers.get(providerId) : undefined;

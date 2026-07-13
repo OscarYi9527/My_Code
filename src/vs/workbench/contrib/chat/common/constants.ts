@@ -259,7 +259,7 @@ export function getDefaultNewChatSessionType(
 ): string {
 	const defaultProvider = configurationService.getValue<string>(ChatConfiguration.EditorDefaultProvider);
 	const defaultType = getConfiguredEditorDefaultSessionType(defaultProvider);
-	if (defaultType === SessionType.AgentHostCopilot && !isEditorLocalAgentEnabled(configurationService)) {
+	if ((defaultType === SessionType.AgentHostCopilot || defaultType === SessionType.AgentHostCodex) && !isEditorLocalAgentEnabled(configurationService)) {
 		return defaultType;
 	}
 
@@ -342,7 +342,8 @@ export function isVisibleEditorChatSessionType(
 	chatSessionsService: Pick<IChatSessionsService, 'getChatSessionContribution' | 'getAllChatSessionContributions'>
 ): boolean {
 	if (sessionType === localChatSessionType) {
-		if (!isEditorLocalAgentEnabled(configurationService) && configurationService.getValue<string>(ChatConfiguration.EditorDefaultProvider) === 'copilotAh') {
+		const defaultProvider = configurationService.getValue<string>(ChatConfiguration.EditorDefaultProvider);
+		if (!isEditorLocalAgentEnabled(configurationService) && (defaultProvider === 'copilotAh' || defaultProvider === 'codex')) {
 			return false;
 		}
 		return isEditorLocalAgentEnabled(configurationService) || getVisibleNonLocalEditorChatSessionTypes(configurationService, chatSessionsService).length === 0;
@@ -357,6 +358,8 @@ export function isVisibleEditorChatSessionType(
 
 function getConfiguredEditorDefaultSessionType(defaultProvider: string | undefined): string | undefined {
 	switch (defaultProvider) {
+		case 'codex':
+			return SessionType.AgentHostCodex;
 		case 'local':
 			return localChatSessionType;
 		case 'copilotAh':

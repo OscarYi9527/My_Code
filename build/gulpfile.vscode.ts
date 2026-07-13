@@ -342,7 +342,15 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 			.pipe(util.cleanNodeModules(path.join(import.meta.dirname, `.moduleignore.${process.platform}`)));
 		ensureCopilotPlatformPackage(platform, arch);
 		const copilotRuntimePrebuilds = gulp.src(getCopilotRuntimePrebuildFiles(platform, arch), { base: '.', dot: true, allowEmpty: true });
-		const deps = es.merge(cleanedDeps, copilotRuntimePrebuilds)
+		// Codex Agent Host is a product feature, not a development-only
+		// dependency. Ship the JS launcher plus only the current target's
+		// native package so local distributions do not rely on the release
+		// CDN agent-SDK pipeline.
+		const codexRuntime = gulp.src([
+			'node_modules/@openai/codex/**',
+			`node_modules/@openai/codex-${platform}-${arch}/**`,
+		], { base: '.', dot: true });
+		const deps = es.merge(cleanedDeps, copilotRuntimePrebuilds, codexRuntime)
 			.pipe(filter(getCopilotExcludeFilter(platform, arch)))
 			.pipe(filter(getCopilotTgrepExcludeFilter(platform, arch)))
 			.pipe(filter(getRipgrepExcludeFilter(platform, arch)))
@@ -353,6 +361,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 				'**/*.node',
 				'**/@vscode/ripgrep-universal/bin/**',
 				'**/@github/copilot-*/**',
+				'**/@openai/codex*/**',
 				'**/node-pty/build/Release/*',
 				'**/node-pty/build/Release/conpty/*',
 				'**/node-pty/lib/worker/conoutSocketWorker.js',
@@ -615,6 +624,11 @@ function prepareCopilotRipgrepShimTask(platform: string, arch: string, destinati
 		const appNodeModulesDir = path.join(appBase, 'node_modules');
 
 		const builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');
+		if (!fs.existsSync(path.join(builtInCopilotExtensionDir, 'package.json'))) {
+			// Codex-only distributions intentionally omit the Copilot
+			// extension, so there is no Copilot SDK shim to materialize.
+			return;
+		}
 		prepareBuiltInCopilotRipgrepShim(platform, arch, builtInCopilotExtensionDir, appNodeModulesDir);
 	};
 }

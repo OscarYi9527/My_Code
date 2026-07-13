@@ -215,10 +215,10 @@ export function claudePreferAgentHostSettingId(isSessionsWindow: boolean): strin
  * should unconditionally return `true` and callers can drop the gate entirely.
  */
 export function shouldSurfaceLocalAgentHostProvider(provider: AgentProvider, configurationService: IConfigurationService, isSessionsWindow: boolean): boolean {
-	if (provider !== 'claude') {
-		return true;
+	if (provider !== 'codex') {
+		return false;
 	}
-	return configurationService.getValue<boolean>(claudePreferAgentHostSettingId(isSessionsWindow)) === true;
+	return true;
 }
 
 // -- Codex agent settings --------------------------------------------------------
@@ -265,6 +265,12 @@ export const AgentHostCodexAgentCodexHomeEnvVar = 'CODEX_HOME';
 
 /** Forwarded extra args for `codex app-server` (JSON-encoded string[]). */
 export const AgentHostCodexAgentBinaryArgsEnvVar = 'VSCODE_AGENT_HOST_CODEX_APP_SERVER_ARGS';
+
+/** Selects the Codex model routing implementation used by the agent host. */
+export const AgentHostCodexProxyModeEnvVar = 'VSCODE_AGENT_HOST_CODEX_PROXY_MODE';
+
+/** Base URL of the product-managed local multi-upstream Proxy. */
+export const AgentHostCodexProxyBaseUrlEnvVar = 'VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL';
 
 // -- OpenTelemetry settings ------------------------------------------------------
 //
@@ -537,6 +543,8 @@ export interface IAgentSdkStarterSettings {
 	readonly codexBinaryArgs?: readonly string[];
 	readonly claudeAgentEnabled?: boolean;
 	readonly codexAgentEnabled?: boolean;
+	readonly codexProxyMode?: 'internal-copilot' | 'external-local-proxy';
+	readonly codexProxyBaseUrl?: string;
 }
 
 export function buildAgentSdkEnv(
@@ -561,6 +569,8 @@ export function buildAgentSdkEnv(
 	if (settings.codexAgentEnabled !== undefined) {
 		setIfMissing(AgentHostCodexAgentEnabledEnvVar, settings.codexAgentEnabled ? 'true' : 'false');
 	}
+	setIfMissing(AgentHostCodexProxyModeEnvVar, settings.codexProxyMode);
+	setIfMissing(AgentHostCodexProxyBaseUrlEnvVar, settings.codexProxyBaseUrl);
 	return out;
 }
 
@@ -1183,6 +1193,12 @@ export interface IAgent {
 	/** List persisted sessions from this provider. */
 	listSessions(): Promise<IAgentSessionMetadata[]>;
 
+	/**
+	 * Refresh the provider-owned model catalog.
+	 * Optional because not every provider has an external, refreshable catalog.
+	 */
+	refreshModels?(): Promise<void>;
+
 	/** Retrieve metadata for a single persisted session, without enumerating the provider catalog. */
 	getSessionMetadata?(session: URI): Promise<IAgentSessionMetadata | undefined>;
 
@@ -1339,6 +1355,9 @@ export interface IAgentService {
 
 	/** List all available sessions from the Copilot CLI. */
 	listSessions(): Promise<IAgentSessionMetadata[]>;
+
+	/** Refresh one provider's model catalog and return the resulting model count. */
+	refreshModels(provider: AgentProvider): Promise<number>;
 
 	/** Create a new session. Returns the session URI. */
 	createSession(config?: IAgentCreateSessionConfig): Promise<URI>;
@@ -1625,6 +1644,7 @@ export interface IAgentConnection {
 	// ---- Session lifecycle --------------------------------------------------
 	authenticate(params: AuthenticateParams): Promise<AuthenticateResult>;
 	listSessions(): Promise<IAgentSessionMetadata[]>;
+	refreshModels(provider: AgentProvider): Promise<number>;
 	createSession(config?: IAgentCreateSessionConfig): Promise<URI>;
 	resolveSessionConfig(params: IAgentResolveSessionConfigParams): Promise<ResolveSessionConfigResult>;
 	sessionConfigCompletions(params: IAgentSessionConfigCompletionsParams): Promise<SessionConfigCompletionsResult>;

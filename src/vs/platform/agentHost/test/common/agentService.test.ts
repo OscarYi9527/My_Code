@@ -7,7 +7,7 @@ import assert from 'assert';
 import { URI } from '../../../../base/common/uri.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import { IConfigurationService } from '../../../configuration/common/configuration.js';
-import { AgentSession, AgentHostOTelEnvVars, buildAgentHostOTelEnv, isAgentEnabled, readAgentHostOTelPolicySettings, sanitizeAgentHostOTelPolicySettings } from '../../common/agentService.js';
+import { AgentHostCodexProxyBaseUrlEnvVar, AgentHostCodexProxyModeEnvVar, AgentSession, AgentHostOTelEnvVars, buildAgentHostOTelEnv, buildAgentSdkEnv, isAgentEnabled, readAgentHostOTelPolicySettings, sanitizeAgentHostOTelPolicySettings } from '../../common/agentService.js';
 
 suite('AgentSession namespace', () => {
 
@@ -66,6 +66,30 @@ suite('isAgentEnabled', () => {
 			assert.strictEqual(isAgentEnabled(envValue, defaultEnabled), expected);
 		});
 	}
+});
+
+suite('buildAgentSdkEnv', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('forwards external Codex Proxy routing without overwriting inherited values', () => {
+		assert.deepStrictEqual(buildAgentSdkEnv({
+			codexProxyMode: 'external-local-proxy',
+			codexProxyBaseUrl: 'http://127.0.0.1:47892',
+		}, {}), {
+			[AgentHostCodexProxyModeEnvVar]: 'external-local-proxy',
+			[AgentHostCodexProxyBaseUrlEnvVar]: 'http://127.0.0.1:47892',
+		});
+
+		assert.deepStrictEqual(buildAgentSdkEnv({
+			codexProxyMode: 'external-local-proxy',
+			codexProxyBaseUrl: 'http://127.0.0.1:47892',
+		}, {
+			[AgentHostCodexProxyBaseUrlEnvVar]: 'http://localhost:5000',
+		}), {
+			[AgentHostCodexProxyModeEnvVar]: 'external-local-proxy',
+		});
+	});
 });
 
 suite('buildAgentHostOTelEnv', () => {

@@ -19,7 +19,7 @@ import { IProductService } from '../../../product/common/productService.js';
 import { createSchema, platformSessionSchema, schemaProperty, type SessionMode } from '../../common/agentHostSchema.js';
 import { createPricingMetaFromBilling, type ICAPIModelBilling } from '../../common/agentModelPricing.js';
 import { getReasoningEffortDescription, getReasoningEffortLabel } from '../../common/reasoningEffort.js';
-import { AgentHostCodexAgentBinaryArgsEnvVar, AgentHostCodexAgentCodexHomeEnvVar, AgentHostCodexAgentSdkRootEnvVar, AgentSession, AgentSignal, GITHUB_COPILOT_PROTECTED_RESOURCE, GITHUB_REPO_PROTECTED_RESOURCE, IActiveClient, IAgent, IAgentCreateSessionConfig, IAgentCreateSessionResult, IAgentDescriptor, IAgentMaterializeSessionEvent, IAgentModelInfo, IAgentResolveSessionConfigParams, IAgentSessionConfigCompletionsParams, IAgentSessionMetadata, IMcpNotification, type AgentProvider } from '../../common/agentService.js';
+import { AgentHostCodexAgentBinaryArgsEnvVar, AgentHostCodexAgentCodexHomeEnvVar, AgentHostCodexAgentSdkRootEnvVar, AgentHostCodexProxyBaseUrlEnvVar, AgentHostCodexProxyModeEnvVar, AgentSession, AgentSignal, GITHUB_COPILOT_PROTECTED_RESOURCE, GITHUB_REPO_PROTECTED_RESOURCE, IActiveClient, IAgent, IAgentCreateSessionConfig, IAgentCreateSessionResult, IAgentDescriptor, IAgentMaterializeSessionEvent, IAgentModelInfo, IAgentResolveSessionConfigParams, IAgentSessionConfigCompletionsParams, IAgentSessionMetadata, IMcpNotification, type AgentProvider } from '../../common/agentService.js';
 import { SessionConfigKey } from '../../common/sessionConfigKeys.js';
 import { AHP_AUTH_REQUIRED, ProtocolError } from '../../common/state/sessionProtocol.js';
 import { ActionType, isChatAction, type SessionAction, type ChatAction } from '../../common/state/sessionActions.js';
@@ -92,6 +92,23 @@ const CLIENT_INFO = {
 	// changes.
 	version: '0.1.0',
 };
+
+const CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS = 30_000;
+const CODEX_LOOPBACK_NO_PROXY_HOSTS = ['127.0.0.1', 'localhost', '::1'] as const;
+
+function withLoopbackNoProxy(value: string | undefined): string {
+	const entries = (value ?? '')
+		.split(',')
+		.map(entry => entry.trim())
+		.filter(entry => entry.length > 0);
+	const normalized = new Set(entries.map(entry => entry.toLowerCase()));
+	for (const host of CODEX_LOOPBACK_NO_PROXY_HOSTS) {
+		if (!normalized.has(host)) {
+			entries.push(host);
+		}
+	}
+	return entries.join(',');
+}
 
 const CODEX_THINKING_LEVEL_KEY = 'thinkingLevel';
 
@@ -589,11 +606,17 @@ export class CodexAgent extends Disposable implements IAgent {
 	) {
 		super();
 		this._metadataStore = instantiationService.createInstance(CodexSessionMetadataStore);
+		if (this._usesExternalProxy()) {
+			this._queueExternalModelRefresh();
+		}
 	}
 
 	// #region Auth
 
 	getProtectedResources(): ProtectedResourceMetadata[] {
+		if (this._usesExternalProxy()) {
+			return [];
+		}
 		return [
 			GITHUB_COPILOT_PROTECTED_RESOURCE,
 			GITHUB_REPO_PROTECTED_RESOURCE
@@ -633,6 +656,9 @@ export class CodexAgent extends Disposable implements IAgent {
 	}
 
 	private _ensureAuthenticated(): string {
+		if (this._usesExternalProxy()) {
+			return '';
+		}
 		const token = this._githubToken;
 		if (!token) {
 			throw new ProtocolError(
@@ -803,6 +829,74 @@ export class CodexAgent extends Disposable implements IAgent {
 		}
 	}
 
+	private _queueExternalModelRefresh(): void {
+		void this.refreshModels().catch(err => {
+			this._logService.warn(`[Codex] Failed to refresh external Proxy models: ${err instanceof Error ? err.message : String(err)}`);
+		});
+	}
+
+	/**
+	 * Refresh the model catalog without restarting the shared external Proxy.
+	 * Concurrent callers share one request so editor restoration and activation
+	 * cannot produce duplicate `/v1/models` fetches.
+	 */
+	async refreshModels(): Promise<void> {
+		if (this._modelsRefreshPromise) {
+			return this._modelsRefreshPromise;
+		}
+
+		const refreshPromise = (this._usesExternalProxy()
+			? this._refreshExternalModels()
+			: this._refreshModels(this._ensureAuthenticated()))
+			.finally(() => {
+				if (this._modelsRefreshPromise === refreshPromise) {
+					this._modelsRefreshPromise = undefined;
+				}
+			});
+		this._modelsRefreshPromise = refreshPromise;
+		return refreshPromise;
+	}
+
+	private async _refreshExternalModels(): Promise<void> {
+		const baseUrl = this._externalProxyBaseUrl();
+		const response = await fetch(`${baseUrl}/v1/models`, { headers: { 'User-Agent': `${USER_AGENT_PREFIX}/${this._productService.version}` } });
+		if (!response.ok) {
+			throw new Error(`Proxy model catalog request failed with HTTP ${response.status}`);
+		}
+		const catalog = await response.json() as {
+			readonly models?: readonly {
+				readonly slug?: string;
+				readonly display_name?: string;
+				readonly context_window?: number;
+				readonly input_modalities?: readonly string[];
+			}[];
+			readonly data?: readonly { readonly id?: string }[];
+		};
+		const configSchema = this._createReasoningEffortConfigSchema();
+		const richModels = Array.isArray(catalog.models) ? catalog.models : [];
+		const models: IAgentModelInfo[] = richModels.length > 0
+			? richModels
+				.filter(model => typeof model.slug === 'string' && model.slug.length > 0)
+				.map((model): IAgentModelInfo => ({
+					provider: this.id,
+					id: model.slug!,
+					name: model.display_name ?? model.slug!,
+					maxContextWindow: model.context_window,
+					supportsVision: model.input_modalities?.includes('image') === true,
+					configSchema,
+				}))
+			: (Array.isArray(catalog.data) ? catalog.data : [])
+				.filter(model => typeof model.id === 'string' && model.id.length > 0)
+				.map((model): IAgentModelInfo => ({
+					provider: this.id,
+					id: model.id!,
+					name: model.id!,
+					supportsVision: false,
+					configSchema,
+				}));
+		this._models.set(models, undefined);
+	}
+
 	// #endregion
 
 	// #region Connection lifecycle
@@ -820,6 +914,9 @@ export class CodexAgent extends Disposable implements IAgent {
 			return this._connection.promise;
 		}
 		const token = this._ensureAuthenticated();
+		if (this._usesExternalProxy() && this._models.get().length === 0 && !this._modelsRefreshPromise) {
+			this._queueExternalModelRefresh();
+		}
 		const promise = this._startConnection(token).then(ready => {
 			this._connection = { kind: 'ready', ...ready };
 			return ready;
@@ -852,10 +949,10 @@ export class CodexAgent extends Disposable implements IAgent {
 		if (this._agentSdkDownloader.isAvailable(CodexSdkPackage)) {
 			return this._agentSdkDownloader.loadSdkRoot(CodexSdkPackage, CancellationToken.None);
 		}
-		const devRoot = await resolveCodexDevSdkRoot();
-		if (devRoot) {
-			this._logService.info(`[Codex] resolving SDK from repo node_modules (dev fallback): ${devRoot}`);
-			return devRoot;
+		const bundledRoot = await resolveCodexDevSdkRoot();
+		if (bundledRoot) {
+			this._logService.info(`[Codex] resolving SDK from bundled node_modules: ${bundledRoot}`);
+			return bundledRoot;
 		}
 		return this._agentSdkDownloader.loadSdkRoot(CodexSdkPackage, CancellationToken.None);
 	}
@@ -886,17 +983,39 @@ export class CodexAgent extends Disposable implements IAgent {
 			throw new Error(`Codex binary not executable: ${binaryPath} (${err instanceof Error ? err.message : String(err)})`);
 		}
 
-		const proxyHandle = await this._codexProxyService.start(token);
+		const externalProxy = this._usesExternalProxy();
+		const proxyHandle: ICodexProxyHandle = externalProxy
+			? {
+				baseUrl: this._externalProxyBaseUrl(),
+				nonce: '',
+				setToken: () => { },
+				dispose: () => { },
+			}
+			: await this._codexProxyService.start(token);
 
 		// Build child env: inherit, override OPENAI_API_KEY so the proxy's
 		// nonce check passes. The proxy provider is plumbed via `-c` CLI
 		// overrides below; we deliberately do NOT write a config.toml,
 		// which would force a managed CODEX_HOME and trip codex's
 		// "refusing to write helper binaries under TMPDIR" warning.
-		const env: NodeJS.ProcessEnv = {
-			...process.env,
-			OPENAI_API_KEY: proxyHandle.nonce,
-		};
+		const env: NodeJS.ProcessEnv = { ...process.env };
+		// The Rust HTTP client respects the Windows system proxy even for
+		// loopback URLs. Explicitly bypass it so a machine-level proxy (for
+		// example 127.0.0.1:7890) cannot intercept the product's local AI
+		// Proxy connection. Preserve any enterprise/user exclusions.
+		const noProxy = withLoopbackNoProxy(env.NO_PROXY ?? env.no_proxy);
+		env.NO_PROXY = noProxy;
+		env.no_proxy = noProxy;
+		// A development Code window may itself be launched from Codex Desktop.
+		// Do not leak the parent Codex turn/session identity into the product's
+		// independent app-server.
+		delete env.CODEX_THREAD_ID;
+		delete env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE;
+		delete env.CODEX_CI;
+		delete env.CODEX_SHELL;
+		if (!externalProxy) {
+			env.OPENAI_API_KEY = proxyHandle.nonce;
+		}
 		const userCodexHome = process.env[AgentHostCodexAgentCodexHomeEnvVar];
 		if (userCodexHome) {
 			env.CODEX_HOME = userCodexHome;
@@ -906,14 +1025,15 @@ export class CodexAgent extends Disposable implements IAgent {
 		// local proxy with WebSocket transport disabled. Using `-c`
 		// overrides composes with the user's ~/.codex/config.toml — their
 		// other settings (model, MCP servers, etc.) still apply.
+		const providerName = externalProxy ? 'local_multi_proxy' : 'vscode-proxy';
 		const providerOverrides = [
-			`model_provider="vscode-proxy"`,
-			`model_providers.vscode-proxy.name="VS Code Proxy"`,
-			`model_providers.vscode-proxy.base_url="${proxyHandle.baseUrl}/v1"`,
-			`model_providers.vscode-proxy.wire_api="responses"`,
-			`model_providers.vscode-proxy.env_key="OPENAI_API_KEY"`,
-			`model_providers.vscode-proxy.requires_openai_auth=false`,
-			`model_providers.vscode-proxy.supports_websockets=false`,
+			`model_provider="${providerName}"`,
+			`model_providers.${providerName}.name="${externalProxy ? 'Local Multi-Upstream Proxy' : 'VS Code Proxy'}"`,
+			`model_providers.${providerName}.base_url="${proxyHandle.baseUrl}/v1"`,
+			`model_providers.${providerName}.wire_api="responses"`,
+			...(!externalProxy ? [`model_providers.${providerName}.env_key="OPENAI_API_KEY"`] : []),
+			`model_providers.${providerName}.requires_openai_auth=false`,
+			`model_providers.${providerName}.supports_websockets=false`,
 			// Route MCP tool-call approvals through codex's `request_user_input`
 			// path (a proper Allow / Allow-and-remember / Cancel options
 			// question the agent host already renders) instead of the
@@ -962,7 +1082,7 @@ export class CodexAgent extends Disposable implements IAgent {
 			// With `requires_openai_auth = false` on the proxy provider,
 			// codex does not require a separate login step — the proxy
 			// nonce is read from OPENAI_API_KEY by the provider's env_key.
-			if (userCodexHome) {
+			if (userCodexHome && !externalProxy) {
 				// User-provided CODEX_HOME may target a provider that
 				// still requires auth; preserve the apiKey login path.
 				await client.request<'account/login/start'>('account/login/start', {
@@ -1052,6 +1172,18 @@ export class CodexAgent extends Disposable implements IAgent {
 		void this._refreshMcpInventory(client);
 
 		return { client, proxyHandle, child };
+	}
+
+	private _usesExternalProxy(): boolean {
+		return usesExternalCodexProxy(process.env);
+	}
+
+	private _externalProxyBaseUrl(): string {
+		const value = process.env[AgentHostCodexProxyBaseUrlEnvVar]?.replace(/\/+$/, '');
+		if (!value) {
+			throw new Error('Codex external Proxy mode requires a Proxy base URL.');
+		}
+		return value;
 	}
 
 	/**
@@ -1643,7 +1775,14 @@ export class CodexAgent extends Disposable implements IAgent {
 			mcpController: undefined,
 		};
 		this._sessions.set(sessionId, session);
-		this._schedulePrewarm(session);
+		// External Proxy sessions are intentionally materialized by the first
+		// user turn. Eager prewarm can otherwise leave a background
+		// `thread/start` pending indefinitely and make the first real send reuse
+		// that stuck promise. The first materialization is local app-server work;
+		// it does not add a model round trip.
+		if (!this._usesExternalProxy()) {
+			this._schedulePrewarm(session);
+		}
 		return {
 			session: sessionUri,
 			workingDirectory: config.workingDirectory,
@@ -1657,6 +1796,7 @@ export class CodexAgent extends Disposable implements IAgent {
 	 * `sendMessage` before the first `turn/start`.
 	 */
 	private async _materializeIfNeeded(session: ICodexSession, fireMaterializedEvent = true): Promise<void> {
+		this._logService.info(`[Codex:${session.sessionId}] materialize check thread=${session.threadId ?? 'none'} pending=${session.materializePromise !== undefined} disposed=${session.disposed}`);
 		if (session.disposed) {
 			return;
 		}
@@ -1667,6 +1807,7 @@ export class CodexAgent extends Disposable implements IAgent {
 			return;
 		}
 		if (session.materializePromise) {
+			this._logService.info(`[Codex:${session.sessionId}] awaiting existing materialize`);
 			await session.materializePromise;
 			if (fireMaterializedEvent) {
 				this._fireMaterialized(session);
@@ -1674,8 +1815,10 @@ export class CodexAgent extends Disposable implements IAgent {
 			return;
 		}
 		session.materializePromise = this._materialize(session).finally(() => {
+			this._logService.info(`[Codex:${session.sessionId}] materialize promise settled`);
 			session.materializePromise = undefined;
 		});
+		this._logService.info(`[Codex:${session.sessionId}] awaiting new materialize`);
 		await session.materializePromise;
 		if (fireMaterializedEvent) {
 			this._fireMaterialized(session);
@@ -1690,8 +1833,11 @@ export class CodexAgent extends Disposable implements IAgent {
 			throw new Error(`Cannot materialize codex session ${session.sessionId}: no working directory`);
 		}
 		const conn = await this._ensureConnection();
+		this._logService.info(`[Codex:${session.sessionId}] materialize connection ready`);
 		const config = this._readSessionConfig(session);
+		this._logService.info(`[Codex:${session.sessionId}] resolving materialize model`);
 		const model = await this._resolveModel(session);
+		this._logService.info(`[Codex:${session.sessionId}] sending thread/start model=${model.id}`);
 		const startResult = await conn.client.request<'thread/start', { thread: { id: string } }>('thread/start', {
 			cwd: session.workingDirectory.fsPath,
 			model: model.id,
@@ -1701,7 +1847,8 @@ export class CodexAgent extends Disposable implements IAgent {
 				web_search: narrowWebSearchMode(config[CodexSessionConfigKey.WebSearchMode]) ?? codexSessionConfigDefaults[CodexSessionConfigKey.WebSearchMode],
 			},
 			dynamicTools: this._buildDynamicTools(session),
-		});
+		}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
+		this._logService.info(`[Codex:${session.sessionId}] thread/start returned`);
 		const threadId = startResult.thread.id;
 		if (session.disposed) {
 			try {
@@ -1818,20 +1965,24 @@ export class CodexAgent extends Disposable implements IAgent {
 	}
 
 	async sendMessage(sessionUri: URI, _chat: URI, prompt: string, attachments?: readonly MessageAttachment[], turnId?: string): Promise<void> {
-		this._logService.info(`[Codex DEBUG] sendMessage session=${sessionUri.toString()} prompt=${JSON.stringify(prompt).slice(0, 60)}`);
+		this._logService.info(`[Codex DEBUG] sendMessage session=${sessionUri.toString()} promptLength=${prompt.length}`);
 		const sessionId = AgentSession.id(sessionUri);
 		const session = this._sessions.get(sessionId);
 		if (!session) {
 			throw new Error(`Codex session not found: ${sessionUri.toString()}`);
 		}
+		this._logService.info(`[Codex:${sessionId}] ensuring connection`);
 		const conn = await this._ensureConnection();
+		this._logService.info(`[Codex:${sessionId}] connection ready`);
 		const effectiveTurnId = turnId ?? generateUuid();
 
 		// Materialize codex thread on first send (provisional → live).
 		// `_materializeIfNeeded` is idempotent.
 		try {
 			this._claimPrewarm(session);
+			this._logService.info(`[Codex:${sessionId}] starting materialize`);
 			await this._materializeIfNeeded(session);
+			this._logService.info(`[Codex:${sessionId}] materialize completed`);
 			this._persistMaterializedSession(session);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -1869,7 +2020,7 @@ export class CodexAgent extends Disposable implements IAgent {
 			try {
 				await conn.client.request<'thread/resume'>('thread/resume', {
 					threadId,
-				});
+				}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
 				session.needsResume = false;
 			} catch (err) {
 				this._fire(sessionUri, {
@@ -1897,7 +2048,7 @@ export class CodexAgent extends Disposable implements IAgent {
 				input: input.slice(),
 				model: model.id,
 				...turnOptions,
-			});
+			}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
 			// The thread now has committed history; client tools are locked to
 			// what was registered at `thread/start` and won't be re-applied.
 			session.firstTurnSent = true;
@@ -2240,7 +2391,7 @@ export class CodexAgent extends Disposable implements IAgent {
 	}
 
 	async listSessions(): Promise<IAgentSessionMetadata[]> {
-		if (!this._githubToken) {
+		if (!this._usesExternalProxy() && !this._githubToken) {
 			return [];
 		}
 		try {
@@ -2616,6 +2767,10 @@ function parseBinaryArgs(json: string | undefined): string[] {
 	} catch {
 		return [];
 	}
+}
+
+export function usesExternalCodexProxy(env: Readonly<NodeJS.ProcessEnv>): boolean {
+	return env[AgentHostCodexProxyModeEnvVar] === 'external-local-proxy';
 }
 
 /**

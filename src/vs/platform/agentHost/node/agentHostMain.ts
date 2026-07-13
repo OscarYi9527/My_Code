@@ -27,7 +27,7 @@ import { CopilotApiService, ICopilotApiService } from './shared/copilotApiServic
 import { ClaudeAgent } from './claude/claudeAgent.js';
 import { ClaudeAgentSdkService, ClaudeSdkPackage, IClaudeAgentSdkService } from './claude/claudeAgentSdkService.js';
 import { ClaudeProxyService, IClaudeProxyService } from './claude/claudeProxyService.js';
-import { CodexAgent, CodexSdkPackage } from './codex/codexAgent.js';
+import { CodexAgent, CodexSdkPackage, resolveCodexDevSdkRoot } from './codex/codexAgent.js';
 import { CodexProxyService, ICodexProxyService } from './codex/codexProxyService.js';
 import { AgentSdkDownloader, IAgentSdkDownloader } from './agentSdkDownloader.js';
 import { IAgentHostOTelService } from '../common/otel/agentHostOTelService.js';
@@ -206,7 +206,8 @@ async function startAgentHost(): Promise<void> {
 		// Codex registration is one-way (register-on-enable): the env-var toggle
 		// or the renderer-forwarded `codexAgentEnabled` root config enables it.
 		// Disabling requires an agent host restart.
-		if (!environmentService.isBuilt || agentSdkDownloader.isAvailable(CodexSdkPackage)) {
+		const bundledCodexSdkAvailable = !!(await resolveCodexDevSdkRoot());
+		if (!environmentService.isBuilt || agentSdkDownloader.isAvailable(CodexSdkPackage) || bundledCodexSdkAvailable) {
 			const agentConfigurationService = agentService.configurationService;
 			let codexRegistered = false;
 			const registerCodexIfEnabled = () => {

@@ -316,6 +316,7 @@ export class AgentHostChatInputPicker extends Disposable {
 		this._container = container;
 		container.classList.add('agent-host-chat-input-picker-host');
 		container.classList.add(`agent-host-chat-input-picker-host-${this._property}`);
+		container.dataset.agentHostConfigProperty = this._property;
 		this._renderChip();
 	}
 
@@ -408,6 +409,13 @@ export class AgentHostChatInputPicker extends Disposable {
 		dom.clearNode(this._container);
 
 		const ctx = this._readContext();
+		if (ctx) {
+			this._container.dataset.agentHostConfigValue = typeof ctx.value === 'string' || typeof ctx.value === 'boolean'
+				? String(ctx.value)
+				: '';
+		} else {
+			delete this._container.dataset.agentHostConfigValue;
+		}
 		// For sessions that have already started (i.e. no longer untitled —
 		// the first message was sent and the chat session has been
 		// materialized), hide the picker entirely when the property cannot
@@ -459,6 +467,9 @@ export class AgentHostChatInputPicker extends Disposable {
 			trigger.classList.toggle('info', value === 'autoApprove');
 		}
 		const label = this._labelFor(schema, value);
+		const titleSpan = dom.append(trigger, dom.$('span.agent-host-chat-input-picker-title'));
+		titleSpan.textContent = `${schema.title}:`;
+		titleSpan.setAttribute('aria-hidden', 'true');
 		const labelSpan = dom.append(trigger, dom.$('span.agent-host-chat-input-picker-label'));
 		labelSpan.textContent = label;
 		trigger.setAttribute('aria-label', isReadOnly

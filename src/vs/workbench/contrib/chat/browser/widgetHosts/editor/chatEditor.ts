@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import './media/chatEditor.css';
 import * as dom from '../../../../../../base/browser/dom.js';
 import { renderIcon } from '../../../../../../base/browser/ui/iconLabel/iconLabels.js';
 import { raceCancellationError } from '../../../../../../base/common/async.js';
@@ -32,8 +33,13 @@ import { IChatService } from '../../../common/chatService/chatService.js';
 import { IChatSessionsService, localChatSessionType } from '../../../common/chatSessionsService.js';
 import { ChatAgentLocation, ChatModeKind } from '../../../common/constants.js';
 import { clearChatEditor } from '../../actions/chatClear.js';
+import { AgentSessionsControl } from '../../agentSessions/agentSessionsControl.js';
+import { AgentSessionProviders } from '../../agentSessions/agentSessions.js';
+import { AgentSessionsFilter, AgentSessionsGrouping, AgentSessionsSorting } from '../../agentSessions/agentSessionsFilter.js';
+import { IAgentSessionsService } from '../../agentSessions/agentSessionsService.js';
 import { ChatEditorInput } from './chatEditorInput.js';
 import { ChatWidget } from '../../widget/chatWidget.js';
+import { HoverPosition } from '../../../../../../base/browser/ui/hover/hoverWidget.js';
 
 export interface IChatEditorOptions extends IEditorOptions {
 	/**
@@ -68,6 +74,10 @@ export class ChatEditor extends AbstractEditorWithViewState<IChatEditorViewState
 	private dimension = new dom.Dimension(0, 0);
 	private _loadingContainer: HTMLElement | undefined;
 	private _editorContainer: HTMLElement | undefined;
+	private _taskHistoryContainer: HTMLElement | undefined;
+	private _taskHistoryHeader: HTMLElement | undefined;
+	private _taskHistoryControl: AgentSessionsControl | undefined;
+	private _taskHistoryVisible = false;
 
 	constructor(
 		group: IEditorGroup,
@@ -76,6 +86,7 @@ export class ChatEditor extends AbstractEditorWithViewState<IChatEditorViewState
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IStorageService storageService: IStorageService,
 		@IChatSessionsService private readonly chatSessionsService: IChatSessionsService,
+		@IAgentSessionsService private readonly agentSessionsService: IAgentSessionsService,
 		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 		@IChatService private readonly chatService: IChatService,
 		@ITextResourceConfigurationService textResourceConfigurationService: ITextResourceConfigurationService,
@@ -140,6 +151,107 @@ export class ChatEditor extends AbstractEditorWithViewState<IChatEditorViewState
 		}));
 		this.widget.render(parent);
 		this.widget.setVisible(true);
+		this.createTaskHistory(parent, scopedInstantiationService);
+	}
+
+	private createTaskHistory(parent: HTMLElement, instantiationService: IInstantiationService): void {
+		const historyContainer = this._taskHistoryContainer = dom.append(parent, dom.$('.chat-editor-task-history'));
+		historyContainer.hidden = true;
+		historyContainer.setAttribute('role', 'region');
+		historyContainer.setAttribute('aria-label', nls.localize('chatEditor.workspaceTasks', "Tasks in Current Folder"));
+
+		const header = this._taskHistoryHeader = dom.append(historyContainer, dom.$('.chat-editor-task-history-header'));
+		const heading = dom.append(header, dom.$('span.chat-editor-task-history-title'));
+		heading.textContent = nls.localize('chatEditor.workspaceTasks', "Tasks in Current Folder");
+
+		const closeButton = dom.append(header, dom.$<HTMLButtonElement>('button.chat-editor-task-history-close'));
+		closeButton.type = 'button';
+		closeButton.title = nls.localize('chatEditor.closeWorkspaceTasks', "Close Task List");
+		closeButton.setAttribute('aria-label', closeButton.title);
+		closeButton.appendChild(renderIcon(Codicon.close));
+		this._register(dom.addDisposableListener(closeButton, dom.EventType.CLICK, () => this.hideTaskHistory(true)));
+
+		const controlContainer = dom.append(historyContainer, dom.$('.chat-editor-task-history-control'));
+		const filter = this._register(instantiationService.createInstance(AgentSessionsFilter, {
+			allowedProviders: [AgentSessionProviders.AgentHostCodex],
+			groupResults: () => AgentSessionsGrouping.Date,
+			sortResults: () => AgentSessionsSorting.Created,
+			overrideExclude: session => session.providerType !== AgentSessionProviders.AgentHostCodex,
+		}));
+		const control = this._taskHistoryControl = this._register(instantiationService.createInstance(AgentSessionsControl, controlContainer, {
+			source: 'chatEditorTaskHistory',
+			filter,
+			overrideStyles: {},
+			disableHover: true,
+			hideSessionBadge: true,
+			showCreatedTime: true,
+			getHoverPosition: () => HoverPosition.BELOW,
+			trackActiveEditorSession: () => false,
+			overrideSessionOpenOptions: openEvent => ({
+				...openEvent,
+				sideBySide: true,
+				editorOptions: {
+					...openEvent.editorOptions,
+					pinned: true,
+					preserveFocus: false,
+				}
+			}),
+			notifySessionOpened: () => this.hideTaskHistory(false),
+		}));
+		control.setVisible(false);
+	}
+
+	/**
+	 * Shows or hides the tasks created for the current workspace by Codex Agent Host.
+	 */
+	async toggleTaskHistory(): Promise<void> {
+		if (this._taskHistoryVisible) {
+			this.hideTaskHistory(true);
+			return;
+		}
+
+		if (!this._taskHistoryContainer || !this._taskHistoryControl) {
+			return;
+		}
+
+		this._taskHistoryVisible = true;
+		this._taskHistoryContainer.hidden = false;
+		this._taskHistoryControl.setVisible(true);
+		this.layoutTaskHistory();
+
+		await this.agentSessionsService.model.resolve(AgentSessionProviders.AgentHostCodex);
+		if (!this._taskHistoryVisible) {
+			return;
+		}
+
+		await this._taskHistoryControl.update();
+		this.layoutTaskHistory();
+		this._taskHistoryControl.openFind();
+	}
+
+	private hideTaskHistory(focusChatInput: boolean): void {
+		if (!this._taskHistoryContainer || !this._taskHistoryControl) {
+			return;
+		}
+
+		this._taskHistoryVisible = false;
+		this._taskHistoryControl.setVisible(false);
+		this._taskHistoryControl.clearFocus();
+		this._taskHistoryContainer.hidden = true;
+
+		if (focusChatInput) {
+			this.widget.focusInput();
+		}
+	}
+
+	private layoutTaskHistory(): void {
+		if (!this._taskHistoryVisible || !this._taskHistoryContainer || !this._taskHistoryControl || !this._taskHistoryHeader) {
+			return;
+		}
+
+		const width = this._taskHistoryContainer.clientWidth;
+		const height = Math.max(0, this._taskHistoryContainer.clientHeight - this._taskHistoryHeader.offsetHeight);
+		this._taskHistoryControl.layout(height, width);
 	}
 
 	protected override setEditorVisible(visible: boolean): void {
@@ -314,5 +426,6 @@ export class ChatEditor extends AbstractEditorWithViewState<IChatEditorViewState
 		if (this.widget) {
 			this.widget.layout(dimension.height, dimension.width);
 		}
+		this.layoutTaskHistory();
 	}
 }

@@ -44,6 +44,7 @@ import './services/lifecycle/electron-browser/lifecycleService.js';
 import './services/title/electron-browser/titleService.js';
 import './services/host/electron-browser/nativeHostService.js';
 import '../platform/meteredConnection/electron-browser/meteredConnectionService.js';
+import '../platform/aiEditorProxy/electron-browser/aiEditorProxyService.js';
 import './services/request/electron-browser/requestService.js';
 import './services/clipboard/electron-browser/clipboardService.js';
 import './services/contextmenu/electron-browser/contextmenuService.js';
@@ -123,6 +124,7 @@ import './contrib/codeEditor/electron-browser/codeEditor.contribution.js';
 
 // Debug
 import './contrib/debug/electron-browser/extensionHostDebugService.js';
+import './contrib/aiEditorProxy/electron-browser/aiEditorProxy.contribution.js';
 
 // Extensions Management
 import './contrib/extensions/electron-browser/extensions.contribution.js';

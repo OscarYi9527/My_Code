@@ -33,6 +33,17 @@ suite('ChatConfiguration defaults', () => {
 		assert.strictEqual(isVisibleEditorChatSessionType(localChatSessionType, configurationService, chatSessionsService), true);
 	});
 
+	test('editor default returns Codex in the embedded editor before its contribution registers', () => {
+		const configurationService = new TestConfigurationService({
+			[ChatConfiguration.EditorLocalAgentEnabled]: false,
+			[ChatConfiguration.EditorDefaultProvider]: 'codex',
+		});
+		const chatSessionsService = createChatSessionsService();
+
+		assert.strictEqual(getDefaultNewChatSessionType(configurationService, chatSessionsService), SessionType.AgentHostCodex);
+		assert.strictEqual(isVisibleEditorChatSessionType(localChatSessionType, configurationService, chatSessionsService), false);
+	});
+
 	test('editor default returns agent host Copilot when local is disabled and copilotAh is configured', () => {
 		const configurationService = new TestConfigurationService({
 			[ChatConfiguration.EditorLocalAgentEnabled]: false,

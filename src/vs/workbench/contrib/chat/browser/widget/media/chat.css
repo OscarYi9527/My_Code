@@ -1651,10 +1651,129 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	align-items: center;
 	gap: 6px;
 	padding: 0 4px;
+	position: relative;
 }
 
 .interactive-session .chat-secondary-toolbar:empty {
 	display: none;
+}
+
+/* Compact session summary shown below the main chat input. */
+.interactive-session .chat-session-settings-compact {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	gap: 7px;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+}
+
+.interactive-session .chat-session-provider-summary {
+	color: var(--vscode-foreground);
+	font-weight: 500;
+}
+
+.interactive-session .chat-session-provider-summary::after {
+	content: '';
+	display: inline-block;
+	width: 1px;
+	height: 12px;
+	margin-left: 7px;
+	vertical-align: -2px;
+	background: var(--vscode-editorWidget-border);
+}
+
+.interactive-session .chat-session-security-summary {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.interactive-session .chat-session-settings-compact.warning .chat-session-security-summary {
+	color: var(--vscode-problemsWarningIcon-foreground);
+}
+
+.interactive-session .chat-session-settings-button {
+	flex-shrink: 0;
+	border: 0;
+	border-radius: 4px;
+	padding: 3px 7px;
+	color: var(--vscode-icon-foreground);
+	background: transparent;
+	font: inherit;
+	cursor: pointer;
+}
+
+.interactive-session .chat-session-settings-button:hover,
+.interactive-session .chat-session-settings-button.checked {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.interactive-session .chat-session-settings-button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 1px;
+}
+
+/* The existing live picker controls are retained inside this grouped panel. */
+.interactive-session .chat-session-settings-panel {
+	position: absolute;
+	z-index: 50;
+	right: 4px;
+	bottom: calc(100% + 6px);
+	box-sizing: border-box;
+	width: min(520px, calc(100% - 8px));
+	max-height: min(420px, 60vh);
+	overflow: auto;
+	padding: 10px;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 8px;
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	box-shadow: 0 4px 14px var(--vscode-widget-shadow);
+}
+
+.interactive-session .chat-session-settings-panel[hidden] {
+	display: none;
+}
+
+.interactive-session .chat-session-settings-section + .chat-session-settings-section {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid var(--vscode-editorWidget-border);
+}
+
+.interactive-session .chat-session-settings-heading {
+	margin: 0 0 7px 3px;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.interactive-session .chat-session-settings-body {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px;
+	min-width: 0;
+}
+
+.interactive-session .chat-session-settings-panel .chat-secondary-input-toolbar {
+	flex: 1 1 auto;
+	overflow: visible;
+}
+
+.interactive-session .chat-session-settings-panel .chat-secondary-input-toolbar .monaco-action-bar .actions-container,
+.interactive-session .chat-session-settings-panel .chat-secondary-generic-chips {
+	display: flex;
+	flex-wrap: wrap;
+	overflow: visible;
+}
+
+.interactive-session .chat-session-settings-panel .chat-secondary-generic-chips {
+	flex: 1 1 100%;
+	width: 100%;
+	min-width: 0;
 }
 
 /* Dividers between adjacent items in the secondary toolbar. */

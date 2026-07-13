@@ -55,6 +55,7 @@ export interface IAgentSessionsControlOptions {
 	readonly hideSessionBadge?: boolean;
 	readonly useStatusOnlyIcons?: boolean;
 	readonly compactShowMore?: boolean;
+	readonly showCreatedTime?: boolean;
 
 	getHoverPosition(): HoverPosition;
 	trackActiveEditorSession(): boolean;

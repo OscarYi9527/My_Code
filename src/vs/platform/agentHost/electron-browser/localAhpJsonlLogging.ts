@@ -17,6 +17,7 @@ const REDACTED_VALUE = '<redacted>';
 const REQUEST_METHODS: ReadonlySet<string> = new Set<keyof IAgentService>([
 	'authenticate',
 	'listSessions',
+	'refreshModels',
 	'createSession',
 	'resolveSessionConfig',
 	'sessionConfigCompletions',

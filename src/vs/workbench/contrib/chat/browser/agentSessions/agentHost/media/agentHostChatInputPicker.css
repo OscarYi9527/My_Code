@@ -105,6 +105,19 @@
 	}
 }
 
+.chat-session-settings-panel .agent-host-chat-input-picker-label {
+	display: inline;
+}
+
+.agent-host-chat-input-picker-title {
+	display: none;
+}
+
+.chat-session-settings-panel .agent-host-chat-input-picker-title {
+	display: inline;
+	color: var(--vscode-descriptionForeground);
+}
+
 /*
  * Elevated auto-approve levels get themed colors on the chip trigger:
  *   .warning → Autopilot (red/orange)

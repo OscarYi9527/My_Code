@@ -1,0 +1,91 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.chat-editor-relative {
+	position: relative;
+}
+
+.chat-editor-task-history {
+	position: absolute;
+	z-index: 20;
+	top: 10px;
+	right: 10px;
+	left: 10px;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	height: min(52%, 560px);
+	min-height: 240px;
+	overflow: hidden;
+	border: 1px solid var(--vscode-widget-border);
+	border-radius: 10px;
+	background: var(--vscode-editor-background);
+	box-shadow: 0 6px 20px var(--vscode-widget-shadow);
+}
+
+.chat-editor-task-history[hidden] {
+	display: none;
+}
+
+.chat-editor-task-history-header {
+	display: flex;
+	flex: 0 0 42px;
+	align-items: center;
+	box-sizing: border-box;
+	padding: 0 8px 0 14px;
+	border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.chat-editor-task-history-title {
+	flex: 1;
+	overflow: hidden;
+	font-size: 13px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.chat-editor-task-history-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	color: var(--vscode-icon-foreground);
+	background: transparent;
+	cursor: pointer;
+}
+
+.chat-editor-task-history-close:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.chat-editor-task-history-close:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.chat-editor-task-history-control {
+	flex: 1;
+	min-height: 0;
+}
+
+.chat-editor-task-history-control > .agent-sessions-viewer {
+	height: 100%;
+}
+
+.chat-editor-task-history-control .agent-session-status {
+	margin-left: auto;
+}
+
+@media (max-height: 520px) {
+	.chat-editor-task-history {
+		height: calc(100% - 20px);
+		min-height: 0;
+	}
+}
