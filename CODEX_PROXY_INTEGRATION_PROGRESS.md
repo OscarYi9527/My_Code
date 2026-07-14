@@ -691,3 +691,23 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - Proxy 已收到、已转发、已完成、已失败、状态格式错误或查询失败时均不重试，
   从而避免重复运行 AI 工具、终端命令或文件修改。
 - `typecheck-client`、定向测试、`compile`、`core-ci` 和 Windows 成品打包通过。
+
+## 20. 2026-07-14 GitHub Actions 依赖安装修复
+
+### 根因
+
+- GitHub Actions 的 `npm ci` 在安装依赖前失败，提示锁文件缺少
+  `cpu-features`。
+- 根目录 `package.json` 曾用 `ssh2.cpu-features: "0.0.0"` 覆盖一个不存在的
+  npm 版本；该覆盖使锁文件省略了 `ssh2` 的可选依赖，但 npm 11 的 `npm ci`
+  仍要求锁文件完整记录该依赖。
+
+### 修复与验证
+
+- 移除了无效的 `cpu-features: "0.0.0"` 覆盖。
+- 锁文件补充了 `cpu-features@0.0.10` 及其可选依赖 `buildcheck@0.0.7`。
+- 在隔离目录中使用与 GitHub Actions Node 24.15 对应的 npm 11.5.1 执行
+  `npm ci --ignore-scripts`，安装成功；`npm ls cpu-features` 确认
+  `ssh2@1.17.0 -> cpu-features@0.0.10`。
+- 本次仅修改 CI 依赖清单，不涉及 AI Editor UI 或运行时逻辑，因此无需重新构建
+  开发版和 Windows 产品版。
