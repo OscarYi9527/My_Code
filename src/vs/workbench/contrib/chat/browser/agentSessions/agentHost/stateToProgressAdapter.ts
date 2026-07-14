@@ -12,6 +12,7 @@ import { MessageKind, ToolCallContributorKind, ToolCallStatus, TurnState, Respon
 import { getToolKind } from '../../../../../../platform/agentHost/common/state/sessionReducers.js';
 import { readToolCallMeta } from '../../../../../../platform/agentHost/common/meta/agentToolCallMeta.js';
 import { getChatErrorDetailsFromMeta, IChatErrorContext } from '../../../common/chatErrorMessages.js';
+import { AGENT_HOST_CHECK_STATUS_AND_CONTINUE_CONFIRMATION } from '../../../../../../platform/agentHost/common/agentHostRecovery.js';
 import { AGENT_HOST_SCHEME, toAgentHostUri } from '../../../../../../platform/agentHost/common/agentHostUri.js';
 import { getAgentFeedbackAttachmentMetadata, isAgentFeedbackAnnotationsAttachment, isAgentFeedbackAttachment } from '../../../../../../platform/agentHost/common/meta/agentFeedbackAttachments.js';
 import { isViewUnreviewedCommentsTool } from '../../../../../../platform/agentHost/common/meta/agentFeedbackAnnotations.js';
@@ -289,7 +290,7 @@ export function usageInfoToQuotas(usage: UsageInfo | undefined): IAgentHostQuota
  * The `lookup` callback is responsible for any session-level fallback (e.g.
  * `summary.model?.id` when usage hasn't reported a model yet).
  */
-export function turnsToHistory(backendSession: URI, turns: readonly Turn[], participantId: string, connectionAuthority: string, lookup?: TurnModelLookup, errorContext?: IChatErrorContext): IChatSessionHistoryItem[] {
+export function turnsToHistory(backendSession: URI, turns: readonly Turn[], participantId: string, connectionAuthority: string, lookup?: TurnModelLookup, errorContext?: IChatErrorContext, includeCodexRecoveryAction: boolean = false): IChatSessionHistoryItem[] {
 	const history: IChatSessionHistoryItem[] = [];
 	for (const turn of turns) {
 		const rawModelId = turn.usage?.model;
@@ -364,11 +365,31 @@ export function turnsToHistory(backendSession: URI, turns: readonly Turn[], part
 		if (turn.state === TurnState.Error && turn.error) {
 			errorDetails = getChatErrorDetailsFromMeta(turn.error, errorContext)
 				?? { message: `Error: (${turn.error.errorType}) ${turn.error.message}` };
+			if (includeCodexRecoveryAction && isCodexRecoveryError(turn.error.errorType)) {
+				errorDetails = {
+					...errorDetails,
+					confirmationButtons: [
+						...(errorDetails.confirmationButtons ?? []),
+						{
+							label: localize('agentHost.checkStatusAndContinue', "Check status and continue"),
+							data: AGENT_HOST_CHECK_STATUS_AND_CONTINUE_CONFIRMATION,
+						},
+					],
+				};
+			}
 		}
 
 		history.push({ type: 'response', parts, participant: participantId, details, ...(errorDetails ? { errorDetails } : {}) });
 	}
 	return history;
+}
+
+function isCodexRecoveryError(errorType: string): boolean {
+	return errorType === 'CodexError'
+		|| errorType === 'CodexDisconnected'
+		|| errorType === 'CodexMaterializeFailed'
+		|| errorType === 'CodexResumeFailed'
+		|| errorType === 'CodexTurnError';
 }
 
 /**

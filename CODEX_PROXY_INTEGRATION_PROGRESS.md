@@ -106,7 +106,7 @@ AI Editor
 - [x] E02 记录 Agent Host 工具调用和命令执行状态。
 - [x] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
 - [x] E04 仅自动重试可确认未转发的请求。
-- [ ] E05 实现“检查状态并继续”恢复流程。
+- [x] E05 实现“检查状态并继续”恢复流程。
 - [ ] E06 验证预先存在的 Git 改动不会被错误归因或覆盖。
 - [ ] E07 验证非 Git 工作区文件基线。
 
@@ -724,3 +724,33 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   子项目再次执行 `npm ci`；其 `package.json` 也有同一个无效覆盖。已同步修复
   `remote/package.json` 与 `remote/package-lock.json`，并以 npm 11.5.1 的隔离
   `npm ci --ignore-scripts` 验证 `ssh2@1.17.0 -> cpu-features@0.0.10`。
+
+## 21. 2026-07-14 E05 “检查状态并继续”恢复流程
+
+### 实现
+
+- Codex Turn 因 app-server 断连、thread/materialize/resume 失败、`turn/start`
+  失败或 Codex 明确返回 failed 时，会在本地会话数据库记录需恢复的 Turn ID、失败
+  原因和时间；不会记录用户提示词、终端输出或文件内容。
+- 失败 Turn 的 AI 对话错误卡片提供“检查状态并继续”按钮；历史对话重新打开后也会
+  还原该按钮。
+- 点击按钮会创建一个新的 Turn，而不是重放失败 Turn。该新 Turn 使用不会受界面
+  语言影响的内部确认标识，并向 Codex 提供：
+  - 失败 Turn 的 Proxy 转发状态（未记录、已接收、已转发、已完成或不可用）；
+  - 同一 Turn 的工具名称和最终/当前执行状态，不含工具输入和输出；
+  - 强制恢复规则：先检查当前工作区，Git 工作区先检查 `git status --short` 与
+    聚焦 `git diff`；不回滚文件，也不重放 started/running 或状态不明的命令/工具。
+- 恢复元数据在被消费后清除；若新的恢复 Turn 再次失败，将记录新的 Turn，避免旧状态
+  被错误复用。
+
+### 验证
+
+- `npm run typecheck-client`：通过。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- `scripts\test.bat --grep "Codex recovery errors restore"`：`1 passing`，
+  验证失败历史会话会恢复“检查状态并继续”按钮。
+- 开发版：隔离用户目录通过 `scripts\code.bat` 启动，进程存活检查通过。
+- Windows 产品版：`npm run core-ci` 与 `npm run gulp vscode-win32-x64-min-ci`
+  通过；`D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe` 使用隔离用户目录启动
+  检查通过；`product.json` 10/10 SHA-256 校验匹配。
+- 本轮未停止或重启共享 Proxy；结束时 `/live` 返回 `status: ok`。

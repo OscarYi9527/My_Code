@@ -21,6 +21,7 @@ import { IPosition } from '../../../../../../editor/common/core/position.js';
 import { isLocation, type Location } from '../../../../../../editor/common/languages.js';
 import { localize } from '../../../../../../nls.js';
 import { AgentProvider, AgentSession, type IAgentConnection } from '../../../../../../platform/agentHost/common/agentService.js';
+import { AGENT_HOST_CHECK_STATUS_AND_CONTINUE_CONFIRMATION, AGENT_HOST_CHECK_STATUS_AND_CONTINUE_PROMPT } from '../../../../../../platform/agentHost/common/agentHostRecovery.js';
 import { AgentFeedbackAttachmentDisplayKind, AgentFeedbackAttachmentMetadataKey } from '../../../../../../platform/agentHost/common/meta/agentFeedbackAttachments.js';
 import { readToolCallMeta } from '../../../../../../platform/agentHost/common/meta/agentToolCallMeta.js';
 import { readCompletionAttachmentMeta } from '../../../../../../platform/agentHost/common/meta/agentCompletionAttachmentMeta.js';
@@ -170,6 +171,14 @@ function userOriginMessage(text: string, attachments: readonly MessageAttachment
 	return attachments?.length
 		? { text, origin: { kind: MessageKind.User }, attachments: [...attachments] }
 		: { text, origin: { kind: MessageKind.User } };
+}
+
+function isCodexRecoveryError(errorType: string): boolean {
+	return errorType === 'CodexError'
+		|| errorType === 'CodexDisconnected'
+		|| errorType === 'CodexMaterializeFailed'
+		|| errorType === 'CodexResumeFailed'
+		|| errorType === 'CodexTurnError';
 }
 
 /**
@@ -862,7 +871,7 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 						}
 						const fallbackRawModelId = lastTurnModelSelection(sessionState)?.id;
 						const lookup = this._createTurnModelLookup(sessionResource, fallbackRawModelId);
-						history.push(...turnsToHistory(resolvedSession, sessionState.turns, this._config.agentId, this._config.connectionAuthority, lookup, this._chatErrorContext()));
+						history.push(...turnsToHistory(resolvedSession, sessionState.turns, this._config.agentId, this._config.connectionAuthority, lookup, this._chatErrorContext(), this._config.provider === 'codex'));
 
 						// Enrich history with inner tool calls from subagent
 						// child sessions. Subscribes to each child session so
@@ -1145,8 +1154,20 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 		if (turn?.state !== TurnState.Error || !turn.error) {
 			return undefined;
 		}
-		return getChatErrorDetailsFromMeta(turn.error, this._chatErrorContext())
+		const details = getChatErrorDetailsFromMeta(turn.error, this._chatErrorContext())
 			?? { message: localize('agentHost.turnError', "Error: ({0}) {1}", turn.error.errorType, turn.error.message) };
+		return this._config.provider === 'codex' && isCodexRecoveryError(turn.error.errorType)
+			? {
+				...details,
+				confirmationButtons: [
+					...(details.confirmationButtons ?? []),
+					{
+						label: localize('agentHost.checkStatusAndContinue', "Check status and continue"),
+						data: AGENT_HOST_CHECK_STATUS_AND_CONTINUE_CONFIRMATION,
+					},
+				],
+			}
+			: details;
 	}
 
 	/**
@@ -1571,11 +1592,12 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 
 		// Dispatch session/turnStarted — the server will call sendMessage on
 		// the provider as a side effect.
+		const isRecoveryRequest = request.acceptedConfirmationData?.includes(AGENT_HOST_CHECK_STATUS_AND_CONTINUE_CONFIRMATION);
 		const turnAction: ChatTurnStartedAction = {
 			type: ActionType.ChatTurnStarted,
 			turnId,
 			message: {
-				...userOriginMessage(request.message, messageAttachments),
+				...userOriginMessage(isRecoveryRequest ? AGENT_HOST_CHECK_STATUS_AND_CONTINUE_PROMPT : request.message, messageAttachments),
 				...(selectedModel ? { model: selectedModel } : {}),
 				...(requestedAgentUri ? { agent: { uri: requestedAgentUri } } : {}),
 			},

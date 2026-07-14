@@ -63,8 +63,8 @@ function finalizeToolInvocation(invocation: Parameters<typeof rawFinalizeToolInv
 	return rawFinalizeToolInvocation(invocation, tc, URI.file('/'), 'local');
 }
 
-function turnsToHistory(backendSession: Parameters<typeof rawTurnsToHistory>[0], turns: Parameters<typeof rawTurnsToHistory>[1], participantId: Parameters<typeof rawTurnsToHistory>[2], lookup?: Parameters<typeof rawTurnsToHistory>[4]) {
-	return rawTurnsToHistory(backendSession, turns, participantId, 'local', lookup);
+function turnsToHistory(backendSession: Parameters<typeof rawTurnsToHistory>[0], turns: Parameters<typeof rawTurnsToHistory>[1], participantId: Parameters<typeof rawTurnsToHistory>[2], lookup?: Parameters<typeof rawTurnsToHistory>[4], includeCodexRecoveryAction: boolean = false) {
+	return rawTurnsToHistory(backendSession, turns, participantId, 'local', lookup, undefined, includeCodexRecoveryAction);
 }
 
 /**
@@ -612,6 +612,19 @@ suite('stateToProgressAdapter', () => {
 			if (response.type !== 'response') { return; }
 			assert.strictEqual(response.errorDetails?.message, 'Error: (test) boom');
 			assert.ok(!response.parts.some(p => p.kind === 'markdownContent' && (p as IChatMarkdownContent).content.value.includes('boom')), 'Error should not be duplicated as a markdown part');
+		});
+
+		test('Codex recovery errors restore a check-status action', () => {
+			const turn = createTurn({
+				state: TurnState.Error,
+				error: { errorType: 'CodexTurnError', message: 'connection failed' },
+			});
+
+			const history = turnsToHistory(URI.file('/'), [turn], 'p', undefined, true);
+			const response = history[1];
+			assert.strictEqual(response.type, 'response');
+			if (response.type !== 'response') { return; }
+			assert.deepStrictEqual(response.errorDetails?.confirmationButtons?.map(button => button.data), ['agent-host.checkStatusAndContinue']);
 		});
 
 		test('forwarded quota error turn produces quota-exceeded error details', () => {

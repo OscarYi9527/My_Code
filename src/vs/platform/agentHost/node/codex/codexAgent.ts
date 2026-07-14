@@ -35,6 +35,7 @@ import { buildElicitationRequest, cancelledElicitationResponse, declinedElicitat
 import type { AhpMcpUiHostCapabilities, Customization } from '../../common/state/protocol/channels-session/state.js';
 import { IAgentConfigurationService } from '../agentConfigurationService.js';
 import { IAgentHostCheckpointService } from '../../common/agentHostCheckpointService.js';
+import { AGENT_HOST_CHECK_STATUS_AND_CONTINUE_PROMPT, type ICodexRecoveryRecord } from '../../common/agentHostRecovery.js';
 import { ICopilotApiService } from '../shared/copilotApiService.js';
 import { extractForwardedErrorInfo } from '../shared/forwardedChatError.js';
 import { IAgentSdkDownloader, IAgentSdkPackage } from '../agentSdkDownloader.js';
@@ -1399,6 +1400,9 @@ export class CodexAgent extends Disposable implements IAgent {
 	private _handleTurnCompletedNotification(session: ICodexSession, params: TurnCompletedNotification): (SessionAction | ChatAction)[] {
 		const appTurnId = params.turn.id;
 		const hostTurnId = this._hostTurnId(session, appTurnId);
+		if (params.turn.status === 'failed') {
+			void this._recordRecoveryNeeded(session, hostTurnId, 'Codex reported that the turn failed.');
+		}
 		const out = mapTurnCompleted(session.mapState, this._withHostTurn(session, params));
 		// Remember which codex (app-server) turn each workbench turn maps to so
 		// truncateSession can translate a host turn id to a thread rollback even
@@ -1689,6 +1693,7 @@ export class CodexAgent extends Disposable implements IAgent {
 				session.hostTurnIdByAppTurnId.delete(appTurnId);
 			}
 			if (turnId) {
+				void this._recordRecoveryNeeded(session, turnId, 'Codex app-server disconnected while the turn was active.');
 				this._fire(session.sessionUri, {
 					type: ActionType.ChatError,
 					turnId,
@@ -1993,6 +1998,9 @@ export class CodexAgent extends Disposable implements IAgent {
 		const conn = await this._ensureConnection();
 		this._logService.info(`[Codex:${sessionId}] connection ready`);
 		const effectiveTurnId = turnId ?? generateUuid();
+		if (prompt === AGENT_HOST_CHECK_STATUS_AND_CONTINUE_PROMPT) {
+			prompt = await this._createRecoveryPrompt(session);
+		}
 
 		// Materialize codex thread on first send (provisional → live).
 		// `_materializeIfNeeded` is idempotent.
@@ -2005,6 +2013,7 @@ export class CodexAgent extends Disposable implements IAgent {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[Codex:${sessionId}] materialize failed: ${message}`);
+			await this._recordRecoveryNeeded(session, effectiveTurnId, `Session materialization failed: ${message}`);
 			this._fire(sessionUri, {
 				type: ActionType.ChatError,
 				turnId: effectiveTurnId,
@@ -2024,6 +2033,7 @@ export class CodexAgent extends Disposable implements IAgent {
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
 				this._logService.error(`[Codex:${sessionId}] tool re-materialize failed: ${message}`);
+				await this._recordRecoveryNeeded(session, effectiveTurnId, `Tool rematerialization failed: ${message}`);
 				this._fire(sessionUri, {
 					type: ActionType.ChatError,
 					turnId: effectiveTurnId,
@@ -2041,12 +2051,14 @@ export class CodexAgent extends Disposable implements IAgent {
 				}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
 				session.needsResume = false;
 			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				await this._recordRecoveryNeeded(session, effectiveTurnId, `Thread resume failed: ${message}`);
 				this._fire(sessionUri, {
 					type: ActionType.ChatError,
 					turnId: effectiveTurnId,
 					error: {
 						errorType: 'CodexResumeFailed',
-						message: err instanceof Error ? err.message : String(err),
+						message,
 					},
 				});
 				this._fire(sessionUri, { type: ActionType.ChatTurnComplete, turnId: effectiveTurnId });
@@ -2112,6 +2124,7 @@ export class CodexAgent extends Disposable implements IAgent {
 			}
 			const message = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[Codex:${sessionId}] turn/start error: ${message}`);
+			await this._recordRecoveryNeeded(session, effectiveTurnId, `Turn start failed: ${message}`);
 			this._fire(sessionUri, {
 				type: ActionType.ChatError,
 				turnId: effectiveTurnId,
@@ -2282,6 +2295,70 @@ export class CodexAgent extends Disposable implements IAgent {
 		} catch (err) {
 			this._logService.info(`[Codex:${session.sessionId}] Proxy forwarding state unavailable; not retrying: ${err instanceof Error ? err.message : String(err)}`);
 			return false;
+		}
+	}
+
+	private _recordRecoveryNeeded(session: ICodexSession, turnId: string, cause: string): Promise<void> {
+		const recovery: ICodexRecoveryRecord = { turnId, cause, recordedAt: Date.now() };
+		return this._metadataStore.writeRecovery(session.sessionUri, recovery);
+	}
+
+	/**
+	 * Builds a fresh, conservative recovery turn. It never replays a failed
+	 * request or command: the model is asked to inspect the live workspace
+	 * before deciding what can safely continue.
+	 */
+	private async _createRecoveryPrompt(session: ICodexSession): Promise<string> {
+		const context = await this._metadataStore.consumeRecoveryContext(session.sessionUri);
+		const proxyState = context.recovery
+			? await this._getExternalProxyTurnState(session, context.recovery.turnId)
+			: undefined;
+		const proxySummary = proxyState === undefined
+			? 'unavailable'
+			: proxyState === null
+				? 'not recorded by the Proxy'
+				: proxyState;
+		const tools = context.toolStates.length
+			? context.toolStates.map(tool => `- ${tool.displayName} (${tool.toolName}): ${tool.state}`).join('\n')
+			: '- No tool execution state was recorded for the interrupted turn.';
+		const recovery = context.recovery
+			? `Previous turn: ${context.recovery.turnId}\nReported failure: ${context.recovery.cause}\nProxy forwarding state: ${proxySummary}`
+			: 'No durable interrupted-turn record is available. Treat all prior side effects as potentially incomplete.';
+
+		return [
+			'A previous Codex turn was interrupted or failed. Perform a recovery check before continuing.',
+			'Do not automatically replay the previous prompt, terminal commands, tool calls, or file edits. Do not roll back files.',
+			'First inspect the live workspace state. In a Git workspace, inspect `git status --short` and a focused `git diff`; otherwise inspect the files relevant to the task.',
+			'You may use read-only inspection to determine what completed. Do not repeat any tool or command marked started/running or otherwise uncertain. Explain the current state and ask before repeating uncertain work.',
+			'Recovery record:',
+			recovery,
+			'Recorded tool states:',
+			tools,
+		].join('\n\n');
+	}
+
+	/**
+	 * Returns the local Proxy's recorded state for a turn. `null` is a valid
+	 * answer meaning that the Proxy never received the turn; `undefined` means
+	 * that the state is unavailable and must be treated as uncertain.
+	 */
+	private async _getExternalProxyTurnState(session: ICodexSession, turnId: string): Promise<string | null | undefined> {
+		if (!this._usesExternalProxy()) {
+			return undefined;
+		}
+		try {
+			const baseUrl = this._externalProxyBaseUrl();
+			const response = await fetch(`${baseUrl}/control/code-turns/${encodeURIComponent(session.sessionId)}/${encodeURIComponent(turnId)}`, {
+				signal: AbortSignal.timeout(1500),
+			});
+			if (!response.ok) {
+				return undefined;
+			}
+			const payload = await response.json() as { state?: unknown };
+			return payload.state === null || typeof payload.state === 'string' ? payload.state : undefined;
+		} catch (err) {
+			this._logService.info(`[Codex:${session.sessionId}] Proxy forwarding state unavailable for recovery: ${err instanceof Error ? err.message : String(err)}`);
+			return undefined;
 		}
 	}
 

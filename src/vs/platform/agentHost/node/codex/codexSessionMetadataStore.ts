@@ -5,6 +5,7 @@
 
 import { URI } from '../../../../base/common/uri.js';
 import { ILogService } from '../../../log/common/log.js';
+import { ICodexRecoveryRecord, META_CODEX_RECOVERY_REQUIRED } from '../../common/agentHostRecovery.js';
 import { ISessionDataService } from '../../common/sessionDataService.js';
 
 /**
@@ -36,6 +37,15 @@ export interface ICodexSessionOverlayUpdate {
 	readonly threadId?: string;
 	readonly cwd?: URI;
 	readonly modelId?: string;
+}
+
+export interface ICodexRecoveryContext {
+	readonly recovery?: ICodexRecoveryRecord;
+	readonly toolStates: readonly {
+		readonly toolName: string;
+		readonly displayName: string;
+		readonly state: string;
+	}[];
 }
 
 export class CodexSessionMetadataStore {
@@ -108,5 +118,94 @@ export class CodexSessionMetadataStore {
 			this._logService.warn(`[Codex] metadata read failed for ${session.toString()}: ${err instanceof Error ? err.message : String(err)}`);
 			return {};
 		}
+	}
+
+	/**
+	 * Records the turn that needs a conservative recovery check. This is kept
+	 * separately from the Codex transcript so it survives an Agent Host restart
+	 * without storing the user's prompt or tool output.
+	 */
+	async writeRecovery(session: URI, recovery: ICodexRecoveryRecord): Promise<void> {
+		try {
+			const ref = this._sessionDataService.openDatabase(session);
+			try {
+				await ref.object.setMetadata(META_CODEX_RECOVERY_REQUIRED, JSON.stringify(recovery));
+			} finally {
+				ref.dispose();
+			}
+		} catch (err) {
+			this._logService.warn(`[Codex] recovery metadata write failed for ${session.toString()}: ${err instanceof Error ? err.message : String(err)}`);
+		}
+	}
+
+	/**
+	 * Consumes the compact recovery data needed to construct a new diagnostic
+	 * turn. Tool inputs and outputs are intentionally excluded: only names and
+	 * terminal states are supplied to the model.
+	 */
+	async consumeRecoveryContext(session: URI): Promise<ICodexRecoveryContext> {
+		try {
+			const ref = await this._sessionDataService.tryOpenDatabase(session);
+			if (!ref) {
+				return { toolStates: [] };
+			}
+			try {
+				const rawRecovery = await ref.object.getMetadata(META_CODEX_RECOVERY_REQUIRED);
+				const recovery = parseRecoveryRecord(rawRecovery);
+				if (rawRecovery) {
+					await ref.object.setMetadata(META_CODEX_RECOVERY_REQUIRED, '');
+				}
+
+				const rawExecutions = await ref.object.getMetadata('turn.executionRecords');
+				return {
+					recovery,
+					toolStates: recovery ? parseToolStates(rawExecutions, recovery.turnId) : [],
+				};
+			} finally {
+				ref.dispose();
+			}
+		} catch (err) {
+			this._logService.warn(`[Codex] recovery metadata read failed for ${session.toString()}: ${err instanceof Error ? err.message : String(err)}`);
+			return { toolStates: [] };
+		}
+	}
+}
+
+function parseRecoveryRecord(raw: string | undefined): ICodexRecoveryRecord | undefined {
+	if (!raw) {
+		return undefined;
+	}
+	try {
+		const candidate = JSON.parse(raw) as Partial<ICodexRecoveryRecord>;
+		if (typeof candidate.turnId === 'string' && typeof candidate.cause === 'string' && typeof candidate.recordedAt === 'number') {
+			return { turnId: candidate.turnId, cause: candidate.cause, recordedAt: candidate.recordedAt };
+		}
+	} catch {
+		// Ignore malformed stale metadata and continue safely without it.
+	}
+	return undefined;
+}
+
+function parseToolStates(raw: string | undefined, turnId: string): ICodexRecoveryContext['toolStates'] {
+	if (!raw) {
+		return [];
+	}
+	try {
+		const records = JSON.parse(raw) as unknown[];
+		if (!Array.isArray(records)) {
+			return [];
+		}
+		return records.flatMap(record => {
+			if (!record || typeof record !== 'object') {
+				return [];
+			}
+			const value = record as { turnId?: unknown; toolName?: unknown; displayName?: unknown; state?: unknown };
+			if (value.turnId !== turnId || typeof value.toolName !== 'string' || typeof value.displayName !== 'string' || typeof value.state !== 'string') {
+				return [];
+			}
+			return [{ toolName: value.toolName, displayName: value.displayName, state: value.state }];
+		});
+	} catch {
+		return [];
 	}
 }
