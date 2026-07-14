@@ -34,6 +34,7 @@ import { buildCodexMcpReadResult, codexMcpListToInventory, codexMcpToolsChanged,
 import { buildElicitationRequest, cancelledElicitationResponse, declinedElicitationResponse, elicitationResponseFromAnswers } from './codexElicitationMapper.js';
 import type { AhpMcpUiHostCapabilities, Customization } from '../../common/state/protocol/channels-session/state.js';
 import { IAgentConfigurationService } from '../agentConfigurationService.js';
+import { IAgentHostCheckpointService } from '../../common/agentHostCheckpointService.js';
 import { ICopilotApiService } from '../shared/copilotApiService.js';
 import { extractForwardedErrorInfo } from '../shared/forwardedChatError.js';
 import { IAgentSdkDownloader, IAgentSdkPackage } from '../agentSdkDownloader.js';
@@ -611,6 +612,7 @@ export class CodexAgent extends Disposable implements IAgent {
 		@IAgentConfigurationService private readonly _configurationService: IAgentConfigurationService,
 		@IAgentSdkDownloader private readonly _agentSdkDownloader: IAgentSdkDownloader,
 		@IProductService private readonly _productService: IProductService,
+		@IAgentHostCheckpointService private readonly _checkpointService: IAgentHostCheckpointService,
 		@IInstantiationService instantiationService: IInstantiationService,
 	) {
 		super();
@@ -1871,6 +1873,13 @@ export class CodexAgent extends Disposable implements IAgent {
 		session.materializedToolsSig = toolsSignature(session.clientToolSet.merged());
 		this._logService.info(`[Codex DEBUG] materialized session=${session.sessionUri.toString()} threadId=${session.threadId}`);
 		this._sessionIdByThreadId.set(session.threadId, session.sessionId);
+		// Capture the original workspace state before the first Codex turn.
+		// AgentSideEffects records subsequent end-of-turn checkpoints, so this
+		// baseline prevents pre-existing user edits from being attributed to the
+		// AI session and provides the safe reference point for recovery.
+		this._checkpointService.captureBaseline(session.sessionUri, session.workingDirectory).catch(err => {
+			this._logService.warn(`[Codex:${session.sessionId}] Baseline checkpoint capture failed: ${err instanceof Error ? err.message : String(err)}`);
+		});
 		// Advertise the agent host's server tools on this session so clients see
 		// them as server-provided. Execution happens in-process via
 		// `_handleDynamicToolCallRpc`; the tools were registered with codex in

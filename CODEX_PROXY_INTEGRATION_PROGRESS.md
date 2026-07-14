@@ -102,7 +102,7 @@ AI Editor
 
 ### 阶段 E：中断恢复
 
-- [ ] E01 建立每 Turn 工作区基线。
+- [x] E01 建立每 Turn 工作区基线。
 - [ ] E02 记录 Agent Host 工具调用和命令执行状态。
 - [ ] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
 - [ ] E04 仅自动重试可确认未转发的请求。
@@ -618,3 +618,29 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `D:\AI_prejoct\VSCode-win32-x64\resources\app\product.json` 的 10 项 SHA-256（Base64 无填充格式）校验全部匹配。
 - 已启动 `D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe` 验证：简体中文界面、Codex Chat Editor、Proxy 模型选择、历史对话入口和“当前文件夹任务”面板均正常。
 - 本轮没有停止或重启共享 Proxy。
+
+## 16. 2026-07-14 E01 Codex Turn 工作区基线
+
+### 实现
+
+- Codex session 在成功 materialize 并取得工作区目录后，立即调用
+  `IAgentHostCheckpointService.captureBaseline(...)`。
+- 基线使用现有的私有 Git checkpoint ref；它记录 AI 首次执行前的完整工作树，
+  因此对话开始前已有的 Git 改动不会被归因到 AI。
+- 后续的 `AgentSideEffects` 保持在每个 Turn 结束时捕获增量 checkpoint；
+  E01 现已覆盖 Codex Agent Host，而不仅是原有 Copilot 路径。
+- 基线捕获为 best-effort：非 Git 文件夹或 Git 检查点异常只写日志，不会中断
+  Codex 会话。
+
+### 验证
+
+- `npm run typecheck-client`：通过。
+- `scripts\test.bat --grep "codexSessionConfigKeys"`：`2 passing`。
+  测试启动时存在已有 `.build\electron` 占用警告，但定向测试结果为通过。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- `npm run core-ci`：通过，成品 `out-vscode-min` 已同步。
+- `npm run gulp vscode-win32-x64-min-ci`：通过（将 Windows SDK x64
+  `signtool.exe` 临时加入 PATH 后完成）。
+- 开发版和 Windows 成品均使用隔离用户目录成功启动；Windows 成品
+  `product.json` 的 10/10 SHA-256 校验值匹配。
+- 共享 Proxy 未重启；结束时 `/live` 返回 `status: ok`。
