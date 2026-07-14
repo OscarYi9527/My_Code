@@ -104,7 +104,7 @@ AI Editor
 
 - [x] E01 建立每 Turn 工作区基线。
 - [x] E02 记录 Agent Host 工具调用和命令执行状态。
-- [ ] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
+- [x] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
 - [ ] E04 仅自动重试可确认未转发的请求。
 - [ ] E05 实现“检查状态并继续”恢复流程。
 - [ ] E06 验证预先存在的 Git 改动不会被错误归因或覆盖。
@@ -670,3 +670,15 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 隔离用户目录启动 `Code - OSS.exe` 通过；
   - `product.json` 的 10/10 SHA-256 校验值匹配。
 - 共享 Proxy 未停止或重启；结束时 `/live` 返回 `status: ok`。
+
+## 18. 2026-07-14 E03 Proxy 请求状态完成
+
+- Codex `turn/start` 通过原生 `responsesapiClientMetadata` 发送不含用户内容的
+  `vscode_session_id` 与 `vscode_turn_id`。
+- Proxy 使用这些匿名标识记录 `received`、`forwarded`、`completed` 和 `failed`，
+  并提供本机 `/control/code-turns/<session>/<turn>` 查询接口。
+- 已获用户明确批准后，使用 `scripts\restart-ai-proxy.ps1` 安全重启共享 Proxy；
+  `/live` 恢复为 `status: ok`。
+- Proxy 语法检查通过；其既有完整测试为 `58 passing / 2 failing`，失败项是账号
+  额度粘性与缓存刷新测试，与本次请求状态改动无关。
+- Code 侧 `typecheck-client`、`compile`、`core-ci` 和 Windows 成品打包均通过。

@@ -2065,6 +2065,14 @@ export class CodexAgent extends Disposable implements IAgent {
 				threadId,
 				input: input.slice(),
 				model: model.id,
+				// The external Proxy persists this opaque identifier with every
+				// Responses request. It lets recovery distinguish a request that
+				// was never received from one that was already forwarded, without
+				// placing workspace content or the user prompt in Proxy state.
+				responsesapiClientMetadata: {
+					vscode_session_id: session.sessionId,
+					vscode_turn_id: effectiveTurnId,
+				},
 				...turnOptions,
 			}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
 			// The thread now has committed history; client tools are locked to
