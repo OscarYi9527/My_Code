@@ -105,7 +105,7 @@ AI Editor
 - [x] E01 建立每 Turn 工作区基线。
 - [x] E02 记录 Agent Host 工具调用和命令执行状态。
 - [x] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
-- [ ] E04 仅自动重试可确认未转发的请求。
+- [x] E04 仅自动重试可确认未转发的请求。
 - [ ] E05 实现“检查状态并继续”恢复流程。
 - [ ] E06 验证预先存在的 Git 改动不会被错误归因或覆盖。
 - [ ] E07 验证非 Git 工作区文件基线。
@@ -682,3 +682,12 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - Proxy 语法检查通过；其既有完整测试为 `58 passing / 2 failing`，失败项是账号
   额度粘性与缓存刷新测试，与本次请求状态改动无关。
 - Code 侧 `typecheck-client`、`compile`、`core-ci` 和 Windows 成品打包均通过。
+
+## 19. 2026-07-14 E04 安全自动重试
+
+- Codex `turn/start` 发生异常时会查询本机 Proxy 的 Turn 状态。
+- 仅当查询请求成功且 Proxy 返回 `state: null`（确认未收到该 Turn）时，使用相同
+  Turn 标识自动重试一次。
+- Proxy 已收到、已转发、已完成、已失败、状态格式错误或查询失败时均不重试，
+  从而避免重复运行 AI 工具、终端命令或文件修改。
+- `typecheck-client`、定向测试、`compile`、`core-ci` 和 Windows 成品打包通过。

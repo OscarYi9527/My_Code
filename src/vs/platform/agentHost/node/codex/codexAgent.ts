@@ -2085,6 +2085,31 @@ export class CodexAgent extends Disposable implements IAgent {
 				this._fire(sessionUri, { type: ActionType.ChatTurnCancelled, turnId: effectiveTurnId });
 				return;
 			}
+			// A failed JSON-RPC turn/start is ambiguous: app-server may have
+			// accepted the turn and the Proxy could already be executing it.
+			// Retry exactly once only when the local Proxy positively confirms
+			// it never forwarded this opaque session/turn pair.
+			if (await this._externalProxyConfirmsNotForwarded(session, effectiveTurnId)) {
+				try {
+					const retryModel = await this._resolveModel(session);
+					const retryTurnOptions = this._turnStartOptions(session, retryModel.id);
+					await conn.client.request<'turn/start'>('turn/start', {
+						threadId,
+						input: input.slice(),
+						model: retryModel.id,
+						responsesapiClientMetadata: {
+							vscode_session_id: session.sessionId,
+							vscode_turn_id: effectiveTurnId,
+						},
+						...retryTurnOptions,
+					}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
+					session.firstTurnSent = true;
+					this._logService.info(`[Codex:${sessionId}] safely retried turn ${effectiveTurnId}; Proxy confirmed it was not forwarded`);
+					return;
+				} catch (retryError) {
+					err = retryError;
+				}
+			}
 			const message = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[Codex:${sessionId}] turn/start error: ${message}`);
 			this._fire(sessionUri, {
@@ -2230,6 +2255,33 @@ export class CodexAgent extends Disposable implements IAgent {
 			} catch (err) {
 				this._logService.info(`[Codex:${threadId}] thread/unsubscribe failed: ${err instanceof Error ? err.message : String(err)}`);
 			}
+		}
+	}
+
+	/**
+	 * A `null` state is safe only when it came from a successful local Proxy
+	 * response: it means that Proxy never received this turn. Network errors,
+	 * forwarded/completed states and malformed responses are all treated as
+	 * unsafe and must remain user-visible rather than being replayed.
+	 */
+	private async _externalProxyConfirmsNotForwarded(session: ICodexSession, turnId: string): Promise<boolean> {
+		if (!this._usesExternalProxy()) {
+			return false;
+		}
+		try {
+			await new Promise(resolve => setTimeout(resolve, 75));
+			const baseUrl = this._externalProxyBaseUrl();
+			const response = await fetch(`${baseUrl}/control/code-turns/${encodeURIComponent(session.sessionId)}/${encodeURIComponent(turnId)}`, {
+				signal: AbortSignal.timeout(1500),
+			});
+			if (!response.ok) {
+				return false;
+			}
+			const payload = await response.json() as { state?: unknown };
+			return payload.state === null;
+		} catch (err) {
+			this._logService.info(`[Codex:${session.sessionId}] Proxy forwarding state unavailable; not retrying: ${err instanceof Error ? err.message : String(err)}`);
+			return false;
 		}
 	}
 
