@@ -1249,6 +1249,13 @@ export interface IAgent {
 	onArchivedChanged?(session: URI, isArchived: boolean): Promise<void>;
 
 	/**
+	 * Notifies the provider that the user assigned a custom session title.
+	 * Providers with a native persisted session catalog can mirror the title
+	 * so other clients observe the same name.
+	 */
+	onTitleChanged?(session: URI, title: string): Promise<void>;
+
+	/**
 	 * Get (or lazily create) the per-session handle for an active client,
 	 * identified by `clientId`. Mutating the returned {@link IActiveClient}'s
 	 * `tools` / `customizations` updates only that client's contribution; the

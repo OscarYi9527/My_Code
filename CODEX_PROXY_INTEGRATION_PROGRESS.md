@@ -98,7 +98,7 @@ AI Editor
 - [x] D02 Code 启动时优先恢复已打开或工作区保存的 Codex 会话。
 - [x] D03 开发模式与简约模式复用同一 Chat Editor/Codex Thread。
 - [x] D04 保留原生多会话管理入口。
-- [ ] D05 验证新建、切换、重命名、归档和删除。
+- [x] D05 验证新建、切换、重命名、归档和删除。
 
 ### 阶段 E：中断恢复
 
@@ -593,3 +593,28 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - `D:\AI_prejoct\My_code\screenshots\workspace-task-history-dev.png`
   - `D:\AI_prejoct\My_code\screenshots\workspace-task-history-product-zh.png`
 - 本轮未停止或重启共享 Proxy；最终 `/live` 返回 `status: ok`。
+
+## 15. 2026-07-14 D05 Codex 多会话生命周期完成
+
+### 实现
+
+- Codex 重命名会同步调用 `thread/name/set`，并继续保存本地标题。
+- 归档和恢复会同步调用 `thread/archive` / `thread/unarchive`；首次操作历史会话前，会临时订阅该会话，保证操作通道已恢复。
+- 删除使用 Codex 的归档能力，并将真实 `threadId` 写入不对用户暴露的
+  `codex.deletedThreadIds` 墓碑；因此删除后的任务不会在刷新或冷启动时重新出现。
+- 历史目录同时读取 active 和 archived 的 `thread/list` 结果，并包含 `appServer` 等 Codex Agent Host 创建来源。
+
+### 运行验证
+
+- 开发版实际创建并收到 `OK.` 回复的测试会话。
+- 实际归档后，Agent Host 请求日志、Codex SQLite 均确认该会话已归档。
+- 冷启动后，Agent Host 返回已归档会话；会话列表在滚动至底部后显示 **Archived** 分组及 2 条会话（此前未滚动的虚拟列表造成“未显示”的误判）。
+- 删除、墓碑加载、重命名和归档同步路径的定向测试通过：`9 passing`。
+
+### 构建与成品验证
+
+- 开发版：`npm run typecheck-client`、`npm run compile` 通过；`scripts\test.bat` 定向测试 `9 passing`。
+- Windows 成品：`npm run core-ci` 与 `npm run gulp vscode-win32-x64-min-ci` 通过。
+- `D:\AI_prejoct\VSCode-win32-x64\resources\app\product.json` 的 10 项 SHA-256（Base64 无填充格式）校验全部匹配。
+- 已启动 `D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe` 验证：简体中文界面、Codex Chat Editor、Proxy 模型选择、历史对话入口和“当前文件夹任务”面板均正常。
+- 本轮没有停止或重启共享 Proxy。

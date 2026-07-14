@@ -64,6 +64,7 @@ export class MockAgent implements IAgent {
 	readonly respondToPermissionCalls: { requestId: string; approved: boolean }[] = [];
 	readonly changeModelCalls: { session: URI; model: ModelSelection; chat?: URI }[] = [];
 	readonly changeAgentCalls: { session: URI; agent: AgentSelection | undefined; chat?: URI }[] = [];
+	readonly titleChangedCalls: { session: URI; title: string }[] = [];
 	readonly authenticateCalls: { resource: string; token: string }[] = [];
 	readonly setClientCustomizationsCalls: { clientId: string; customizations: ClientPluginCustomization[] }[] = [];
 	readonly setClientToolsCalls: { clientId: string; tools: readonly ToolDefinition[] }[] = [];
@@ -177,6 +178,10 @@ export class MockAgent implements IAgent {
 
 	async changeAgent(session: URI, agent: AgentSelection | undefined, chat?: URI): Promise<void> {
 		this.changeAgentCalls.push({ session, agent, chat });
+	}
+
+	async onTitleChanged(session: URI, title: string): Promise<void> {
+		this.titleChangedCalls.push({ session, title });
 	}
 
 	async authenticate(resource: string, token: string): Promise<boolean> {

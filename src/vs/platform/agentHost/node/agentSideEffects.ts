@@ -850,6 +850,10 @@ export class AgentSideEffects extends Disposable {
 					break;
 				}
 				this._persistSessionFlag(channel, 'customTitle', action.title);
+				const agent = this._options.getAgent(channel);
+				agent?.onTitleChanged?.(URI.parse(channel), action.title).catch(err => {
+					this._logService.warn(`[AgentSideEffects] onTitleChanged failed for ${channel}`, err);
+				});
 				break;
 			}
 			case ActionType.ChatPendingMessageSet:
@@ -986,6 +990,10 @@ export class AgentSideEffects extends Disposable {
 				// new title here directly (the client-dispatched rename path relies
 				// on the `SessionTitleChanged` case in `handleAction` instead).
 				this._persistSessionFlag(sessionChannel, 'customTitle', title);
+				const agent = this._options.getAgent(sessionChannel);
+				agent?.onTitleChanged?.(URI.parse(sessionChannel), title).catch(err => {
+					this._logService.warn(`[AgentSideEffects] onTitleChanged failed for ${sessionChannel}`, err);
+				});
 			}
 			// Acknowledge the rename with a brief response so the turn has
 			// visible content in the transcript.

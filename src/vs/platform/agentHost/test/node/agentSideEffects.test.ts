@@ -403,7 +403,13 @@ suite('AgentSideEffects', () => {
 			renameSideEffects.handleAction(defaultChatUri, action);
 			await new Promise(r => setTimeout(r, 10));
 
-			assert.deepStrictEqual(agent.sendMessageCalls, []);
+			assert.deepStrictEqual({
+				sendMessageCalls: agent.sendMessageCalls,
+				titleChangedCalls: agent.titleChangedCalls.map(call => ({ session: call.session.toString(), title: call.title })),
+			}, {
+				sendMessageCalls: [],
+				titleChangedCalls: [{ session: sessionUri.toString(), title: 'Renamed Session' }],
+			});
 			const state = stateManager.getSessionState(sessionUri.toString());
 			assert.strictEqual(state?.title, 'Renamed Session');
 			assert.strictEqual(stateManager.getActiveTurnId(sessionUri.toString()), undefined);
@@ -2507,7 +2513,13 @@ suite('AgentSideEffects', () => {
 			// Wait for the async persistence
 			await new Promise(r => setTimeout(r, 50));
 
-			assert.strictEqual(await sessionDb.getMetadata('customTitle'), 'Custom Title');
+			assert.deepStrictEqual({
+				persistedTitle: await sessionDb.getMetadata('customTitle'),
+				providerCalls: localAgent.titleChangedCalls.map(call => ({ session: call.session.toString(), title: call.title })),
+			}, {
+				persistedTitle: 'Custom Title',
+				providerCalls: [{ session: sessionUri.toString(), title: 'Custom Title' }],
+			});
 		});
 
 		test('handleListSessions returns persisted custom title', async () => {

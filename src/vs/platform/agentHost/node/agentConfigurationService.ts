@@ -12,6 +12,7 @@ import { URI } from '../../../base/common/uri.js';
 import { createDecorator } from '../../instantiation/common/instantiation.js';
 import { ILogService } from '../../log/common/log.js';
 import { AgentHostConfigKey, agentHostCustomizationConfigSchema, defaultAgentHostCustomizationConfigValues } from '../common/agentHostCustomizationConfig.js';
+import { codexInternalStateSchema } from '../common/codexConfig.js';
 import { sandboxConfigSchema } from '../common/sandboxConfigSchema.js';
 import type { ISchema, SchemaDefinition, SchemaValue } from '../common/agentHostSchema.js';
 import { ProtocolError } from '../common/state/sessionProtocol.js';
@@ -280,6 +281,11 @@ export class AgentConfigurationService extends Disposable implements IAgentConfi
 			return {
 				...agentHostCustomizationConfigSchema.validateOrDefault(parsed, defaults),
 				...sandboxConfigSchema.validateOrDefault(parsed, {}),
+				// Internal provider state is intentionally loaded without
+				// merging its schema into the root config exposed to clients.
+				// This keeps tombstones durable without presenting them as
+				// editable session settings.
+				...codexInternalStateSchema.validateOrDefault(parsed, {}),
 			};
 		} catch (err) {
 			const code = err && typeof err === 'object' && hasKey(err, { code: true }) ? String(err.code) : undefined;

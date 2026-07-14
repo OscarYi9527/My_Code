@@ -36,6 +36,8 @@ import { IChatEditingService } from '../../../common/editing/chatEditingService.
 import { IChatResponseFileChangesService } from '../../../browser/chatResponseFileChangesService.js';
 import { IMarkdownString } from '../../../../../../base/common/htmlContent.js';
 import { IChatSessionsService, type IChatSessionItemController, type IChatSessionRequestHistoryItem, type IChatSessionsExtensionPoint } from '../../../common/chatSessionsService.js';
+import { IAgentSessionsService } from '../../../browser/agentSessions/agentSessionsService.js';
+import type { IAgentSession } from '../../../browser/agentSessions/agentSessionsModel.js';
 import { ILanguageModelsService, type ILanguageModelChatMetadata } from '../../../common/languageModels.js';
 import { IProductService } from '../../../../../../platform/product/common/productService.js';
 import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
@@ -241,11 +243,13 @@ class MockAgentHostService extends mock<IAgentHostService>() {
 	}
 
 	public authenticateCalls: { resource: string; scopes?: readonly string[]; token: string }[] = [];
+	public subscriptionCalls: URI[] = [];
 	override async authenticate(params: { resource: string; scopes?: readonly string[]; token: string }): Promise<{ authenticated: boolean }> {
 		this.authenticateCalls.push({ resource: params.resource, scopes: params.scopes, token: params.token });
 		return { authenticated: true };
 	}
 	override getSubscription<T>(_kind: StateComponents, resource: URI): IReference<IAgentSubscription<T>> {
+		this.subscriptionCalls.push(resource);
 		const resourceStr = resource.toString();
 		const emitter = new Emitter<T>();
 		const onWillApply = new Emitter<ActionEnvelope>();
@@ -507,6 +511,7 @@ function createTestServices(disposables: DisposableStore, workingDirectoryResolv
 	const chatWidgetService = new MockChatWidgetService();
 	const chatSessionContributions: IChatSessionsExtensionPoint[] = [];
 	const chatSessionItemControllers: { type: string; controller: IChatSessionItemController }[] = [];
+	const agentSessionArchivedEmitter = disposables.add(new Emitter<IAgentSession>());
 	const openerService: { openedUrls: (string | URI)[]; openShouldFail: boolean; openResult: boolean } & Partial<IOpenerService> = {
 		openedUrls: [],
 		openShouldFail: false,
@@ -544,6 +549,12 @@ function createTestServices(disposables: DisposableStore, workingDirectoryResolv
 			chatSessionContributions.push(contribution);
 			return toDisposable(() => { });
 		},
+	});
+	instantiationService.stub(IAgentSessionsService, {
+		_serviceBrand: undefined,
+		onDidChangeSessionArchivedState: agentSessionArchivedEmitter.event,
+		model: undefined!,
+		getSession: () => undefined,
 	});
 	instantiationService.stub(IDefaultAccountService, { onDidChangeDefaultAccount: Event.None, getDefaultAccount: async () => null });
 	instantiationService.stub(IAuthenticationService, { onDidChangeSessions: Event.None, ...authServiceOverride });
@@ -686,7 +697,7 @@ function createTestServices(disposables: DisposableStore, workingDirectoryResolv
 	instantiationService.stub(IAgentHostActiveClientService, activeClientService);
 	instantiationService.stub(IOpenerService, openerService as IOpenerService);
 
-	return { instantiationService, agentHostService, chatAgentService, chatWidgetService, chatService, openerService, activeClientService, seedActiveClient, chatSessionContributions, chatSessionItemControllers, newSessionFolderService, trustController };
+	return { instantiationService, agentHostService, chatAgentService, chatWidgetService, chatService, openerService, activeClientService, seedActiveClient, chatSessionContributions, chatSessionItemControllers, agentSessionArchivedEmitter, newSessionFolderService, trustController };
 }
 
 function createSessionListStore(disposables: DisposableStore, instantiationService: TestInstantiationService, connection: IAgentHostSessionListConnection): AgentHostSessionListStore {
@@ -5091,12 +5102,12 @@ suite('AgentHostChatContribution', () => {
 			disposables.add(instantiationService.createInstance(AgentHostContribution));
 
 			agentHostService.setRootState({
-				agents: [{ provider: 'copilot' as const, displayName: 'Agent Host - Copilot', description: 'test', models: [] }],
+				agents: [{ provider: 'codex' as const, displayName: 'Agent Host - Codex', description: 'test', models: [] }],
 				activeSessions: 0,
 			});
 
 			assert.deepStrictEqual(chatSessionContributions.map(c => ({ type: c.type, supportsImageAttachments: c.capabilities?.supportsImageAttachments })), [
-				{ type: 'agent-host-copilot', supportsImageAttachments: true },
+				{ type: 'agent-host-codex', supportsImageAttachments: true },
 			]);
 			assert.deepStrictEqual(chatSessionItemControllers.map(c => c.type), []);
 		});
@@ -5106,11 +5117,60 @@ suite('AgentHostChatContribution', () => {
 			disposables.add(instantiationService.createInstance(AgentHostSessionListContribution));
 
 			agentHostService.setRootState({
-				agents: [{ provider: 'copilot' as const, displayName: 'Agent Host - Copilot', description: 'test', models: [] }],
+				agents: [{ provider: 'codex' as const, displayName: 'Agent Host - Codex', description: 'test', models: [] }],
 				activeSessions: 0,
 			});
 
-			assert.deepStrictEqual(chatSessionItemControllers.map(c => c.type), ['agent-host-copilot']);
+			assert.deepStrictEqual(chatSessionItemControllers.map(c => c.type), ['agent-host-codex']);
+		});
+
+		test('session list contribution restores an unopened local session before forwarding archive state', async () => {
+			const { instantiationService, agentHostService, agentSessionArchivedEmitter } = createTestServices(disposables);
+			disposables.add(instantiationService.createInstance(AgentHostSessionListContribution));
+
+			const resource = URI.from({ scheme: 'agent-host-codex', path: '/historical-thread' });
+			const session = upcastPartial<IAgentSession>({
+				resource,
+				providerType: 'agent-host-codex',
+				isArchived: () => true,
+				setArchived: () => { },
+			});
+
+			agentSessionArchivedEmitter.fire(session);
+			await timeout(0);
+
+			assert.deepStrictEqual(agentHostService.subscriptionCalls.map(uri => uri.toString()), ['codex:/historical-thread']);
+			assert.deepStrictEqual(agentHostService.dispatchedActions.map(({ channel, action }) => ({ channel, action })), [{
+				channel: 'codex:/historical-thread',
+				action: {
+					type: ActionType.SessionIsArchivedChanged,
+					isArchived: true,
+				},
+			}]);
+		});
+
+		test('session list contribution forwards restore state for local agent-host sessions', async () => {
+			const { instantiationService, agentHostService, agentSessionArchivedEmitter } = createTestServices(disposables);
+			disposables.add(instantiationService.createInstance(AgentHostSessionListContribution));
+
+			const resource = URI.from({ scheme: 'agent-host-codex', path: '/archived-thread' });
+			const session = upcastPartial<IAgentSession>({
+				resource,
+				providerType: 'agent-host-codex',
+				isArchived: () => false,
+				setArchived: () => { },
+			});
+
+			agentSessionArchivedEmitter.fire(session);
+			await timeout(0);
+
+			assert.deepStrictEqual(agentHostService.dispatchedActions.map(({ channel, action }) => ({ channel, action })), [{
+				channel: 'codex:/archived-thread',
+				action: {
+					type: ActionType.SessionIsArchivedChanged,
+					isArchived: false,
+				},
+			}]);
 		});
 
 		test('session list contribution does not register item controller in sessions window', () => {

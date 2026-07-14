@@ -18,6 +18,7 @@ import { ILogService } from '../../../log/common/log.js';
 import { IProductService } from '../../../product/common/productService.js';
 import { createSchema, platformSessionSchema, schemaProperty, type SessionMode } from '../../common/agentHostSchema.js';
 import { createPricingMetaFromBilling, type ICAPIModelBilling } from '../../common/agentModelPricing.js';
+import { CODEX_DELETED_THREAD_IDS_KEY, codexInternalStateSchema } from '../../common/codexConfig.js';
 import { getReasoningEffortDescription, getReasoningEffortLabel } from '../../common/reasoningEffort.js';
 import { AgentHostCodexAgentBinaryArgsEnvVar, AgentHostCodexAgentCodexHomeEnvVar, AgentHostCodexAgentSdkRootEnvVar, AgentHostCodexProxyBaseUrlEnvVar, AgentHostCodexProxyModeEnvVar, AgentSession, AgentSignal, GITHUB_COPILOT_PROTECTED_RESOURCE, GITHUB_REPO_PROTECTED_RESOURCE, IActiveClient, IAgent, IAgentCreateSessionConfig, IAgentCreateSessionResult, IAgentDescriptor, IAgentMaterializeSessionEvent, IAgentModelInfo, IAgentResolveSessionConfigParams, IAgentSessionConfigCompletionsParams, IAgentSessionMetadata, IMcpNotification, type AgentProvider } from '../../common/agentService.js';
 import { SessionConfigKey } from '../../common/sessionConfigKeys.js';
@@ -71,6 +72,7 @@ import type { JsonValue } from './protocol/generated/serde_json/JsonValue.js';
 import type { GetAccountResponse } from './protocol/generated/v2/GetAccountResponse.js';
 import type { Thread } from './protocol/generated/v2/Thread.js';
 import type { ThreadListResponse } from './protocol/generated/v2/ThreadListResponse.js';
+import type { ThreadSourceKind } from './protocol/generated/v2/ThreadSourceKind.js';
 import type { ThreadReadResponse } from './protocol/generated/v2/ThreadReadResponse.js';
 import type { TurnCompletedNotification } from './protocol/generated/v2/TurnCompletedNotification.js';
 import type { TurnStartedNotification } from './protocol/generated/v2/TurnStartedNotification.js';
@@ -111,6 +113,13 @@ function withLoopbackNoProxy(value: string | undefined): string {
 }
 
 const CODEX_THINKING_LEVEL_KEY = 'thinkingLevel';
+/**
+ * `thread/list` defaults to Codex's interactive sources when `sourceKinds` is
+ * omitted. Sessions created by this integration use the `appServer` source,
+ * so explicitly request every top-level user-session source. Subagent sources
+ * stay excluded because they are represented inside their parent session.
+ */
+const CODEX_SESSION_SOURCE_KINDS: readonly ThreadSourceKind[] = ['cli', 'vscode', 'exec', 'appServer', 'unknown'];
 
 /**
  * User-agent prefix applied to the Codex agent's outbound CAPI calls (e.g. the
@@ -2164,28 +2173,39 @@ export class CodexAgent extends Disposable implements IAgent {
 		this._logService.info(`[Codex DEBUG] disposeSession session=${sessionUri.toString()}`);
 		const sessionId = AgentSession.id(sessionUri);
 		const session = this._sessions.get(sessionId);
-		if (!session) {
-			return;
+		const threadId = await this._resolveThreadId(sessionUri);
+
+		// AgentService.disposeSession is the permanent removal path used by the
+		// sessions UI. Codex app-server does not expose thread/delete, so archive
+		// is its durable removal primitive: thread/list excludes archived threads
+		// and the deleted task cannot reappear after refresh or restart.
+		if (threadId !== undefined) {
+			const conn = await this._ensureConnection();
+			await conn.client.request<'thread/archive'>('thread/archive', { threadId });
+			this._markThreadDeleted(threadId);
 		}
-		session.disposed = true;
-		this._claimPrewarm(session);
-		this._sessions.delete(sessionId);
-		session.mcpController?.dispose();
-		if (session.threadId !== undefined) {
-			this._sessionIdByThreadId.delete(session.threadId);
+
+		if (session) {
+			session.disposed = true;
+			this._claimPrewarm(session);
+			this._sessions.delete(sessionId);
+			session.mcpController?.dispose();
+			if (session.threadId !== undefined) {
+				this._sessionIdByThreadId.delete(session.threadId);
+			}
+			// Unpark any pending approvals so codex doesn't deadlock waiting
+			// on a response we will never deliver.
+			session.pendingCommandApprovals.denyAll('decline');
+			// Reject any in-flight client tool calls so their `item/tool/call`
+			// handlers unwind instead of awaiting a response that won't arrive.
+			session.pendingClientToolCalls.rejectAll(new CancellationError());
+			session.pendingUserInputs.rejectAll(new CancellationError());
+			// Clear any buffered steering so its pending bubble doesn't leak.
+			this._drainPendingSteering(session);
 		}
-		// Unpark any pending approvals so codex doesn't deadlock waiting
-		// on a response we will never deliver.
-		session.pendingCommandApprovals.denyAll('decline');
-		// Reject any in-flight client tool calls so their `item/tool/call`
-		// handlers unwind instead of awaiting a response that won't arrive.
-		session.pendingClientToolCalls.rejectAll(new CancellationError());
-		session.pendingUserInputs.rejectAll(new CancellationError());
-		// Clear any buffered steering so its pending bubble doesn't leak.
-		this._drainPendingSteering(session);
+
 		const conn = this._connection;
-		if (conn.kind === 'ready' && session.threadId !== undefined) {
-			const threadId = session.threadId;
+		if (conn.kind === 'ready' && threadId !== undefined) {
 			// `thread/unsubscribe` is the codex-native way to release a
 			// session. Codex evicts after its 30-minute idle grace.
 			try {
@@ -2193,6 +2213,20 @@ export class CodexAgent extends Disposable implements IAgent {
 			} catch (err) {
 				this._logService.info(`[Codex:${threadId}] thread/unsubscribe failed: ${err instanceof Error ? err.message : String(err)}`);
 			}
+		}
+	}
+
+	async onTitleChanged(sessionUri: URI, title: string): Promise<void> {
+		const threadId = await this._resolveThreadId(sessionUri);
+		if (threadId === undefined) {
+			return;
+		}
+		try {
+			const conn = await this._ensureConnection();
+			await conn.client.request<'thread/name/set'>('thread/name/set', { threadId, name: title });
+		} catch (err) {
+			this._logService.warn(`[Codex:${threadId}] thread/name/set failed: ${err instanceof Error ? err.message : String(err)}`);
+			throw err;
 		}
 	}
 
@@ -2251,11 +2285,8 @@ export class CodexAgent extends Disposable implements IAgent {
 		if (threadId === undefined) {
 			return;
 		}
-		const conn = this._connection;
-		if (conn.kind !== 'ready') {
-			return;
-		}
 		try {
+			const conn = await this._ensureConnection();
 			if (isArchived) {
 				await conn.client.request<'thread/archive'>('thread/archive', { threadId });
 			} else {
@@ -2263,17 +2294,22 @@ export class CodexAgent extends Disposable implements IAgent {
 			}
 		} catch (err) {
 			this._logService.warn(`[Codex:${threadId}] thread/${isArchived ? 'archive' : 'unarchive'} failed: ${err instanceof Error ? err.message : String(err)}`);
+			throw err;
 		}
 	}
 
 	/** Resolve the codex thread id for a session: in-memory → persisted overlay. */
 	private async _resolveThreadId(sessionUri: URI): Promise<string | undefined> {
 		const existing = this._sessions.get(AgentSession.id(sessionUri));
-		if (existing?.threadId !== undefined) {
+		if (existing) {
 			return existing.threadId;
 		}
 		const overlay = await this._metadataStore.read(sessionUri);
-		return overlay.threadId;
+		// Sessions discovered directly from `thread/list` use the canonical
+		// codex thread id as their AgentSession URI id and have no VS Code
+		// overlay yet. Falling back to the URI id lets rename/archive/delete
+		// work before the historical session has ever been opened.
+		return overlay.threadId ?? AgentSession.id(sessionUri);
 	}
 
 	respondToPermissionRequest(requestId: string, approved: boolean): void {
@@ -2396,9 +2432,18 @@ export class CodexAgent extends Disposable implements IAgent {
 		}
 		try {
 			const conn = await this._ensureConnection();
-			const response = await conn.client.request<'thread/list', ThreadListResponse>('thread/list', {
-				limit: 200,
-			});
+			const [activeResponse, archivedResponse] = await Promise.all([
+				conn.client.request<'thread/list', ThreadListResponse>('thread/list', {
+					limit: 200,
+					archived: false,
+					sourceKinds: [...CODEX_SESSION_SOURCE_KINDS],
+				}),
+				conn.client.request<'thread/list', ThreadListResponse>('thread/list', {
+					limit: 200,
+					archived: true,
+					sourceKinds: [...CODEX_SESSION_SOURCE_KINDS],
+				}),
+			]);
 			// Map persisted threads back to the URI the workbench already
 			// knows them by. After `_materializeIfNeeded` runs, the codex
 			// thread is persisted to disk under its thread id but the
@@ -2413,9 +2458,24 @@ export class CodexAgent extends Disposable implements IAgent {
 					liveUriByThreadId.set(s.threadId, s.sessionUri);
 				}
 			}
-			return response.data.map(t => this._threadToMetadata(
-				t,
-				liveUriByThreadId.get(t.id) ?? AgentSession.uri(this.id, t.id),
+			const deletedThreadIds = this._deletedThreadIds();
+			const sessionsByThreadId = new Map<string, { readonly thread: Thread; readonly isArchived: boolean }>();
+			for (const thread of archivedResponse.data) {
+				if (!deletedThreadIds.has(thread.id)) {
+					sessionsByThreadId.set(thread.id, { thread, isArchived: true });
+				}
+			}
+			// Prefer the active catalogue if a transient app-server state ever
+			// exposes the same thread in both responses.
+			for (const thread of activeResponse.data) {
+				if (!deletedThreadIds.has(thread.id)) {
+					sessionsByThreadId.set(thread.id, { thread, isArchived: false });
+				}
+			}
+			return [...sessionsByThreadId.values()].map(({ thread, isArchived }) => this._threadToMetadata(
+				thread,
+				liveUriByThreadId.get(thread.id) ?? AgentSession.uri(this.id, thread.id),
+				isArchived,
 			));
 		} catch (err) {
 			this._logService.warn(`[Codex] thread/list failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -2423,7 +2483,7 @@ export class CodexAgent extends Disposable implements IAgent {
 		}
 	}
 
-	private _threadToMetadata(thread: Thread, sessionUri: URI): IAgentSessionMetadata {
+	private _threadToMetadata(thread: Thread, sessionUri: URI, isArchived = false): IAgentSessionMetadata {
 		return {
 			session: sessionUri,
 			// Codex returns Unix seconds; the agent host expects ms.
@@ -2431,7 +2491,28 @@ export class CodexAgent extends Disposable implements IAgent {
 			modifiedTime: (thread.updatedAt ?? thread.createdAt ?? 0) * 1000,
 			summary: thread.name ?? thread.preview ?? undefined,
 			workingDirectory: thread.cwd ? URI.file(thread.cwd) : undefined,
+			isArchived,
 		};
+	}
+
+	private _deletedThreadIds(): Set<string> {
+		return new Set(this._configurationService.getRootValue(
+			codexInternalStateSchema,
+			CODEX_DELETED_THREAD_IDS_KEY,
+		) ?? []);
+	}
+
+	private _markThreadDeleted(threadId: string): void {
+		const deletedThreadIds = this._deletedThreadIds();
+		deletedThreadIds.add(threadId);
+		// Always write, even when another root-state source already supplied
+		// this tombstone. The in-memory root state can outlive or be restored
+		// independently of `agent-host-config.json`; skipping the idempotent
+		// update in that case would leave the on-disk catalogue stale and let
+		// the thread reappear on the next cold start.
+		this._configurationService.updateRootConfig({
+			[CODEX_DELETED_THREAD_IDS_KEY]: [...deletedThreadIds],
+		});
 	}
 
 	setServerToolHost(host: IAgentServerToolHost): void {

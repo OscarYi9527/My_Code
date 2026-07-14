@@ -4,11 +4,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { URI } from '../../../../base/common/uri.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import { NullLogService } from '../../../log/common/log.js';
 import { createSchema, schemaProperty } from '../../common/agentHostSchema.js';
+import { CODEX_DELETED_THREAD_IDS_KEY, codexInternalStateSchema } from '../../common/codexConfig.js';
 import type { RootConfigState } from '../../common/state/protocol/state.js';
 import { buildSubagentSessionUri, SessionStatus, type SessionSummary } from '../../common/state/sessionState.js';
 import { AgentConfigurationService } from '../../node/agentConfigurationService.js';
@@ -166,5 +170,38 @@ suite('AgentConfigurationService', () => {
 			const state = manager.getSessionState(uri);
 			assert.deepStrictEqual(state?.config?.values, { level: 'low', limit: 42 });
 		});
+	});
+
+	// ---- persisted internal state -----------------------------------------
+
+	test('loads persisted Codex deleted-thread tombstones without exposing their schema', () => {
+		const tempDir = mkdtempSync(join(tmpdir(), 'agent-host-codex-config-'));
+		const localDisposables = new DisposableStore();
+		try {
+			const rootConfigResource = URI.file(join(tempDir, 'agent-host-config.json'));
+			writeFileSync(rootConfigResource.fsPath, JSON.stringify({
+				customizations: [],
+				[CODEX_DELETED_THREAD_IDS_KEY]: ['thread-a', 'thread-b'],
+			}));
+
+			const persistedManager = localDisposables.add(new AgentHostStateManager(new NullLogService()));
+			const persistedService = localDisposables.add(new AgentConfigurationService(
+				persistedManager,
+				new NullLogService(),
+				rootConfigResource,
+			));
+
+			assert.deepStrictEqual(
+				persistedService.getRootValue(codexInternalStateSchema, CODEX_DELETED_THREAD_IDS_KEY),
+				['thread-a', 'thread-b'],
+			);
+			assert.strictEqual(
+				persistedManager.rootState.config?.schema.properties[CODEX_DELETED_THREAD_IDS_KEY],
+				undefined,
+			);
+		} finally {
+			localDisposables.dispose();
+			rmSync(tempDir, { recursive: true, force: true });
+		}
 	});
 });

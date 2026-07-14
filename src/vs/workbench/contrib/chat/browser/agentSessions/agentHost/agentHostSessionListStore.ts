@@ -4,23 +4,19 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CancellationToken } from '../../../../../../base/common/cancellation.js';
-import { Emitter, Event } from '../../../../../../base/common/event.js';
-import { Disposable } from '../../../../../../base/common/lifecycle.js';
+import { Emitter } from '../../../../../../base/common/event.js';
+import { Disposable, DisposableStore } from '../../../../../../base/common/lifecycle.js';
 import { extUriBiasedIgnorePathCase } from '../../../../../../base/common/resources.js';
 import { URI } from '../../../../../../base/common/uri.js';
-import { AgentSession, type IAgentSessionMetadata } from '../../../../../../platform/agentHost/common/agentService.js';
-import type { INotification } from '../../../../../../platform/agentHost/common/state/sessionActions.js';
-import { SessionStatus, type SessionSummary } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { AgentSession, type IAgentConnection, type IAgentSessionMetadata } from '../../../../../../platform/agentHost/common/agentService.js';
+import { ActionType, type INotification } from '../../../../../../platform/agentHost/common/state/sessionActions.js';
+import { SessionStatus, StateComponents, type SessionSummary } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 
 /**
  * Minimal agent-host connection surface needed by the session list store.
  */
-export interface IAgentHostSessionListConnection {
-	readonly onDidNotification: Event<INotification>;
-	listSessions(): Promise<IAgentSessionMetadata[]>;
-	disposeSession(session: URI): Promise<void>;
-}
+export type IAgentHostSessionListConnection = Pick<IAgentConnection, 'onDidNotification' | 'listSessions' | 'disposeSession' | 'getSubscription' | 'dispatch'>;
 
 /**
  * Provider-tagged backend session entry owned by the shared session-list store.
@@ -118,6 +114,62 @@ export class AgentHostSessionListStore extends Disposable {
 
 	async disposeSession(provider: string, rawId: string): Promise<void> {
 		await this._connection.disposeSession(AgentSession.uri(provider, rawId));
+	}
+
+	/**
+	 * Persists an archive-state change in the agent host. The workbench's
+	 * {@link AgentSessionsModel} owns the immediate UI state, but local
+	 * agent-host providers are not extension-contributed session providers and
+	 * therefore do not receive the normal main-thread/extension-host callback.
+	 *
+	 * Acquire a temporary session subscription before dispatching so historical
+	 * sessions that have never been opened in this window are restored in the
+	 * agent host and have an action channel ready to receive the change.
+	 */
+	async setSessionArchived(provider: string, rawId: string, isArchived: boolean): Promise<void> {
+		const session = AgentSession.uri(provider, rawId);
+		const subscriptionRef = this._connection.getSubscription(StateComponents.Session, session, 'AgentHostSessionListStore');
+		try {
+			const subscription = subscriptionRef.object;
+			const initialValue = subscription.value;
+			if (initialValue instanceof Error) {
+				throw initialValue;
+			}
+			if (initialValue === undefined) {
+				await new Promise<void>((resolve, reject) => {
+					const listeners = new DisposableStore();
+					const finish = (error?: Error) => {
+						listeners.dispose();
+						if (error) {
+							reject(error);
+						} else {
+							resolve();
+						}
+					};
+
+					listeners.add(subscription.onDidChange(() => finish()));
+					if (subscription.onDidError) {
+						listeners.add(subscription.onDidError(error => finish(error)));
+					}
+
+					// Re-check after installing listeners in case the initial
+					// snapshot completed between acquisition and registration.
+					const currentValue = subscription.value;
+					if (currentValue instanceof Error) {
+						finish(currentValue);
+					} else if (currentValue !== undefined) {
+						finish();
+					}
+				});
+			}
+
+			this._connection.dispatch(session.toString(), {
+				type: ActionType.SessionIsArchivedChanged,
+				isArchived,
+			});
+		} finally {
+			subscriptionRef.dispose();
+		}
 	}
 
 	removeSession(provider: string, rawId: string): void {
