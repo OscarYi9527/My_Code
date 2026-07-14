@@ -754,3 +754,15 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   通过；`D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe` 使用隔离用户目录启动
   检查通过；`product.json` 10/10 SHA-256 校验匹配。
 - 本轮未停止或重启共享 Proxy；结束时 `/live` 返回 `status: ok`。
+
+## 22. 2026-07-14 GitHub Actions 后续基线修复
+
+- npm 安装和缓存脚本修复后的 CI 已实际进入 Monaco 浏览器测试与 Component
+  Fixtures 截图阶段，确认此前依赖/权限故障已排除。
+- Monaco 测试页只设置了 `window.instance`，但测试脚本使用了未定义的裸
+  `instance` 标识符；已改为显式访问 `window.instance`。
+- Component Fixtures 的两张 Inline Chat Zone Widget 截图哈希因既有 AI Editor
+  UI 改动而变化；已按 CI 生成的标准 manifest 更新
+  `blocks-ci-screenshots.md` 基线。
+- 本机 Monaco 测试 TypeScript 编译通过；完整浏览器测试受本机未安装 Playwright
+  Chromium 限制未执行，GitHub Actions 运行器具备该浏览器并会执行完整验证。
