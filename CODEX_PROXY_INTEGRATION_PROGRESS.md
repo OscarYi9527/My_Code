@@ -720,3 +720,7 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `.github/workflows/node_modules_cache/cache.sh`，但该脚本在 Git 中为 `100644`，
   导致 `Permission denied`。已将其 Git 文件模式改为可执行的 `100755`；
   缓存归档恢复正常后，后续截图步骤即可生成其 manifest。
+- Monaco 检查进一步确认根目录安装已通过，但根目录的 postinstall 会在 `remote`
+  子项目再次执行 `npm ci`；其 `package.json` 也有同一个无效覆盖。已同步修复
+  `remote/package.json` 与 `remote/package-lock.json`，并以 npm 11.5.1 的隔离
+  `npm ci --ignore-scripts` 验证 `ssh2@1.17.0 -> cpu-features@0.0.10`。
