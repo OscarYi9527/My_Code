@@ -760,7 +760,8 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - npm 安装和缓存脚本修复后的 CI 已实际进入 Monaco 浏览器测试与 Component
   Fixtures 截图阶段，确认此前依赖/权限故障已排除。
 - Monaco 测试页只设置了 `window.instance`，但测试脚本使用了未定义的裸
-  `instance` 标识符；已改为显式访问 `window.instance`。
+  `instance` 标识符；已改为显式访问 `window.instance`。CI 随后暴露编辑器
+  实例的异步初始化竞态，测试现已在每次加载页面后等待 `window.instance` 就绪。
 - Component Fixtures 的两张 Inline Chat Zone Widget 截图哈希因既有 AI Editor
   UI 改动而变化；已按 CI 生成的标准 manifest 更新
   `blocks-ci-screenshots.md` 基线。

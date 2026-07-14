@@ -65,6 +65,7 @@ describe('API Integration Tests', function (): void {
 
 	beforeEach(async () => {
 		await page.goto(APP);
+		await page.waitForFunction(() => !!(window as Window & { instance?: unknown }).instance);
 	});
 
 	it('`monaco` is not exposed as global', async function (): Promise<any> {
@@ -139,6 +140,7 @@ describe('API Integration Tests', function (): void {
 	describe('Accessibility', function (): void {
 		beforeEach(async () => {
 			await page.goto(APP);
+			await page.waitForFunction(() => !!(window as Window & { instance?: unknown }).instance);
 			await injectAxe(page);
 			await page.evaluate(`
 			(function () {
