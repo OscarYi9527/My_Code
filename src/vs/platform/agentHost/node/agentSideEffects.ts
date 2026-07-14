@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { SequencerByKey } from '../../../base/common/async.js';
 import { Disposable, DisposableStore, IDisposable } from '../../../base/common/lifecycle.js';
 import { NKeyMap } from '../../../base/common/map.js';
 import { equals } from '../../../base/common/objects.js';
@@ -22,7 +23,7 @@ import { ITelemetryService } from '../../telemetry/common/telemetry.js';
 import { ISessionDataService } from '../common/sessionDataService.js';
 import { SessionConfigKey } from '../common/sessionConfigKeys.js';
 import { ChatOriginKind, ToolCallContributorKind, type AgentInfo } from '../common/state/protocol/state.js';
-import { ActionType, StateAction, type ChatToolCallCompleteAction } from '../common/state/sessionActions.js';
+import { ActionType, StateAction, type ChatToolCallCompleteAction, type ChatToolCallReadyAction, type ChatToolCallStartAction } from '../common/state/sessionActions.js';
 import {
 	buildSubagentChatUri,
 	getToolFileEdits,
@@ -89,6 +90,26 @@ interface ISubagentSessionRef {
 	readonly chatUri: ProtocolURI;
 }
 
+export const META_TURN_EXECUTION_RECORDS = 'turn.executionRecords';
+
+export interface ITurnExecutionRecord {
+	readonly turnId: string;
+	readonly toolCallId: string;
+	readonly toolName: string;
+	readonly displayName: string;
+	readonly state: 'started' | 'running' | 'completed' | 'failed';
+	readonly startedAt: number;
+	readonly completedAt?: number;
+	readonly input?: string;
+}
+
+function truncateExecutionInput(input: string | undefined): string | undefined {
+	if (!input) {
+		return undefined;
+	}
+	return input.length <= 4096 ? input : `${input.substring(0, 4096)}…`;
+}
+
 /**
  * Shared implementation of agent side-effect handling.
  *
@@ -108,6 +129,7 @@ export class AgentSideEffects extends Disposable {
 	private readonly _permissionManager: SessionPermissionManager;
 
 	private readonly _subagentChats = new NKeyMap<ISubagentSessionRef, [ProtocolURI, string]>();
+	private readonly _turnExecutionSequencer = new SequencerByKey<string>();
 
 	/**
 	 * Buffers signals whose `parentToolCallId` references a subagent
@@ -437,6 +459,7 @@ export class AgentSideEffects extends Disposable {
 		}
 
 		this._stateManager.dispatchServerAction(sessionKey, action);
+		this._recordTurnExecution(sessionScope, action);
 
 		// Mark first visible progress for TTFT telemetry
 		if (action.type === ActionType.ChatDelta
@@ -516,6 +539,80 @@ export class AgentSideEffects extends Disposable {
 		// targets that chat's title, mirroring `seedTitleFromFirstMessage`.
 		const titleChatChannel = isAhpChatChannel(sessionKey) && !isDefaultChatUri(sessionKey) ? sessionKey : undefined;
 		this._titleController.refineTitleFromFirstTurn(sessionScope, titleChatChannel);
+	}
+
+	/**
+	 * Persists a compact local audit trail for agent tools and terminal
+	 * commands. It intentionally stores only the invocation input and state,
+	 * never command output or project file contents. The per-session sequencer
+	 * makes start/ready/complete transitions deterministic even when several
+	 * tools finish concurrently.
+	 */
+	private _recordTurnExecution(session: ProtocolURI, action: StateAction): void {
+		if (action.type !== ActionType.ChatToolCallStart
+			&& action.type !== ActionType.ChatToolCallReady
+			&& action.type !== ActionType.ChatToolCallComplete) {
+			return;
+		}
+		void this._turnExecutionSequencer.queue(session, async () => {
+			const ref = this._options.sessionDataService.openDatabase(URI.parse(session));
+			try {
+				const raw = await ref.object.getMetadata(META_TURN_EXECUTION_RECORDS);
+				let records: ITurnExecutionRecord[] = [];
+				if (raw) {
+					try {
+						records = JSON.parse(raw) as ITurnExecutionRecord[];
+					} catch {
+						this._logService.warn(`[AgentSideEffects] Ignoring malformed ${META_TURN_EXECUTION_RECORDS} for ${session}`);
+					}
+				}
+
+				const key = `${action.turnId}:${action.toolCallId}`;
+				const index = records.findIndex(record => `${record.turnId}:${record.toolCallId}` === key);
+				const existing = index >= 0 ? records[index] : undefined;
+				let next: ITurnExecutionRecord | undefined;
+				if (action.type === ActionType.ChatToolCallStart) {
+					const start = action as ChatToolCallStartAction;
+					next = existing ?? {
+						turnId: start.turnId,
+						toolCallId: start.toolCallId,
+						toolName: start.toolName,
+						displayName: start.displayName,
+						state: 'started',
+						startedAt: Date.now(),
+					};
+				} else if (action.type === ActionType.ChatToolCallReady) {
+					const ready = action as ChatToolCallReadyAction;
+					if (existing) {
+						next = {
+							...existing,
+							state: ready.confirmed ? 'running' : existing.state,
+							input: truncateExecutionInput(ready.toolInput) ?? existing.input,
+						};
+					}
+				} else if (existing) {
+					next = {
+						...existing,
+						state: action.result.success ? 'completed' : 'failed',
+						completedAt: Date.now(),
+					};
+				}
+
+				if (!next) {
+					return;
+				}
+				if (index >= 0) {
+					records[index] = next;
+				} else {
+					records.push(next);
+				}
+				await ref.object.setMetadata(META_TURN_EXECUTION_RECORDS, JSON.stringify(records));
+			} catch (err) {
+				this._logService.warn(`[AgentSideEffects] Failed to persist tool execution record for ${session}`, err);
+			} finally {
+				ref.dispose();
+			}
+		});
 	}
 
 	private _describeSignal(signal: AgentSignal): string {

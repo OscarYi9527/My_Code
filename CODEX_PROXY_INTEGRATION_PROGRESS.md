@@ -103,7 +103,7 @@ AI Editor
 ### 阶段 E：中断恢复
 
 - [x] E01 建立每 Turn 工作区基线。
-- [ ] E02 记录 Agent Host 工具调用和命令执行状态。
+- [x] E02 记录 Agent Host 工具调用和命令执行状态。
 - [ ] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
 - [ ] E04 仅自动重试可确认未转发的请求。
 - [ ] E05 实现“检查状态并继续”恢复流程。
@@ -644,3 +644,29 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 开发版和 Windows 成品均使用隔离用户目录成功启动；Windows 成品
   `product.json` 的 10/10 SHA-256 校验值匹配。
 - 共享 Proxy 未重启；结束时 `/live` 返回 `status: ok`。
+
+## 17. 2026-07-14 E02 工具与终端命令执行状态完成
+
+### 已完成
+
+- `AgentSideEffects` 已开始在本地会话数据库的
+  `turn.executionRecords` 中记录工具调用状态：
+  - `started`：工具已开始；
+  - `running`：输入已确认并开始执行；
+  - `completed` / `failed`：工具已结束。
+- 记录内容包含 Turn、工具调用 ID、工具名称、显示名称、时间和最多 4096
+  字符的工具输入（例如终端命令）。
+- 不记录终端输出、AI 完整回复或项目文件内容，避免扩大本地状态的敏感数据范围。
+- 记录按会话串行写入，防止同一 Turn 的并发工具完成时相互覆盖。
+
+### 验证
+
+- `npm run typecheck-client`：通过。
+- `scripts\test.bat --grep "AgentSideEffects"`：`101 passing`。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- `npm run core-ci`：通过，`out-vscode-min` 已同步。
+- Windows 成品：
+  - 用户关闭正在使用的成品窗口后，`npm run gulp vscode-win32-x64-min-ci` 通过；
+  - 隔离用户目录启动 `Code - OSS.exe` 通过；
+  - `product.json` 的 10/10 SHA-256 校验值匹配。
+- 共享 Proxy 未停止或重启；结束时 `/live` 返回 `status: ok`。
