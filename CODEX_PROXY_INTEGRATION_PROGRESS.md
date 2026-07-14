@@ -711,3 +711,12 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `ssh2@1.17.0 -> cpu-features@0.0.10`。
 - 本次仅修改 CI 依赖清单，不涉及 AI Editor UI 或运行时逻辑，因此无需重新构建
   开发版和 Windows 产品版。
+
+### 后续 CI 检查
+
+- 修复提交触发的 Component Fixtures 已越过全部三次 `npm ci` 安装步骤，确认
+  原锁文件问题已解决。
+- 随后发现独立的 Linux 权限问题：缓存工作流直接执行
+  `.github/workflows/node_modules_cache/cache.sh`，但该脚本在 Git 中为 `100644`，
+  导致 `Permission denied`。已将其 Git 文件模式改为可执行的 `100755`；
+  缓存归档恢复正常后，后续截图步骤即可生成其 manifest。
