@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { validateAiEditorProxyArtifact } from '../lib/aiEditorProxyArtifact.ts';
+import { readAiEditorProxyReleaseSource } from '../lib/aiEditorProxyRelease.ts';
 
 interface IArguments {
 	source?: string;
@@ -132,6 +133,7 @@ function main(): void {
 	const buildRoot = path.join(repositoryRoot, '.build');
 	const sourceRoot = path.resolve(args.source ?? process.env['VSCODE_AI_EDITOR_PROXY_ROOT'] ?? '');
 	const artifactRoot = path.resolve(args.out ?? path.join(buildRoot, 'ai-editor-proxy'));
+	const releaseSource = readAiEditorProxyReleaseSource(path.join(import.meta.dirname, 'release.json'));
 
 	if (!args.source && !process.env['VSCODE_AI_EDITOR_PROXY_ROOT']) {
 		throw new Error('Pass --source or set VSCODE_AI_EDITOR_PROXY_ROOT to the codex_proxy checkout.');
@@ -144,12 +146,23 @@ function main(): void {
 	}
 
 	const commit = assertCleanSource(sourceRoot);
+	if (commit.toLowerCase() !== releaseSource.commit.toLowerCase()) {
+		throw new Error(
+			`codex_proxy commit mismatch: expected ${releaseSource.commit}, found ${commit}. ` +
+			'Update build/ai-editor-proxy/release.json explicitly before shipping a different Proxy revision.'
+		);
+	}
 	const packageJson = JSON.parse(fs.readFileSync(path.join(sourceRoot, 'package.json'), 'utf8')) as {
 		name?: string;
 		version?: string;
 	};
 	if (packageJson.name !== 'codex-proxy' || !packageJson.version) {
 		throw new Error('Unexpected codex_proxy package metadata.');
+	}
+	if (packageJson.version !== releaseSource.version) {
+		throw new Error(
+			`codex_proxy version mismatch: expected ${releaseSource.version}, found ${packageJson.version}.`
+		);
 	}
 
 	// The output target is checked above before this recursive removal.

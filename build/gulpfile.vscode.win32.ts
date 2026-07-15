@@ -15,6 +15,7 @@ import { getVersion } from './lib/getVersion.ts';
 import * as task from './lib/gulp/task.ts';
 import * as util from './lib/util.ts';
 import { validateAiEditorProxyArtifact } from './lib/aiEditorProxyArtifact.ts';
+import { assertAiEditorProxyReleaseIdentity, readAiEditorProxyReleaseSource } from './lib/aiEditorProxyRelease.ts';
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -88,7 +89,9 @@ function buildWin32Setup(arch: string, target: string): task.CallbackTask {
 			'ai-editor-proxy'
 		);
 		if ((product as typeof product & { aiEditorProxyBundled?: boolean }).aiEditorProxyBundled === true) {
-			validateAiEditorProxyArtifact(aiEditorProxyRoot, `win32-${arch}`);
+			const releaseManifest = validateAiEditorProxyArtifact(aiEditorProxyRoot, `win32-${arch}`);
+			const releaseSource = readAiEditorProxyReleaseSource(path.join(repoPath, 'build', 'ai-editor-proxy', 'release.json'));
+			assertAiEditorProxyReleaseIdentity(releaseManifest, releaseSource);
 		}
 
 		const definitions: Record<string, unknown> = {

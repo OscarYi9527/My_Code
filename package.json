@@ -77,6 +77,7 @@
     "playwright-install": "npm exec playwright install",
     "compile-build": "npm run gulp compile-build-with-mangling",
     "prepare-ai-editor-proxy": "node --experimental-strip-types build/ai-editor-proxy/prepare.ts",
+    "verify-ai-editor-macos-release": "node --experimental-strip-types build/ai-editor-proxy/verify-macos.ts",
     "verify-ai-editor-windows-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-ai-editor-windows-release.ps1",
     "compile-extensions-build": "npm run gulp compile-extensions-build",
     "minify-vscode": "npm run gulp minify-vscode",

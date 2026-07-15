@@ -824,6 +824,21 @@ if ($productJson.aiEditorProxyBundled -ne $true) {
 $productChecksums = @(Test-ProductChecksums $appRoot $productJson)
 $proxyValidation = Test-ProxyArtifact $proxyRoot
 $proxyManifest = $proxyValidation.manifest
+$proxyReleaseSource = Read-JsonFile (Join-Path $repoRoot 'build\ai-editor-proxy\release.json')
+if (
+	$proxyReleaseSource.schemaVersion -ne 1 -or
+	$proxyReleaseSource.repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or
+	$proxyReleaseSource.commit -notmatch '^[0-9a-fA-F]{40}$' -or
+	$proxyReleaseSource.version -notmatch '^\d+\.\d+\.\d+'
+) {
+	throw 'Invalid pinned AI Editor Proxy release source.'
+}
+if (
+	[string]$proxyManifest.commit -cne [string]$proxyReleaseSource.commit -or
+	[string]$proxyManifest.version -cne [string]$proxyReleaseSource.version
+) {
+	throw 'Bundled Proxy does not match the pinned release source.'
+}
 
 $productNotices = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'ThirdPartyNotices.txt') -Encoding UTF8
 if ($productNotices -notmatch '(?im)^codex\s*$' -or $productNotices -notmatch 'github\.com/openai/codex') {

@@ -37,6 +37,7 @@ import rceditCallback from 'rcedit';
 import { spawnTsgo } from './lib/tsgo.ts';
 import { runEsbuildTranspile, runEsbuildBundle } from './lib/esbuild.ts';
 import { validateAiEditorProxyArtifact } from './lib/aiEditorProxyArtifact.ts';
+import { assertAiEditorProxyReleaseIdentity, readAiEditorProxyReleaseSource } from './lib/aiEditorProxyRelease.ts';
 
 
 const glob = promisify(globCallback);
@@ -241,12 +242,12 @@ function getAiEditorProxyRuntimeStream(platform: string, arch: string): NodeJS.R
 		path.join(root, '.build', 'ai-editor-proxy')
 	);
 	const entryPoint = path.join(artifactRoot, 'src', 'server.js');
-	const releaseManifest = path.join(artifactRoot, 'release-manifest.json');
+	const releaseManifestPath = path.join(artifactRoot, 'release-manifest.json');
 	const requireArtifact =
 		process.env['VSCODE_REQUIRE_AI_EDITOR_PROXY'] === '1' ||
 		(product as typeof product & { aiEditorProxyBundled?: boolean }).aiEditorProxyBundled === true;
 
-	if (!fs.existsSync(entryPoint) || !fs.existsSync(releaseManifest)) {
+	if (!fs.existsSync(entryPoint) || !fs.existsSync(releaseManifestPath)) {
 		if (requireArtifact) {
 			throw new Error(
 				`AI Editor Proxy artifact is required but missing at ${artifactRoot}. ` +
@@ -258,7 +259,9 @@ function getAiEditorProxyRuntimeStream(platform: string, arch: string): NodeJS.R
 		});
 	}
 
-	validateAiEditorProxyArtifact(artifactRoot, `${platform}-${arch}`);
+	const releaseManifest = validateAiEditorProxyArtifact(artifactRoot, `${platform}-${arch}`);
+	const releaseSource = readAiEditorProxyReleaseSource(path.join(root, 'build', 'ai-editor-proxy', 'release.json'));
+	assertAiEditorProxyReleaseIdentity(releaseManifest, releaseSource);
 
 	return gulp.src(`${artifactRoot.replace(/\\/g, '/')}/**`, {
 		base: artifactRoot,

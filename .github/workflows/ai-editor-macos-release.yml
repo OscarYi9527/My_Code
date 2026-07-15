@@ -1,0 +1,196 @@
+name: AI Editor macOS Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ai-editor-macos-release.yml"
+      - "build/ai-editor-proxy/**"
+      - "build/darwin/**"
+      - "build/gulpfile.vscode.ts"
+      - "build/lib/aiEditorProxy*.ts"
+      - "build/lib/test/aiEditorProxy*.test.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "product.json"
+      - "src/vs/platform/agentHost/**"
+      - "src/vs/platform/aiEditorProxy/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-x64:
+    name: macOS x64 product
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      NPM_ARCH: x64
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      VSCODE_ARCH: x64
+      VSCODE_REQUIRE_AI_EDITOR_PROXY: "1"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Read pinned Proxy source
+        id: proxy-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const source = JSON.parse(fs.readFileSync('build/ai-editor-proxy/release.json', 'utf8'));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, [
+            `repository=${source.repository}`,
+            `commit=${source.commit}`,
+            `version=${source.version}`,
+            ''
+          ].join('\n'));
+          NODE
+
+      - name: Checkout pinned Proxy
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.proxy-source.outputs.repository }}
+          ref: ${{ steps.proxy-source.outputs.commit }}
+          path: .build/codex_proxy-source
+
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: ./.github/actions/restore-node-modules
+        with:
+          key-prefix: node_modules-macos
+          key-args: "darwin ${{ env.VSCODE_ARCH }} $(node -p process.arch)"
+
+      - name: Install Code dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --break-system-packages setuptools
+          for attempt in {1..5}; do
+            if npm ci; then
+              exit 0
+            fi
+            if [[ "$attempt" == "5" ]]; then
+              echo "npm ci failed after 5 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+          npm_config_arch: ${{ env.NPM_ARCH }}
+
+      - name: Save node_modules cache
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        uses: ./.github/actions/save-node-modules
+
+      - name: Prepare built-in extensions cache key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .build
+          node build/azure-pipelines/common/computeBuiltInDepsCacheKey.ts > .build/builtindepshash
+
+      - name: Restore built-in extensions cache
+        id: cache-builtin-extensions
+        uses: actions/cache@v5
+        with:
+          path: .build/builtInExtensions
+          key: "builtin-extensions-${{ hashFiles('.build/builtindepshash') }}"
+
+      - name: Download built-in extensions
+        if: steps.cache-builtin-extensions.outputs.cache-hit != 'true'
+        run: node build/lib/builtInExtensions.ts
+
+      - name: Validate pinned Proxy source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix .build/codex_proxy-source ci
+          npm --prefix .build/codex_proxy-source run check
+          npm --prefix .build/codex_proxy-source test
+          test -z "$(git -C .build/codex_proxy-source status --porcelain --untracked-files=all)"
+
+      - name: Prepare macOS Proxy artifact
+        run: >-
+          npm run prepare-ai-editor-proxy --
+          --source "${{ github.workspace }}/.build/codex_proxy-source"
+          --platform darwin-x64
+
+      - name: Validate build tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix build run typecheck
+          node --test "build/lib/test/aiEditorProxy*.test.ts"
+
+      - name: Build Code product sources
+        run: npm run core-ci
+
+      - name: Package macOS x64 product
+        run: npm run gulp vscode-darwin-x64-min-ci
+
+      - name: Verify unpacked macOS product
+        run: npm run verify-ai-editor-macos-release -- --arch x64
+
+      - name: Create and verify DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg_dir="${GITHUB_WORKSPACE}/.build/ai-editor-release/dmg"
+          mkdir -p "$dmg_dir"
+          node build/darwin/create-dmg.ts "$RUNNER_WORKSPACE" "$dmg_dir"
+          dmg_path="$dmg_dir/VSCode-darwin-x64.dmg"
+          python3 build/darwin/patch-dmg.py "$dmg_path" resources/darwin/disk.icns
+          hdiutil verify "$dmg_path"
+          shasum -a 256 "$dmg_path" | tee "$dmg_path.sha256"
+
+      - name: Verify product inside DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg_path="${GITHUB_WORKSPACE}/.build/ai-editor-release/dmg/VSCode-darwin-x64.dmg"
+          mount_point="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "$mount_point" -force >/dev/null 2>&1 || true
+            rmdir "$mount_point" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_point"
+          npm run verify-ai-editor-macos-release -- \
+            --arch x64 \
+            --product-root "$mount_point/Code - OSS.app" \
+            --report "${GITHUB_WORKSPACE}/.build/ai-editor-release/macos-x64-dmg-report.json" \
+            --skip-clean-start
+
+      - name: Publish acceptance summary
+        if: success()
+        shell: bash
+        run: cat .build/ai-editor-release/macos-x64-release-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload macOS release evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ai-editor-macos-x64-release
+          path: |
+            .build/ai-editor-release/**
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
