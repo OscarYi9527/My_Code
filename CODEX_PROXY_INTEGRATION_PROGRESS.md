@@ -116,7 +116,7 @@ AI Editor
 - [x] F02 Agent Host/Proxy 服务单元测试。
 - [x] F03 模型目录与路由集成测试。
 - [x] F04 会话恢复和模式切换集成测试。
-- [ ] F05 Proxy 崩溃和重启恢复测试。
+- [x] F05 Proxy 崩溃和重启恢复测试。
 - [ ] F06 Windows 隔离 Electron UI 验证。
 - [ ] F07 更新开发计划、测试文档和安装包资源清单。
 
@@ -860,7 +860,7 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 本轮生产行为没有变化；仅为既有会话复用逻辑提供可回归测试入口。Windows 成品仍沿用
   已完成 E05 验证的构建，Proxy 未停止或重启。
 
-## 28. 2026-07-15 F05 Proxy 自动恢复安全加固（Windows 成品待验证）
+## 28. 2026-07-15 F05 Proxy 自动恢复安全加固
 
 ### 已完成
 
@@ -876,8 +876,10 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `npm run typecheck-client`、`npm run compile`、`npm run core-ci`：通过。
 - 共享 Proxy 全程未停止或重启，`/live` 保持正常。
 
-### 待完成
+### Windows 成品验证
 
-- 当前正式 `Code - OSS.exe` 正在运行，Windows 打包任务会替换其文件。为避免关闭用户
-  正在使用的窗口，本轮没有强行打包或覆盖该目录；待窗口关闭后执行
-  `vscode-win32-x64-min-ci`、checksum 校验和正式成品启动验证。
+- `npm run gulp vscode-win32-x64-min-ci`：通过，已更新
+  `D:\AI_prejoct\VSCode-win32-x64`。
+- `product.json` 的 10 项 SHA-256（Base64 无填充）校验全部匹配。
+- 成品 `Code - OSS.exe` 使用隔离用户目录启动成功；验证后仅关闭该次由自动验证启动的
+  Code 进程，Proxy 仍返回 `/live: status=ok`。
