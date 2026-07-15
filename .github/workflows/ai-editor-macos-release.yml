@@ -157,7 +157,7 @@ jobs:
           mkdir -p "$dmg_dir"
           node build/darwin/create-dmg.ts "$RUNNER_WORKSPACE" "$dmg_dir"
           dmg_path="$dmg_dir/VSCode-darwin-arm64.dmg"
-          python3 build/darwin/patch-dmg.py "$dmg_path" resources/darwin/disk.icns
+          python3 build/darwin/patch-dmg.py "$dmg_path" resources/darwin/code.icns
           hdiutil verify "$dmg_path"
           shasum -a 256 "$dmg_path" | tee "$dmg_path.sha256"
 
