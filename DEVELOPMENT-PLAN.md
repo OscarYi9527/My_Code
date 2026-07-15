@@ -64,7 +64,61 @@ Code-OSS Workbench
 - 模式切换二次确认、简约布局和简约菜单已通过隔离 Electron UI 验证。
 - 产品运行期间复用健康共享 Proxy，不调用危险的管理端重启接口。
 
-## 当前阶段：发布资源闭环
+## 当前优先级调整（2026-07-15）
+
+- macOS 签名、公证、Intel x64 和 universal 后续打包暂时暂停。
+- 当前开发优先级切换为应用内 Proxy 管理、服务器状态检查和 AI Editor 产品账号 MVP。
+- 产品账号 MVP 使用本机账号/网关服务和 SQLite 跑通流程，正式环境再迁移中央 HTTPS
+  服务和 PostgreSQL。
+- 产品账号与管理界面的 MVP 由 Gateway 提供 Web UI，Code 通过固定地址、无通用浏览器
+  控件的“AI Editor 管理”专用 Webview 标签页内嵌。
+- 管理入口位于 AI Editor 左下角用户头像/用户信息菜单；普通用户和管理员复用同一
+  标签页，由 Gateway API 按账号角色和组织强制授权。
+- Code 使用已登录设备会话向 Gateway 申请一次性短期 Webview 票据，并由管理页面通过
+  POST 换取 HttpOnly 会话；产品 Token 不进入 URL、Webview localStorage 或页面脚本，
+  Refresh Token 不向 Webview 暴露。
+- 关闭“AI Editor 管理”标签页只结束对应的短期管理页面会话，不退出本机产品账号；
+  再次打开时由 Code 自动申请新票据，无需用户重新登录。
+- AI 消息输入框下方只向普通用户显示“AI 服务正常、需要登录、账号不可用、服务暂不
+  可用”等安全汇总状态；端口、Provider、路由、熔断、凭据和底层诊断只允许一级
+  管理员在管理页面查看。
+- 状态栏提供上下文操作：需要登录时进入登录；账号不可用时打开“我的账号”；服务
+  暂不可用时允许重试并显示脱敏错误编号；服务正常时只展示账号、当前模型和可用积分
+  摘要；一级管理员额外显示“打开系统诊断”。
+- Code 启动、窗口恢复和每 30 秒后台刷新账号/服务状态，并在每个新 Turn 发送前强制
+  检查；同时提供手动重试。状态变化不强行中断已经运行的 Turn。
+- 专用管理 Webview 只允许导航到配置的 Gateway 管理源；登录、帮助等外部链接交给
+  系统默认浏览器，并阻止 Webview 内任意跨源跳转、新窗口和未经允许的下载。
+- 调试版 Gateway 地址固定为 `http://127.0.0.1:47920`，只允许开发启动参数覆盖；
+  正式版固定使用产品中央 HTTPS Gateway 地址，普通用户不能修改，避免绕过产品登录、
+  权限和计费。
+- 正式 Code 安装包只携带本地 Edge Proxy，不在普通用户电脑部署中央 Gateway、账号
+  服务或管理 Web UI；调试阶段才由统一脚本在开发机同时启动 Gateway `47920` 和隔离
+  测试 Edge `47921`，共享 Proxy `47892` 保持不变。
+- `codex_proxy` 保留现有 standalone 管理页和兼容链路；同一仓库新增 React +
+  TypeScript + Vite 管理前端，构建后由 Gateway 作为静态资源提供，不整体重写现有
+  Proxy 主体。
+- Gateway 新增的账号、组织、积分、审计和网关模块使用 TypeScript 编写并编译为
+  JavaScript；现有 standalone Proxy 暂不整体迁移，通过兼容适配层复用路由能力。
+- 统一调试脚本检测到空数据库时自动初始化一级管理员，并只在当前控制台显示一次随机
+  强密码；后续启动不得重置数据，只有显式、带警告的 `--reset-data` 才能清空隔离的
+  调试数据库。
+- 初始一级管理员固定登录名为 `admin`，初始化时生成一次性 bootstrap 临时密码且不要求
+  真实邮箱；首次登录必须立即设置正式密码并填写邮箱。MVP 保存邮箱但暂不验证，后续
+  接入邮箱验证后再要求完成验证。
+- 用户正式密码和一次性临时密码只保存 Argon2id 哈希；邀请码、授权码、Webview 一次性
+  票据和 Refresh Token 只保存带服务器密钥的哈希，不在数据库中保存可直接使用的明文。
+- 隔离 Gateway `47920` 不自动读取、复制或迁移共享 Proxy `47892` 的上游账号与密钥；
+  MVP 测试由一级管理员在新管理页面重新登录 ChatGPT，并重新填写 API/Relay 凭据。
+- 已建立完整功能规格、技术计划、数据模型、接口合同、验收指南和 120 项实施任务，见
+  `specs/002-ai-editor-account-gateway/`；实现按登录门禁、中央模型链路、组织与积分、
+  Provider 管理、安全审计四个垂直切片推进。
+- Code 原生账号管理界面延期到 MVP 后评估，见
+  `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。
+- 上游凭据的信封加密延期到 MVP 验证后实施，具体边界、迁移和发布阻断条件见
+  `AI_EDITOR_POST_MVP_ENCRYPTION_TODO.md`。
+
+## 已完成的发布资源闭环
 
 ### G01 Proxy 运行时制品（Windows + macOS arm64 已完成）
 
@@ -105,5 +159,6 @@ Code-OSS Workbench
 ## MVP 后反馈项
 
 - “文件编辑器是否固定避开 AI Chat 编辑器组”暂不修改，待 MVP 用户反馈后决定。
-- 后续将 Proxy 管理平台集成进 Code；MVP 仍通过本地 `/admin` 打开。
+- 将普通用户高频账号操作改造为 Code 原生 Workbench 界面，复杂管理能力继续使用
+  Gateway Web UI；具体范围见 `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。
 - `server/` 旧登录/邀请码原型不属于当前 External Proxy MVP 启动链路。

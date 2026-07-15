@@ -1202,3 +1202,125 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   Firefox，完整 Chromium + Firefox 结果由 GitHub 标准浏览器环境验证。
 - 本轮只修改 Monaco CI fixture、测试保护和进度文档，不涉及 AI Editor UI、运行时
   或 Proxy，无需重建 `out` / `out-vscode-min`，且未停止或重启共享 Proxy。
+
+## 37. 2026-07-15 产品账号 MVP 与凭据加密延期决策
+
+- macOS 签名、公证、Intel x64 和 universal 后续打包暂时暂停；当前优先开发应用内
+  Proxy 管理、服务器状态检查和 AI Editor 产品账号。
+- 产品账号正式架构仍以中央 HTTPS 模块化单体服务和 PostgreSQL 为目标；当前调试阶段
+  先在本机运行账号/模型网关服务并使用 SQLite。
+- 为优先验证 MVP，上游 ChatGPT/API/Relay 凭据的数据库信封加密暂缓实现，调试数据库
+  临时使用 `plaintext-v1`。
+- 产品用户密码哈希、Refresh Token 哈希与轮换、Windows Credential Manager/DPAPI、
+  macOS Keychain、日志脱敏和本机监听边界仍属于 MVP 必做安全功能，不随信封加密延期。
+- 新增 `AI_EDITOR_POST_MVP_ENCRYPTION_TODO.md`，记录明文调试边界、信封加密设计、
+  KMS/密钥轮换、幂等迁移、验收标准、投入评估和公开部署阻断条件。
+
+## 38. 2026-07-15 应用内账号管理界面决策
+
+- MVP 采用 Gateway Web UI + Code 专用 Webview，不使用 VS Code Simple Browser，
+  也不在当前阶段重复实现整套 Code 原生账号管理界面。
+- 专用标签页标题为“AI Editor 管理”，固定到受信任的 Gateway 管理地址，不显示可编辑
+  地址栏、前进、后退等通用浏览器控件，并复用单个标签页实例。
+- 页面入口位于 AI Editor 左下角用户头像/用户信息菜单，不放在服务器状态子栏。
+- 普通用户点击“我的账号”后复用同一标签页，只显示个人资料、积分、设备会话和个人
+  使用记录；二级、一级管理员按既定角色增加对应管理功能。
+- 页面可见性不能代替授权。账号、组织、积分、审计、Provider、路由和诊断权限必须由
+  Gateway API 强制执行。
+- 登录、退出和账号摘要保留 Code 原生入口；使用一次性登录交接，Refresh Token 不进入
+  Webview。
+- Webview 登录交接采用一次性短期票据：Code 使用当前设备会话向 Gateway 申请票据，
+  页面再通过 POST 换取 HttpOnly 管理会话。票据和产品 Token 不写入 URL 或
+  localStorage，页面脚本不能读取 Refresh Token。
+- 关闭“AI Editor 管理”标签页不退出 AI Editor 产品账号；只结束或尽力撤销该 Webview
+  的短期管理会话。再次打开时自动申请新票据，不要求用户重新登录。
+- AI 消息输入框下方的服务器状态对普通用户只显示安全汇总结果，包括“AI 服务正常、
+  需要登录、账号不可用、服务暂不可用”；不显示本机端口、Provider、路由、熔断、
+  凭据状态或最近路由错误。
+- 底层运行状态和诊断信息继续由 Gateway API 按角色保护，只允许一级管理员在管理页面
+  查看，不能依赖 Code 或 Web UI 单纯隐藏。
+- 状态栏上下文操作已确定：
+  - “需要登录”显示登录入口；
+  - “账号不可用”打开当前用户的“我的账号”页面；
+  - “服务暂不可用”提供手动重试并显示脱敏错误编号；
+  - “AI 服务正常”点击后只显示账号、当前模型和可用积分摘要；
+  - 一级管理员额外显示“打开系统诊断”。
+- 状态刷新时机确定为：Code 启动、窗口恢复、每 30 秒后台刷新、每个新 Turn 发送前
+  强制检查，以及用户手动“重试”。检查发现账号到期、禁用或服务不可用时禁止新 Turn，
+  但不强行中断已经运行的 Turn。
+- 专用管理 Webview 采用受限导航策略：只允许配置的 Gateway 管理源；登录、帮助等
+  外部链接使用系统默认浏览器；阻止 Webview 内任意跨源跳转、新窗口和未经允许的下载。
+- Gateway 地址策略确定为：调试版固定 `http://127.0.0.1:47920`，仅开发启动参数可以
+  覆盖；正式发布版固定产品中央 HTTPS 地址，普通用户不能修改，防止切换到未受控服务
+  绕过产品登录、角色权限或统一计费。
+- 正式安装包只随 Code 分发本地 Edge Proxy；中央 Gateway、产品账号服务和管理 Web UI
+  不部署到普通用户电脑。调试阶段使用统一脚本在开发机后台启动 Gateway `47920` 与
+  隔离测试 Edge `47921`，不接触共享 `47892`。
+- 管理前端技术方案确定为 React + TypeScript + Vite，在 `codex_proxy` 同一仓库构建为
+  Gateway 静态资源；保留现有 standalone 管理页和兼容行为，不为本次 MVP 整体重写
+  当前 Proxy 主体。
+- Gateway 后端采用渐进式 TypeScript：新增账号、组织、积分、审计和网关模块编译为
+  JavaScript 运行；现有 standalone Proxy 保持当前实现，通过兼容适配层复用模型路由，
+  避免本次 MVP 引入无关的整体迁移回归。
+- 统一调试脚本首次检测到空 SQLite 数据库时自动执行一次性初始化，只在当前控制台显示
+  初始一级管理员的随机强密码，不写入日志。普通重启保留全部数据；仅显式执行带警告的
+  `--reset-data` 才允许清空隔离调试数据，且不得指向共享 `47892` 数据目录。
+- 初始一级管理员使用固定登录名 `admin`，初始化阶段邮箱可为空；初始化生成的是一次性
+  bootstrap 临时密码，不是可长期使用的管理员密码。首次登录必须立即设置正式密码并
+  填写邮箱。MVP 只保存邮箱、不验证邮箱，后续接入邮箱验证后再要求完成验证。
+- 按用户“非重大细节采用推荐方法”的授权，基础凭据存储确定为：正式密码与一次性临时
+  密码使用 Argon2id；邀请码、授权码、Webview 一次性票据和 Refresh Token 只保存带
+  服务器密钥的哈希。一次性凭据成功使用后立即失效，数据库不保存其可用明文。
+- 隔离 Gateway `47920` 不自动读取、复制或迁移共享 Proxy `47892` 的上游账号和密钥。
+  MVP 测试时由一级管理员在新管理页面重新完成 ChatGPT 登录并重新填写 API/Relay
+  凭据，确保开发过程不触碰当前共享 Proxy 的数据或运行状态。
+
+## 39. 2026-07-15 产品账号与 Gateway MVP 规格闭环
+
+- 所有重大产品问题已经确认完成；用户授权非重大实现细节采用推荐安全默认值。
+- 新增 `specs/002-ai-editor-account-gateway/`，包含：
+  - 8 个可独立验收的用户故事和 50 条功能要求；
+  - 完整数据模型与 SQLite/PostgreSQL repository 边界；
+  - 登录/账号、Edge/Gateway、角色管理、Code/Webview 四组接口合同；
+  - 不接触共享 `47892` 的端到端 quickstart；
+  - 120 项按依赖、用户故事和双构建验收排序的实施任务。
+- `.specify/feature.json` 已切换到新规格，requirements checklist 全部通过，无待确认
+  标记；任务 ID `T001`–`T120` 连续且格式检查通过。
+- 为避免共享 Proxy 自动恢复时加载半成品，已从 GitHub 在
+  `D:\AI_prejoct\codex_proxy-dev` 创建干净隔离 checkout；当前为 `06cd8d5`，
+  与 Code 发布清单的 Proxy 2.2.1 输入一致。
+- 本轮只创建规格和隔离源码 checkout，未修改 Proxy 运行代码，未启动 `47920/47921`，
+  未停止或重启共享 `47892`。
+
+## 40. 2026-07-15 Black 与 Oscar 开发分工
+
+- Black 负责服务器范围：`codex_proxy` 的 Gateway、Edge、三模式、账号、组织、积分、
+  Provider、React 管理页面、审计和服务端测试，共 95 项任务。
+- Oscar 负责 Code 产品范围：账号服务/IPC、系统浏览器回调、账户菜单、状态栏、Turn
+  门禁、专用 Webview、Edge 产品打包、Code 双构建和 Windows 成品验证，共 23 项任务。
+- T112 完整隔离 quickstart 和 T113 共享 `47892` 不变性验证由 Black 与 Oscar 共同
+  完成。
+- 详细任务 ID 映射已写入
+  `specs/002-ai-editor-account-gateway/tasks.md`，技术责任边界已写入
+  `specs/002-ai-editor-account-gateway/plan.md`。
+- 双方以 `contracts/` 为接口事实来源。接口路径、字段、状态码或安全语义变化必须先
+  更新合同并共同确认；联调仅使用 `47920`/`47921`。
+
+## 41. 2026-07-15 Black 现有 codex_proxy 开发基线核对
+
+- 远程已存在 Black（提交作者“小黑”）持续开发的
+  `origin/feature/custom-api-urls`，当前提交为 `e3ed1d6`，比
+  `origin/master@06cd8d5` 多 12 个提交。
+- 现有分支已经覆盖大量与新 Gateway 计划可复用的基础：
+  - 管理页面和管理服务模块化；
+  - ChatGPT 账号级额度与熔断治理；
+  - 成本定价、智能路由和运行诊断；
+  - 配置迁移、运行时发布检查和拆分后的自动化测试。
+- 因此服务器开发不得从旧 master 重置或重新实现同等功能。T001 调整为先审计 Black
+  分支与 T001–T120 的覆盖关系，验证通过的现有能力直接复用并标记完成。
+- 后续 Gateway 工作分支应从 `e3ed1d6` 或 Black 更新后的稳定提交创建；是否合并
+  `master` 由现有分支测试和评审决定，当前不执行强制合并、rebase 或 reset。
+- 本轮只执行 `git fetch` 和只读差异检查，未切换本地工作树、未修改 Black 分支，也未
+  停止或重启共享 `47892`。
+- 新增 `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`，将全部 Code 原生账号管理界面
+  记录为 MVP 后评估项。

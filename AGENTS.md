@@ -42,3 +42,65 @@ loss, and handoffs.
   Proxy, performs the stop/start sequence, verifies `/live`, and makes a
   fallback start attempt if restart fails. Do not replace it with an inline
   stop-then-start command issued from an AI session.
+
+### Black/Oscar repository ownership and collaboration
+
+These ownership rules are persistent for the AI Editor account/Gateway MVP:
+
+- Oscar owns the Code product repository at `D:\AI_prejoct\My_code`:
+  - Code account service and IPC;
+  - system-browser login callback;
+  - lower-left AI Editor account menu and safe status UI;
+  - pre-Turn account gate and dedicated management Webview;
+  - Edge product packaging, release manifest integration, Code development
+    build and Windows product validation.
+- Black owns the server repository `OscarYi9527/codex_proxy`:
+  - standalone/edge/gateway modes;
+  - Gateway, account/auth, organization, invitation, device session, credits,
+    risk, Provider, routing, diagnostics and audit modules;
+  - React management Web UI and server-side tests/documentation.
+- Black's existing server work is based on
+  `feature/custom-api-urls@e3ed1d6` (or a later explicitly confirmed stable
+  commit). Do not reset the work to `master@06cd8d5`, overwrite it, or
+  reimplement equivalent management, quota, cost-governance, routing,
+  diagnostics, migration or test functionality.
+- Before new Gateway implementation, audit Black's current branch against
+  `specs/002-ai-editor-account-gateway/tasks.md`; reuse and validate existing
+  work before marking covered tasks complete.
+- The source of truth for cross-repository interfaces is:
+  `specs/002-ai-editor-account-gateway/contracts/`.
+  Any endpoint, JSON field, status code or security-semantics change must
+  update the relevant contract and be confirmed by both Black and Oscar before
+  either implementation changes.
+- Black must provide the branch name, commit SHA, tests, migrations and API
+  changes for each integration checkpoint. Oscar updates
+  `build/ai-editor-proxy/release.json` only after the server commit is stable
+  and validated.
+- Use Gateway `127.0.0.1:47920` and test Edge `127.0.0.1:47921` for
+  development. Neither person may use account/Gateway development to stop,
+  restart, modify, import from or migrate the shared `127.0.0.1:47892`
+  instance.
+- T112 (full isolated quickstart) and T113 (shared Proxy invariants) require
+  validation by both Black and Oscar before they are marked complete.
+- Each person updates only their assigned task checkboxes. Ownership and task
+  IDs are defined in `specs/002-ai-editor-account-gateway/tasks.md`.
+
+### Repository hygiene for collaborative development
+
+- Use feature branches and pull requests; do not force-push, reset or rewrite
+  another person's active branch.
+- Keep commits small and include the relevant task ID, for example
+  `feat(edge): add safe account status endpoint (T041)`.
+- Never use `git add .` in the dirty Code workspace. Stage only explicit
+  intended files and preserve unrelated user changes.
+- Never commit `node_modules`, `out`, `out-vscode-min`, `.tmp-*`, `.verify-*`,
+  logs, screenshots, ZIP exports, SQLite databases, `.env`, API keys, account
+  credentials, Tokens, DPAPI/Keychain data, PID files, Proxy runtime data or
+  `D:\AI_prejoct\VSCode-win32-x64`.
+- The current detailed implementation source of truth is:
+  - `specs/002-ai-editor-account-gateway/spec.md`
+  - `specs/002-ai-editor-account-gateway/plan.md`
+  - `specs/002-ai-editor-account-gateway/tasks.md`
+  - `specs/002-ai-editor-account-gateway/quickstart.md`
+- When implementation status changes, update the corresponding task checkbox
+  and synchronize `CODEX_PROXY_INTEGRATION_PROGRESS.md`.
