@@ -43,7 +43,7 @@ ai-editor-proxy/
 ├─ package.json
 ├─ package-lock.json
 ├─ LICENSE
-├─ ThirdPartyNotices.txt  # 若制品生成流程提供
+├─ ThirdPartyNotices.txt  # Proxy 生产依赖的第三方声明
 └─ release-manifest.json
 ```
 

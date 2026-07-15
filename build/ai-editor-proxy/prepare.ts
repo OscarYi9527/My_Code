@@ -156,7 +156,7 @@ function main(): void {
 	fs.rmSync(artifactRoot, { recursive: true, force: true });
 	fs.mkdirSync(artifactRoot, { recursive: true });
 
-	for (const file of ['package.json', 'package-lock.json', 'LICENSE', 'README.md', 'SECURITY.md']) {
+	for (const file of ['package.json', 'package-lock.json', 'LICENSE', 'ThirdPartyNotices.txt', 'README.md', 'SECURITY.md']) {
 		copyRequiredFile(sourceRoot, artifactRoot, file);
 	}
 	fs.cpSync(path.join(sourceRoot, 'src'), path.join(artifactRoot, 'src'), { recursive: true });

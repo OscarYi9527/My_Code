@@ -15,6 +15,7 @@ function createArtifact(platform = 'win32-x64'): string {
 	const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-editor-proxy-artifact-'));
 	const files: Record<string, string> = {
 		'LICENSE': 'MIT\n',
+		'ThirdPartyNotices.txt': 'undici 8.7.0\nMIT License\n',
 		'package-lock.json': '{}\n',
 		'package.json': '{"name":"codex-proxy","version":"2.2.0"}\n',
 		'src/server.js': 'console.log("proxy");\n'
@@ -91,6 +92,24 @@ suite('AI Editor Proxy release artifact', () => {
 		assert.throws(
 			() => validateAiEditorProxyArtifact(artifactRoot, 'win32-x64'),
 			/checksum mismatch/
+		);
+	});
+
+	test('rejects an artifact without third-party notices', t => {
+		const artifactRoot = createArtifact();
+		t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
+		fs.rmSync(path.join(artifactRoot, 'ThirdPartyNotices.txt'));
+
+		const manifestPath = path.join(artifactRoot, 'release-manifest.json');
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+			files: Record<string, string>;
+		};
+		delete manifest.files['ThirdPartyNotices.txt'];
+		fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+		assert.throws(
+			() => validateAiEditorProxyArtifact(artifactRoot, 'win32-x64'),
+			/missing required file: ThirdPartyNotices\.txt/
 		);
 	});
 

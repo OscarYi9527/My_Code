@@ -41,6 +41,7 @@ const forbiddenDirectoryNames = new Set([
 
 const requiredFiles = [
 	'LICENSE',
+	'ThirdPartyNotices.txt',
 	'package-lock.json',
 	'package.json',
 	'src/server.js'
