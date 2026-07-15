@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as net from 'net';
+import * as os from 'os';
 import * as path from 'path';
 import { setTimeout as delay } from 'timers/promises';
 import { validateAiEditorProxyArtifact } from '../lib/aiEditorProxyArtifact.ts';
@@ -350,7 +351,11 @@ async function testCleanProductStart(
 		throw new Error('Clean macOS product startup must run on a macOS host.');
 	}
 
-	const cleanRoot = fs.mkdtempSync(path.join(verificationRoot, 'macos-clean-start-'));
+	// VS Code creates a Unix domain socket below --user-data-dir. macOS limits
+	// that socket path to roughly 103 bytes, so the deep GitHub workspace/report
+	// directory cannot safely host the clean profile.
+	const cleanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-macos-'));
+	const failureEvidenceRoot = path.join(verificationRoot, 'macos-clean-start-failure');
 	const userData = path.join(cleanRoot, 'user-data');
 	const extensions = path.join(cleanRoot, 'extensions');
 	const sharedData = path.join(cleanRoot, 'shared-data');
@@ -431,7 +436,7 @@ async function testCleanProductStart(
 		}
 
 		if (liveResponse?.statusCode !== 200) {
-			throw new Error(`Bundled Proxy did not become live on ${baseUrl}. Logs: ${stderrPath}`);
+			throw new Error(`Bundled Proxy did not become live on ${baseUrl}. Failure logs: ${failureEvidenceRoot}`);
 		}
 		if (cdpTargets.length === 0) {
 			throw new Error(`Clean macOS product did not expose a Workbench target on CDP port ${cdpPort}.`);
@@ -495,7 +500,15 @@ async function testCleanProductStart(
 				await terminateProcess(currentListener);
 			}
 		}
-		if (completed && !keepArtifacts) {
+		if (!completed) {
+			fs.mkdirSync(failureEvidenceRoot, { recursive: true });
+			for (const source of [stdoutPath, stderrPath, path.join(settingsDirectory, 'settings.json')]) {
+				if (fs.existsSync(source)) {
+					fs.copyFileSync(source, path.join(failureEvidenceRoot, path.basename(source)));
+				}
+			}
+		}
+		if (!keepArtifacts) {
 			fs.rmSync(cleanRoot, { recursive: true, force: true });
 		}
 	}
