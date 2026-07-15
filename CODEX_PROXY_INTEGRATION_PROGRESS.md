@@ -113,7 +113,7 @@ AI Editor
 ### 阶段 F：验证与打包
 
 - [x] F01 TypeScript typecheck。
-- [ ] F02 Agent Host/Proxy 服务单元测试。
+- [x] F02 Agent Host/Proxy 服务单元测试。
 - [ ] F03 模型目录与路由集成测试。
 - [ ] F04 会话恢复和模式切换集成测试。
 - [ ] F05 Proxy 崩溃和重启恢复测试。
@@ -808,3 +808,25 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `2 passing`（包含 E06 与 E07）。
 - 本轮继续仅新增测试与测试辅助能力，未修改产品运行时代码或 UI；无需替换正在运行的
   Windows 成品窗口。共享 Proxy 未停止或重启。
+
+## 25. 2026-07-15 F02 Agent Host / Proxy 服务定向测试
+
+### 修复与验证
+
+- 组合执行 Agent Host 服务测试时发现：工具确认测试仍使用一个会抛出
+  `not implemented` 的空会话数据服务；E02 的工具执行状态记录会在该路径写入
+  会话数据库，造成测试结束阶段出现未处理错误。
+- 已将该测试夹具替换为内存 `TestSessionDatabase` 服务，保持生产运行时代码不变，
+  并使工具确认和执行状态记录使用同一条可验证的持久化契约。
+- `npm run typecheck-client`：通过。
+- `npm run gulp compile`：通过，开发版 `out` 已同步。
+- 定向服务测试：
+  - AI Editor Proxy URL 与上游状态解析；
+  - Codex Proxy 转发；
+  - Codex app-server JSON-RPC 客户端；
+  - Codex app-server 事件映射；
+  - AgentSideEffects（含 E02 工具执行记录）；
+  - E05 恢复操作历史映射。
+- 合并定向测试结果：`212 passing`。
+- 本轮只修改测试夹具，未修改产品运行时代码或 UI；无需替换正在运行的 Windows
+  成品窗口。共享 Proxy 未停止或重启。

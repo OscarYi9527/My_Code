@@ -38,7 +38,7 @@ import { AgentService } from '../../node/agentService.js';
 import { AgentSideEffects, IAgentSideEffectsOptions } from '../../node/agentSideEffects.js';
 import { SessionDatabase } from '../../node/sessionDatabase.js';
 import { AgentHostStateManager } from '../../node/agentHostStateManager.js';
-import { createNoopGitService, createNullSessionDataService, createSessionDataService } from '../common/sessionTestHelpers.js';
+import { createNoopGitService, createSessionDataService } from '../common/sessionTestHelpers.js';
 import { MockAgent } from './mockAgent.js';
 
 // ---- Tests ------------------------------------------------------------------
@@ -221,7 +221,7 @@ suite('AgentSideEffects', () => {
 		sideEffects = createTestSideEffects(disposables, stateManager, {
 			getAgent: () => agent,
 			agents: agentList,
-			sessionDataService: createNullSessionDataService(),
+			sessionDataService: createSessionDataService(),
 			onTurnComplete: () => { },
 		}, undefined, disposables.add(new AgentHostTelemetryService(telemetryService)));
 	});
@@ -3305,7 +3305,7 @@ suite('AgentSideEffects', () => {
 			const localSideEffects = createTestSideEffects(disposables, stateManager, {
 				getAgent: () => agent,
 				agents: agentList,
-				sessionDataService: createNullSessionDataService(),
+				sessionDataService: createSessionDataService(),
 				onTurnComplete: () => { },
 			}, undefined, NullTelemetryService, changesets);
 			disposables.add(localSideEffects.registerProgressListener(agent));
@@ -3355,7 +3355,7 @@ suite('AgentSideEffects', () => {
 			const localSideEffects = createTestSideEffects(disposables, stateManager, {
 				getAgent: () => agent,
 				agents: agentList,
-				sessionDataService: createNullSessionDataService(),
+				sessionDataService: createSessionDataService(),
 				onTurnComplete: () => { },
 			}, undefined, NullTelemetryService, changesets);
 			disposables.add(localSideEffects.registerProgressListener(agent));
@@ -3382,7 +3382,7 @@ suite('AgentSideEffects', () => {
 			const localSideEffects = createTestSideEffects(disposables, stateManager, {
 				getAgent: () => agent,
 				agents: agentList,
-				sessionDataService: createNullSessionDataService(),
+				sessionDataService: createSessionDataService(),
 				onTurnComplete: () => { },
 			}, undefined, NullTelemetryService, changesets);
 
