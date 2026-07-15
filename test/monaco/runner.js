@@ -6,8 +6,17 @@
 const yaserver = require('yaserver');
 const http = require('http');
 const cp = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = 8563;
+
+for (const relativePath of ['dist/core.html', 'dist/core.bundle.js', 'dist/editorWebWorkerMain.bundle.js']) {
+	const assetPath = path.join(__dirname, relativePath);
+	if (!fs.existsSync(assetPath)) {
+		throw new Error(`Required Monaco test asset is missing: ${assetPath}`);
+	}
+}
 
 yaserver.createServer({
 	rootDir: __dirname

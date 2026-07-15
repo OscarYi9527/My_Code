@@ -136,6 +136,8 @@ Code 仓库和 Proxy 仓库是两个独立版本源。发布流水线需要：
 
 ## 7. 当前状态（2026-07-15）
 
+- Code 发布输入已固定到 `codex_proxy 2.2.1`、commit
+  `06cd8d57dc39ab30be5d193f7678ca227ef1aa30`。
 - Windows 成品已包含 Workbench、中文语言包和 Codex Agent Host 运行时。
 - Windows 成品已包含
   `resources/app/ai-editor-proxy/src/server.js`、生产依赖和带逐文件 SHA-256 的
@@ -151,5 +153,7 @@ Code 仓库和 Proxy 仓库是两个独立版本源。发布流水线需要：
   `undici 8.7.0` 的 MIT 许可证；主产品声明继续包含 Codex 的 Apache-2.0 许可证。
 - Windows 发布验收会生成成品、两个安装器和必需资源的版本/SHA-256 清单，并同时验证
   已配置 Proxy 与空数据首次启动。
-- G02/G03 Windows 安装升级及发布验收闭环已完成；发布流水线仍需加入固定 commit 的
-  双仓库 checkout，macOS 制品和安装升级验证留待后续平台阶段。
+- macOS arm64 流水线已使用固定 commit 双仓库 checkout，完成 `.app` 打包、空数据
+  首次启动、退出后 Proxy 常驻、DMG 校验和挂载后资源复验。
+- macOS arm64 公开 CI 未签名候选验收已通过；Apple Developer ID 签名/公证、
+  Intel x64 和 universal 成品仍是后续发布提升项。

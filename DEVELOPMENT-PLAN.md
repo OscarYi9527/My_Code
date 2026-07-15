@@ -66,16 +66,16 @@ Code-OSS Workbench
 
 ## 当前阶段：发布资源闭环
 
-### G01 Proxy 运行时制品（Windows 本地闭环已完成）
+### G01 Proxy 运行时制品（Windows + macOS arm64 已完成）
 
 - [x] 以独立仓库 `OscarYi9527/codex_proxy` 为源码来源。
 - [x] 构建时生成不包含配置、账号、日志和备份的干净运行时制品。
 - [x] 制品包含 `src/`、`package.json`、生产依赖、许可证、版本和逐文件校验值。
 - [x] Windows 成品将制品放入 Code 可发现的 `ai-editor-proxy` 目录。
 - [x] 发布构建拒绝未提交的 Proxy 工作树，不能静默复制个人运行目录。
-- [ ] macOS 成品接入并验证对应制品。
+- [x] macOS arm64 成品接入并验证对应制品。
 
-### G02 安装与升级（Windows 已完成）
+### G02 安装与升级（Windows + macOS arm64 已完成）
 
 - [x] Windows 用户级/系统级安装器安装 Code、Codex Agent Host 运行时、中文语言包和
   Proxy。
@@ -83,9 +83,9 @@ Code-OSS Workbench
 - [x] 首次启动自动复用健康 Proxy；不存在时后台启动安装包内 Proxy。
 - [x] Windows 重复安装/升级替换旧 Proxy 程序文件，不覆盖用户的账号、API Key、
   统计、配置和备份。
-- [ ] macOS 完成同等的制品、后台启动和退出后常驻验证。
+- [x] macOS arm64 `.app`/DMG 完成同等的制品、后台启动和退出后常驻验证。
 
-### G03 发布验收（Windows 已完成）
+### G03 发布验收（Windows + macOS arm64 未签名候选已完成）
 
 - [x] 使用正式用户级安装器，在无预装 Proxy、空 Code 用户目录和空 Proxy 数据目录完成
   Windows 首次启动。
@@ -94,7 +94,13 @@ Code-OSS Workbench
   `deepseek-v4-pro` 的真实流式回复。
 - [x] 汇总既有模式切换、会话恢复、中断恢复结果，并重新校验 Windows 产品完整性。
 - [x] 生成成品/安装器资源与版本清单、SHA-256 报告，并补齐 Proxy 生产依赖第三方声明。
-- [ ] 在 macOS 阶段完成同等级发布验收。
+- [x] macOS arm64 在标准 GitHub Hosted runner 完成未签名 `.app`/DMG 同等级发布验收。
+
+### 下一平台阶段
+
+- [ ] 使用 Apple Developer ID 完成签名、公证，并在公证后重新执行资源验收。
+- [ ] 在 Intel macOS 环境完成 x64 成品同等级验收。
+- [ ] 在 x64、arm64 都通过后生成并验证 universal 发布候选。
 
 ## MVP 后反馈项
 

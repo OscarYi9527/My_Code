@@ -29,6 +29,24 @@ npm run gulp vscode-win32-x64-min-ci
   D:\AI_prejoct\My_code
 ```
 
+### macOS arm64 成品
+
+在标准 macOS arm64 构建机或
+`.github/workflows/ai-editor-macos-release.yml` 中执行：
+
+```bash
+npm run prepare-ai-editor-proxy -- \
+  --source "/path/to/pinned/codex_proxy" \
+  --platform darwin-arm64
+npm run core-ci
+npm run gulp vscode-darwin-arm64-min-ci
+npm run verify-ai-editor-macos-release -- --arch arm64
+```
+
+流水线还必须创建 DMG、执行 `hdiutil verify`，挂载 DMG 后对其中 `.app` 再次执行资源
+验收。公开 CI 的未签名候选允许 `signatureVerified=false`；正式发布提升必须要求
+Developer ID 签名和公证。
+
 不要同时复用同一个用户目录或扩展目录。验证结束只关闭本轮 Code 实例，不关闭共享
 Proxy。
 
@@ -156,6 +174,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
 5. 确认用户数据目录在首次安装、升级和卸载后的逐文件 SHA-256 均未变化。
 6. 确认整个过程不停止或重启共享 `47892` Proxy。
 
+### TC-12 macOS arm64 `.app` 与 DMG
+
+1. 从固定 Code commit 和固定 `codex_proxy` commit 构建 arm64 `.app`。
+2. 验证 Workbench checksum、Codex arm64 原生运行时、简体中文语言包和 Proxy
+   逐文件 SHA-256。
+3. 使用空 Code 用户目录、空 Proxy 数据目录和备用端口启动 `.app`。
+4. 确认 `/live`、`/admin` 可访问，未配置时 `/ready` 为 HTTP 503、模型目录为空。
+5. 关闭隔离 Code 后确认 Proxy PID 不变且继续存活；验收结束只清理备用测试 Proxy。
+6. 创建并校验 DMG，挂载后再次验证其中 `.app`；不得接触共享 `47892` Proxy。
+
 ## 4. 自动化回归
 
 最低检查：
@@ -175,6 +203,7 @@ npm run core-ci
 - Git checkpoint 真实仓库集成测试；
 - Windows 产品打包与 `product.json` checksum 校验；
 - Windows 用户级/系统级安装器编译与隔离升级保留测试；
+- macOS arm64 `.app`、DMG、空数据首次启动和退出后 Proxy 常驻验收；
 - 隔离 Electron UI 自动化。
 
 Windows x64 发布候选统一阻断命令：
@@ -203,3 +232,4 @@ npm run verify-ai-editor-windows-release -- `
 - 502/409 等错误被无限自动重试；
 - 模式切换导致 Chat 会话丢失或 Workbench editor disposal 错误；
 - 产品 checksum 不匹配。
+- macOS 对应架构的 Codex/Proxy 制品不匹配，或 DMG 挂载后资源验收失败。

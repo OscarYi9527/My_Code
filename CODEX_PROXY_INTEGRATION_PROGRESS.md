@@ -1136,3 +1136,69 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   六个任务全部通过。
 - 18 个由旧的微软内部运行器配置造成的过期排队任务已取消；当前该工作流
   `queued=0`、`in_progress=0`。
+
+## 35. 2026-07-15 G01-G03 macOS arm64 发布候选闭环
+
+### 固定发布输入与跨平台 Proxy
+
+- `build/ai-editor-proxy/release.json` 将发布输入固定到
+  `OscarYi9527/codex_proxy`、版本 `2.2.1`、commit
+  `06cd8d57dc39ab30be5d193f7678ca227ef1aa30`。
+- Proxy 增加 macOS Chrome、Edge 和 Firefox 私密窗口识别；Proxy 源码执行
+  `npm run check` 与完整测试通过，共 `65 passing`。
+- 只更新了 Proxy 源码和发布制品，没有停止或重启共享 `47892` Proxy。
+
+### macOS arm64 流水线与验收
+
+- `.github/workflows/ai-editor-macos-release.yml` 使用标准 `macos-14` arm64 runner，
+  从固定 commit checkout Code 和 Proxy，构建 `.app`、创建 DMG，并上传脱敏验收证据。
+- `verify-ai-editor-macos-release` 验证 Workbench checksum、Codex arm64 原生运行时、
+  中文语言包、Proxy 文件集合和逐文件 SHA-256。
+- 空数据首次启动验证通过：
+  - `/live` 返回正常；
+  - 未配置状态 `/ready` 返回 HTTP 503、模型目录为空；
+  - `/admin` 可访问；
+  - 关闭隔离 Code 后测试 Proxy PID 不变且继续存活；
+  - 只清理备用端口测试 Proxy，不接触共享 `47892`。
+- GitHub Actions 运行
+  [29409776010](https://github.com/OscarYi9527/My_Code/actions/runs/29409776010)
+  为 `success`，21 个构建、验收和清理步骤全部通过。
+- DMG 约 `226.67 MB`，artifact id `8340875744`，SHA-256：
+  `edbb282e8dc05c5aaee7ad1b7da6501ca6c3183990e908a56c9ae86df26e1cc5`。
+- 公开 CI 候选未签名，因此 `signatureVerified=false`；Developer ID 签名、公证、
+  Intel x64 和 universal 成品留待后续平台阶段。
+
+### Windows 同步回归
+
+- Proxy 2.2.1 Windows 制品重新生成并重新打包，构建工具测试 `10 passing`。
+- `npm run typecheck-client`、`npm run compile`、`npm run core-ci`、Windows 产品打包、
+  Inno updater、用户级安装器和系统级安装器均通过。
+- Windows 静态发布报告
+  `.build/ai-editor-release/windows-x64-proxy221-static-report.json` 为 `PASS`：
+  Workbench checksum `10/10`，Proxy 受校验载荷 248 个文件，模型目录 20 个。
+- Windows 成品启动成功，共享 Proxy `/live` 保持 `ok`，未执行停止或重启。
+
+## 36. 2026-07-15 Monaco Editor checks 干净检出修复
+
+### 根因
+
+- `test/monaco/dist/core.html` 存在于开发机，但被根 `.gitignore` 的 `dist` 规则忽略，
+  从未进入 Git。
+- GitHub Actions 的干净检出只由 Webpack 生成 JavaScript，不会生成入口 HTML；
+  浏览器因此访问 404 页面。首个“`monaco` 不暴露为全局变量”测试会误通过，后续
+  `window.instance` 永远不会创建。
+- 之前加入 `waitForFunction(window.instance)` 只把立即的 undefined 错误变成稳定的
+  20 秒超时，并未解决入口文件缺失。
+
+### 修复与本地验证
+
+- 将与 VS Code 上游一致的 `test/monaco/dist/core.html` 强制纳入 Git。
+- `runner.js` 在启动浏览器前检查 HTML、主 bundle 和 worker bundle 均存在，缺失时
+  直接给出资源绝对路径，不再把 404 误报为编辑器初始化超时。
+- 页面加载统一校验 HTTP 200 后再等待 `window.instance`，普通 API 和无障碍测试复用
+  同一个加载辅助函数。
+- `npm run gulp editor-distro`、Webpack 打包和 Monaco TypeScript 编译通过。
+- 本机使用已安装 Chrome 执行 Chromium 测试，`9 passing`；本机未安装 Playwright
+  Firefox，完整 Chromium + Firefox 结果由 GitHub 标准浏览器环境验证。
+- 本轮只修改 Monaco CI fixture、测试保护和进度文档，不涉及 AI Editor UI、运行时
+  或 Proxy，无需重建 `out` / `out-vscode-min`，且未停止或重启共享 Proxy。

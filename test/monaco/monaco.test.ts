@@ -19,6 +19,12 @@ type BrowserType = 'chromium' | 'firefox' | 'webkit';
 
 const browserType: BrowserType = process.env.BROWSER as BrowserType || 'chromium';
 
+async function loadEditor(): Promise<void> {
+	const response = await page.goto(APP);
+	assert.strictEqual(response?.status(), 200, `Failed to load Monaco test page: ${APP}`);
+	await page.waitForFunction(() => !!(window as Window & { instance?: unknown }).instance);
+}
+
 before(async function () {
 	this.timeout(TIMEOUT);
 	console.log(`Starting browser: ${browserType}`);
@@ -64,8 +70,7 @@ describe('API Integration Tests', function (): void {
 	this.timeout(TIMEOUT);
 
 	beforeEach(async () => {
-		await page.goto(APP);
-		await page.waitForFunction(() => !!(window as Window & { instance?: unknown }).instance);
+		await loadEditor();
 	});
 
 	it('`monaco` is not exposed as global', async function (): Promise<any> {
@@ -139,8 +144,7 @@ describe('API Integration Tests', function (): void {
 	});
 	describe('Accessibility', function (): void {
 		beforeEach(async () => {
-			await page.goto(APP);
-			await page.waitForFunction(() => !!(window as Window & { instance?: unknown }).instance);
+			await loadEditor();
 			await injectAxe(page);
 			await page.evaluate(`
 			(function () {
