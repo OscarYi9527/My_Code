@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -63,7 +63,7 @@ jobs:
           NODE
 
       - name: Checkout pinned Proxy
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.proxy-source.outputs.repository }}
           ref: ${{ steps.proxy-source.outputs.commit }}
