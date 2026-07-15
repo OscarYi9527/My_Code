@@ -177,6 +177,19 @@ npm run core-ci
 - Windows 用户级/系统级安装器编译与隔离升级保留测试；
 - 隔离 Electron UI 自动化。
 
+Windows x64 发布候选统一阻断命令：
+
+```powershell
+npm run verify-ai-editor-windows-release -- `
+  -RunResponseTests `
+  -SubscriptionModel gpt-5.6-sol `
+  -NonSubscriptionModel deepseek-v4-pro
+```
+
+该命令必须生成 `PASS` 的 JSON/Markdown 报告，并确认备用端口测试 Proxy 已清理、共享
+`47892` Proxy 仍为 `ok`。正式用户级安装器还需安装到隔离目录后，以该安装目录再次
+执行不带 `-RunResponseTests` 的干净首次启动验收。
+
 ## 5. 发布阻断条件
 
 以下任一情况阻止发布：

@@ -23,7 +23,8 @@ npm run verify-ai-editor-windows-release
 6. 已配置共享 Proxy 的 `/live`、`/ready`、`/v1/models` 和 `/admin` 正常。
 7. 使用全新 Code 用户目录、全新 Proxy 数据目录和备用端口启动 Windows 成品：
    - Code 自动启动安装目录内 Proxy；
-   - `/live`、`/ready`、`/v1/models` 和 `/admin` 可访问；
+   - `/live` 和 `/admin` 可访问；
+   - 未配置上游时 `/ready` 返回 `503 unavailable`，`/v1/models` 返回空目录；
    - 关闭 Code 后该备用端口 Proxy 继续存活；
    - 验证后只终止该备用测试 Proxy。
 

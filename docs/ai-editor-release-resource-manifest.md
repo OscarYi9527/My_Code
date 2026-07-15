@@ -147,5 +147,9 @@ Code 仓库和 Proxy 仓库是两个独立版本源。发布流水线需要：
   重复安装和卸载测试。
 - 重复安装会清除旧 Proxy 程序哨兵；配置、账号、API Key、统计和备份哨兵在安装、
   升级及卸载后的 SHA-256 均保持不变。
-- G02 Windows 安装升级闭环已完成；发布流水线仍需加入固定 commit 的双仓库 checkout，
-  macOS 制品和安装升级验证留待后续平台阶段。
+- Proxy 制品现在强制包含 `ThirdPartyNotices.txt`，当前声明生产依赖
+  `undici 8.7.0` 的 MIT 许可证；主产品声明继续包含 Codex 的 Apache-2.0 许可证。
+- Windows 发布验收会生成成品、两个安装器和必需资源的版本/SHA-256 清单，并同时验证
+  已配置 Proxy 与空数据首次启动。
+- G02/G03 Windows 安装升级及发布验收闭环已完成；发布流水线仍需加入固定 commit 的
+  双仓库 checkout，macOS 制品和安装升级验证留待后续平台阶段。

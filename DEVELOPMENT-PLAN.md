@@ -85,13 +85,16 @@ Code-OSS Workbench
   统计、配置和备份。
 - [ ] macOS 完成同等的制品、后台启动和退出后常驻验证。
 
-### G03 发布验收
+### G03 发布验收（Windows 已完成）
 
-- 在无预装 Proxy 的干净 Windows 用户环境完成首次启动。
-- 验证 `/live`、`/ready`、`/v1/models`、`/v1/responses` 和 `/admin`。
-- 验证至少一个 ChatGPT Subscription 模型和一个非订阅模型。
-- 验证模式切换、会话恢复、中断恢复和产品完整性校验。
-- 生成安装包资源清单、版本清单和第三方许可证。
+- [x] 使用正式用户级安装器，在无预装 Proxy、空 Code 用户目录和空 Proxy 数据目录完成
+  Windows 首次启动。
+- [x] 验证 `/live`、`/ready`、`/v1/models`、`/v1/responses` 和 `/admin`。
+- [x] 验证 ChatGPT Subscription `gpt-5.6-sol` 和非订阅
+  `deepseek-v4-pro` 的真实流式回复。
+- [x] 汇总既有模式切换、会话恢复、中断恢复结果，并重新校验 Windows 产品完整性。
+- [x] 生成成品/安装器资源与版本清单、SHA-256 报告，并补齐 Proxy 生产依赖第三方声明。
+- [ ] 在 macOS 阶段完成同等级发布验收。
 
 ## MVP 后反馈项
 

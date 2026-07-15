@@ -1034,3 +1034,68 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   首次安装、重复安装和卸载后的逐文件 SHA-256 均与安装前完全一致。
 - 验证期间共享 `http://127.0.0.1:47892` Proxy 始终保持 `/live: ok`，未执行停止或
   重启。
+
+## 33. 2026-07-15 G03 Windows 发布候选验收
+
+### 第三方许可证闭环
+
+- 审计确认主产品 `ThirdPartyNotices.txt` 已包含 Codex/OpenAI 的 Apache-2.0 声明，
+  但捆绑 Proxy 原制品只有自身 MIT `LICENSE`，缺少生产依赖 `undici` 的声明。
+- `codex_proxy` 新增 `ThirdPartyNotices.txt`，包含 `undici 8.7.0` 的 MIT 许可证；
+  提交 `73631a2` 已推送到 `OscarYi9527/codex_proxy` 的 `master`。
+- Code 制品生成和校验器现在把 Proxy `ThirdPartyNotices.txt` 设为必需文件；缺少该
+  文件会阻止产品和安装器打包。定向构建测试扩展为 `6 passing`。
+
+### 统一 Windows 发布阻断脚本
+
+- 新增 `npm run verify-ai-editor-windows-release` 和
+  `scripts/verify-ai-editor-windows-release.ps1`，自动验证：
+  - Windows 成品、用户级安装器和系统级安装器的 SHA-256；
+  - `product.json` 的全部 Workbench checksum；
+  - Codex Agent Host、Codex JS/Windows x64 运行时、简体中文语言包和 Proxy 资源；
+  - Proxy 清单的平台、版本、文件集合和逐文件 SHA-256；
+  - 主产品 Codex 声明和 Proxy `undici` 声明；
+  - 已配置 Proxy 的 `/live`、`/ready`、`/v1/models`、`/admin`；
+  - 空 Code 用户目录、空 Proxy 数据目录和备用端口的首次启动；
+  - 可选的 ChatGPT Subscription 与非订阅模型真实 `/v1/responses`。
+- 报告写入：
+  - `.build/ai-editor-release/windows-x64-release-report.json`
+  - `.build/ai-editor-release/windows-x64-release-report.md`
+- 报告只保存版本、哈希、状态码、路由响应头和最多 120 字符输出预览，不保存账号、
+  Token、API Key 或请求正文。
+
+### 最终构建与验收结果
+
+- Code 工具提交 `f4fb7871e` 已推送到 `origin/main`；基于该已提交版本重新运行：
+  - `npm run typecheck-client`：通过；
+  - `npm run compile`：通过，`scripts\code.bat` 隔离启动成功；
+  - `npm run core-ci`：通过；
+  - `npm run gulp vscode-win32-x64-min-ci`：通过；
+  - Windows 用户级/系统级 Inno Setup：均重新编译成功。
+- 最终成品版本：
+  - Code `1.127.0`，commit
+    `f4fb7871e803e735c81638c52749a2aadf794d95`；
+  - Proxy `2.2.0`，commit
+    `73631a22bca75731a98507ae6301e7a4b71506a0`；
+  - Codex `0.142.0` / Windows x64 原生包 `0.142.0-win32-x64`；
+  - 简体中文语言包 `1.127.0`。
+- 最终统一报告：`PASS`
+  - 产品 checksum：`10/10`；
+  - Proxy 受校验载荷：248 个文件；
+  - 已配置 Proxy 模型目录：20 个模型；
+  - `/admin`：HTTP 200，标题“Codex Gateway · 管理控制台”；
+  - `gpt-5.6-sol`：HTTP 200、`owned_by=chatgpt-sub`、回复 `OK`；
+  - `deepseek-v4-pro`：HTTP 200、`owned_by=deepseek`、回复 `OK`。
+- 空数据首次启动：
+  - 初始 Proxy 数据文件数为 0；
+  - Code 从成品内 `ai-editor-proxy/src/server.js` 后台启动备用端口 Proxy；
+  - 未配置状态 `/ready` 返回 HTTP 503、`status=unavailable`；
+  - `/v1/models` 返回 0 个模型，`/admin` 返回 HTTP 200；
+  - 关闭 Code 后 Proxy 保持存活；验证后仅清理该备用端口测试进程。
+- 正式用户级安装器进一步完成真实隔离安装：
+  - 安装退出码 0；
+  - 对安装后的产品重复执行空数据首次启动验收，结果 `PASS`；
+  - 安装包内 Proxy 第三方声明存在且校验通过；
+  - 静默卸载退出码 0。
+- 两轮备用测试 Proxy 均已清理，无残留监听；共享
+  `http://127.0.0.1:47892/live` 始终为 `ok`，未停止或重启。
