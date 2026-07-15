@@ -28,7 +28,11 @@ import {
 
 const HEALTH_POLL_INTERVAL = 15_000;
 const STARTUP_POLL_INTERVAL = 250;
-const STARTUP_TIMEOUT = 10_000;
+// A first launch from the installed product can spend more than ten seconds
+// initializing the writable data directory and Windows credential protection.
+// Keep the poll responsive, but do not spawn a duplicate recovery process
+// while that cold start is still healthy and progressing.
+const STARTUP_TIMEOUT = 30_000;
 const MAX_RESTART_ATTEMPTS = 3;
 
 interface IHttpJsonResponse {
@@ -220,6 +224,8 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 			env: {
 				...process.env,
 				ELECTRON_RUN_AS_NODE: '1',
+				CODEX_PROXY_DATA_DIR: process.env['VSCODE_AI_EDITOR_PROXY_DATA_DIR'] ??
+					join(this.environmentMainService.userHome.fsPath, '.claude', 'proxy'),
 				CODEX_PROXY_HOST: url.hostname === '[::1]' ? '::1' : (url.hostname === 'localhost' ? '127.0.0.1' : url.hostname),
 				CODEX_PROXY_PORT: url.port || '80'
 			},

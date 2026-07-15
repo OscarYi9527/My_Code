@@ -234,6 +234,83 @@ function computeChecksum(filename: string): string {
 	return hash;
 }
 
+function getAiEditorProxyRuntimeStream(): NodeJS.ReadWriteStream {
+	const artifactRoot = path.resolve(
+		process.env['VSCODE_AI_EDITOR_PROXY_ARTIFACT_DIR'] ??
+		path.join(root, '.build', 'ai-editor-proxy')
+	);
+	const entryPoint = path.join(artifactRoot, 'src', 'server.js');
+	const releaseManifest = path.join(artifactRoot, 'release-manifest.json');
+
+	if (!fs.existsSync(entryPoint) || !fs.existsSync(releaseManifest)) {
+		if (process.env['VSCODE_REQUIRE_AI_EDITOR_PROXY'] === '1') {
+			throw new Error(
+				`AI Editor Proxy artifact is required but missing at ${artifactRoot}. ` +
+				'Run npm run prepare-ai-editor-proxy first.'
+			);
+		}
+		return gulp.src(`${path.join(root, '.build', 'missing-ai-editor-proxy').replace(/\\/g, '/')}/**`, {
+			allowEmpty: true
+		});
+	}
+
+	const metadata = JSON.parse(fs.readFileSync(releaseManifest, 'utf8')) as {
+		name?: string;
+		commit?: string;
+		entryPoint?: string;
+		files?: Record<string, string>;
+	};
+	if (
+		metadata.name !== 'codex_proxy' ||
+		metadata.entryPoint !== 'src/server.js' ||
+		!/^[0-9a-f]{40}$/i.test(metadata.commit ?? '') ||
+		!metadata.files ||
+		Object.keys(metadata.files).length === 0
+	) {
+		throw new Error(`Invalid AI Editor Proxy release manifest: ${releaseManifest}`);
+	}
+	const actualFiles: string[] = [];
+	const pending = [artifactRoot];
+	while (pending.length) {
+		const directory = pending.pop()!;
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const fullPath = path.join(directory, entry.name);
+			if (entry.isDirectory()) {
+				pending.push(fullPath);
+			} else if (fullPath !== releaseManifest) {
+				actualFiles.push(path.relative(artifactRoot, fullPath).replace(/\\/g, '/'));
+			}
+		}
+	}
+	const expectedFiles = Object.keys(metadata.files).sort();
+	actualFiles.sort();
+	if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
+		throw new Error(`AI Editor Proxy artifact file list does not match its release manifest: ${artifactRoot}`);
+	}
+	for (const [relativePath, expected] of Object.entries(metadata.files)) {
+		if (
+			path.isAbsolute(relativePath) ||
+			relativePath.split('/').includes('..') ||
+			!/^[0-9a-f]{64}$/i.test(expected)
+		) {
+			throw new Error(`Invalid AI Editor Proxy artifact entry: ${relativePath}`);
+		}
+		const filePath = path.join(artifactRoot, relativePath);
+		if (!fs.existsSync(filePath) || computeChecksum(filePath) !== Buffer.from(expected, 'hex').toString('base64').replace(/=+$/, '')) {
+			throw new Error(`AI Editor Proxy artifact checksum mismatch: ${relativePath}`);
+		}
+	}
+
+	return gulp.src(`${artifactRoot.replace(/\\/g, '/')}/**`, {
+		base: artifactRoot,
+		dot: true
+	}).pipe(rename(file => {
+		file.dirname = file.dirname && file.dirname !== '.'
+			? `ai-editor-proxy/${file.dirname}`
+			: 'ai-editor-proxy';
+	}));
+}
+
 function packageTask(platform: string, arch: string, sourceFolderName: string, destinationFolderName: string, _opts?: { stats?: boolean }) {
 	const destination = path.join(path.dirname(root), destinationFolderName);
 	platform = platform || process.platform;
@@ -325,6 +402,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 		const api = gulp.src('src/vscode-dts/vscode.d.ts').pipe(rename('out/vscode-dts/vscode.d.ts'));
 
 		const telemetry = gulp.src('.build/telemetry/**', { base: '.build/telemetry', dot: true });
+		const aiEditorProxyRuntime = getAiEditorProxyRuntimeStream();
 
 		const jsFilter = util.filter(data => !data.isDirectory() && /\.js$/.test(data.path));
 		const root = path.resolve(path.join(import.meta.dirname, '..'));
@@ -381,6 +459,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 			license,
 			api,
 			telemetry,
+			aiEditorProxyRuntime,
 			sources,
 			deps
 		];

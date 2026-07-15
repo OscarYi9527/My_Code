@@ -39,7 +39,7 @@ AI Editor
 
 ## 3. 本轮验收标准
 
-- [ ] Windows Code 启动时自动检测并启动本地 Proxy。
+- [x] Windows Code 启动时自动检测并启动本地 Proxy。
 - [ ] 未配置上游时显示初始化提示并可打开 `/admin`。
 - [ ] Codex Agent Host 只连接 `local_multi_proxy`。
 - [ ] 模型列表来自 `/v1/models`，可选择模型并发送请求。
@@ -49,7 +49,7 @@ AI Editor
 - [ ] Proxy 中断后按安全策略恢复。
 - [x] TypeScript 类型检查通过。
 - [x] 新增 Proxy 公共逻辑单元测试通过。
-- [ ] Windows 隔离 Electron UI 全链路验证通过。
+- [x] Windows 隔离 Electron UI 全链路验证通过。
 
 ## 4. 实施任务
 
@@ -117,8 +117,8 @@ AI Editor
 - [x] F03 模型目录与路由集成测试。
 - [x] F04 会话恢复和模式切换集成测试。
 - [x] F05 Proxy 崩溃和重启恢复测试。
-- [ ] F06 Windows 隔离 Electron UI 验证。
-- [ ] F07 更新开发计划、测试文档和安装包资源清单。
+- [x] F06 Windows 隔离 Electron UI 验证。
+- [x] F07 更新开发计划、测试文档和安装包资源清单。
 
 ## 5. 2026-07-12 阶段 B 执行记录
 
@@ -883,3 +883,103 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `product.json` 的 10 项 SHA-256（Base64 无填充）校验全部匹配。
 - 成品 `Code - OSS.exe` 使用隔离用户目录启动成功；验证后仅关闭该次由自动验证启动的
   Code 进程，Proxy 仍返回 `/live: status=ok`。
+
+## 29. 2026-07-15 F06 Windows 隔离 Electron UI 验证
+
+### 布局并发修复
+
+- `AiEditorModeLayoutContribution` 对模式布局应用进行串行化，避免 Workbench 启动恢复
+  编辑器与用户模式切换同时执行 `reset/openEditor`。
+- 前一次布局操作失败不会阻断后续模式应用；启动或切换期间的瞬时错误不会留下半应用
+  布局。
+- 新增定向回归测试，模拟开发模式尚未完成时收到简约模式切换，断言两个布局严格按顺序
+  完成。
+
+### 构建和自动化验证
+
+- `npm run typecheck-client`：通过。
+- 定向模式测试：`4 passing`。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- `npm run core-ci`：通过，Windows 成品 `out-vscode-min` 已同步。
+- `npm run gulp vscode-win32-x64-min-ci`：通过；临时将 Windows SDK x64
+  `signtool.exe` 加入 `PATH`。
+- Windows 成品目录已更新到 `D:\AI_prejoct\VSCode-win32-x64`。
+
+### Windows 成品 UI 结果
+
+- 使用隔离用户/扩展目录和 CDP `9368` 启动成品。
+- 全局 UI 为简体中文，Codex Chat Editor 位于 Code 主窗口。
+- 模式按钮下拉同时显示“切换到开发模式”和“切换到简约模式”。
+- 选择简约模式后显示“是否切换到简约模式？”，点击“确认”后才切换。
+- 简约模式验证：
+  - Activity Bar 隐藏；
+  - Explorer/Side Bar 保留；
+  - Panel 和 Auxiliary Bar 隐藏；
+  - 同一个 Codex Chat Editor 恢复到主编辑器组；
+  - 顶层菜单只剩 `File`，子菜单只剩 `Open Folder...`。
+- Renderer Console 为 `0 errors / 0 warnings`，没有 editor disposal 或 pane activation
+  布局并发错误。
+- 验证结束只关闭 PID `44260` 的隔离 Code 实例；共享 Proxy `/live` 保持 `ok`。
+
+## 30. 2026-07-15 F07 计划、测试和发布资源清单
+
+- 重写 `DEVELOPMENT-PLAN.md`，将产品主线更新为
+  `Code-OSS → Codex Agent Host → codex app-server → codex_proxy`，记录已完成阶段、
+  当前发布资源阶段和 MVP 后反馈项。
+- 重写 `TEST-PLAN.md`，移除旧 `electron-app` 登录原型测试，改为双构建、Proxy、
+  模型、中文 IME、模式切换、会话恢复、权限和中断恢复的 MVP 测试计划。
+- 新增 `docs/ai-editor-release-resource-manifest.md`，明确：
+  - Workbench、中文语言包和 Codex 平台运行时资源；
+  - 独立 `codex_proxy` 仓库的干净制品格式；
+  - 必需/排除文件、用户数据边界、版本元数据及 Windows/macOS 验收。
+- 资源审计确认当前 Windows 成品尚未包含
+  `resources/app/ai-editor-proxy/src/server.js`。健康共享 Proxy 的复用已经验证，但无
+  预装 Proxy 的干净用户首次启动仍是发布阻断项。
+- 下一开发任务为 G01：从独立 `codex_proxy` 仓库生成、校验并嵌入不含配置和凭据的
+  Proxy 运行时制品。
+
+## 31. 2026-07-15 G01 Windows Proxy 运行时制品闭环
+
+### 双仓库制品生成
+
+- `codex_proxy` 新增 MIT `LICENSE`，并完成两个本地提交：
+  - `06a4262`：账号级熔断、最终失败计数和脱敏网络根因日志；
+  - `d8c9097`：运行时目录与可写用户数据目录分离，实例锁按端口隔离。
+- Code 新增 `npm run prepare-ai-editor-proxy`：
+  - 只接受干净且已提交的独立 `codex_proxy` 工作树；
+  - 仅复制 `src/`、包元数据、README/SECURITY/LICENSE；
+  - 在隔离 `.build/ai-editor-proxy` 中安装生产依赖；
+  - 排除配置、凭据、账号、日志、统计、备份和 Git 数据；
+  - 生成包含 Proxy commit、版本、平台和逐文件 SHA-256 的
+    `release-manifest.json`。
+- Windows/macOS Code 打包流支持读取该制品；设置
+  `VSCODE_REQUIRE_AI_EDITOR_PROXY=1` 时缺少或校验不匹配会直接阻止打包。
+
+### 运行时数据边界
+
+- Code 启动安装包内 Proxy 时传入独立 `CODEX_PROXY_DATA_DIR`，默认继续使用当前用户
+  `~/.claude/proxy`，因此升级安装目录不会覆盖现有账号、API Key、配置和统计。
+- `codex_proxy` 的配置、备份、DPAPI 密钥、统计、健康历史、请求日志、模型目录和
+  thread route 已改为写入数据目录。
+- 指定数据目录的实例锁包含端口号，不会因共享 47892 已运行而阻止隔离备用端口实例。
+- Windows 安装目录只包含程序和生产依赖，不产生运行时用户数据。
+
+### 验证
+
+- Proxy：`npm run check` 通过，完整测试 `64 passing`，包含独立数据目录/端口锁子进程
+  测试。
+- Code：`npm run typecheck-client`、主进程定向测试 `3 passing`、
+  `npm --prefix build run typecheck`、`npm run compile` 和 `npm run core-ci` 通过。
+- Windows 产品打包在强制 Proxy 制品模式下通过。
+- 成品包含 `resources/app/ai-editor-proxy/src/server.js`，Proxy 制品 248 个文件、
+  未发现配置/凭据/日志/统计文件；`product.json` 10/10 checksum 匹配。
+- 使用隔离 Code 用户目录、隔离 Proxy 数据目录和备用端口 `47903` 验证：
+  - Code 从成品安装目录自动后台启动 Proxy；
+  - 监听进程命令行指向
+    `resources/app/ai-editor-proxy/src/server.js`；
+  - `/live` 返回 `ok`；
+  - 关闭 Code 后测试 Proxy 继续运行；
+  - 验证后只清理该备用端口测试 Proxy，共享 `47892` 始终保持 `/live: ok`。
+- 冷启动首次初始化超过原 10 秒窗口时会产生一次重复启动尝试；Code 启动等待已调整为
+  30 秒。最终成品使用全新数据目录复测，等待超过 30 秒后启动日志仍只有 1 条，关闭
+  Code 后备用端口 Proxy 保持 `/live: ok`。

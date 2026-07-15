@@ -76,6 +76,7 @@
     "stylelint": "node build/stylelint.ts",
     "playwright-install": "npm exec playwright install",
     "compile-build": "npm run gulp compile-build-with-mangling",
+    "prepare-ai-editor-proxy": "node --experimental-strip-types build/ai-editor-proxy/prepare.ts",
     "compile-extensions-build": "npm run gulp compile-extensions-build",
     "minify-vscode": "npm run gulp minify-vscode",
     "minify-vscode-reh": "npm run gulp minify-vscode-reh",

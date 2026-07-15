@@ -1,118 +1,97 @@
-﻿# Code-OSS 魔改开发计划
+# AI Editor（Code-OSS）开发计划
 
-## 当前结论
+## 产品架构
 
-本项目最终目标不是维护 `electron-app/` 手写原型，而是在 Code-OSS / VS Code 原生 workbench 上做定制：保留 VS Code 的 Explorer、Editor Part、Tabs、Layout、Terminal、Extensions 等成熟能力，只新增双模式入口、简约模式布局和基于 Codex 插件的 AI 对话能力。
-
-## 阶段 0：冻结原型
-
-- `electron-app/` 仅保留为交互验证原型。
-- 不再继续在 `electron-app/renderer/app.js` 上补 VS Code 级能力。
-- 原型中可复用的产品结论：
-  - AI 对话应与文件标签同属 Editor Area。
-  - 简约模式需要保留文件树和 AI/文件查看编辑区域。
-  - 标签需要支持关闭、拖拽排序。
-  - 视图尺寸需要可拖动。
-
-## 阶段 1：Code-OSS 构建环境恢复
-
-目标：根目录 Code-OSS 能完成依赖安装、编译并启动。
-
-任务：
-1. 修复 `npm install` 失败问题，重点处理 `@vscode/spdlog`、`@vscode/sqlite3` native module。
-2. 确认 Windows 构建前置条件：Python、Visual Studio Build Tools、MSVC、Windows SDK、node-gyp。
-3. 使用项目 `.nvmrc` 对齐 Node 版本。
-4. 成功执行：
-   - `npm install --legacy-peer-deps`
-   - `npm run compile-client`
-   - `scripts\code.bat` 或等价启动命令
-
-验收：能打开原生 VS Code / Code-OSS workbench。
-
-## 阶段 2：定位 Workbench 定制点
-
-目标：只改 VS Code 原生 workbench，不重写基础 UI。
-
-重点目录：
+产品基于 Code-OSS 原生 Workbench，不再以 `electron-app/` 原型作为产品主线。
 
 ```text
-src/vs/workbench/browser/
-src/vs/workbench/contrib/
-src/vs/workbench/services/
-src/vs/code/
+Code-OSS Workbench
+→ 内嵌 Codex Chat Editor
+→ Codex Agent Host
+→ codex app-server
+→ http://127.0.0.1:47892/v1
+→ codex_proxy 多上游路由
 ```
 
-需要调研：
-- LayoutService / WorkbenchLayout
-- Activity Bar / Sidebar / Panel / Editor Part
-- ViewContainer / ViewPane / Composite
-- EditorInput / EditorPane
-- Commands / Menus / Keybindings
+核心约束：
 
-产出：`docs/workbench-customization-map.md`，记录具体改造入口。
+- 只允许使用 Codex Agent Host，不接入独立 Agents Window 作为普通入口。
+- 普通用户不需要登录 ChatGPT/Copilot；上游凭据由 Proxy 管理平台维护。
+- Code 退出时不关闭共享 Proxy。
+- 开发版 `out` 与 Windows 成品 `out-vscode-min` 必须同步构建和验证。
+- Proxy 只能在用户明确批准后通过 `scripts\restart-ai-proxy.ps1` 安全重启。
 
-## 阶段 3：新增产品模式服务
+## 已完成阶段
 
-目标：在 VS Code 内建立 `dev` / `simple` 模式状态，而不是通过外部 Electron UI 控制。
+### 阶段 1：Code-OSS 与双模式 Workbench
 
-计划新增：
+- Code-OSS Windows 构建环境可用。
+- `dev` / `simple` 模式服务、持久化状态、切换菜单和二次确认已完成。
+- 开发模式保留完整 Activity Bar、Explorer、菜单和编辑能力。
+- 简约模式隐藏 Activity Bar、Panel 和 Auxiliary Bar，保留 Explorer、Editor Area。
+- 简约模式顶层菜单只保留 `File → Open Folder...`。
+- 模式切换期间的布局应用已串行化，避免 Workbench 恢复编辑器时发生并发释放。
 
-```text
-src/vs/workbench/services/aiEditorMode/
-```
+### 阶段 2：Codex Agent Host 与本地 Proxy
 
-能力：
-- 当前模式：`dev | simple`
-- 模式切换命令
-- 状态持久化到 VS Code storage
-- 菜单/命令面板入口
+- Codex Agent Host 随产品启用并作为唯一 AI Provider。
+- `codex app-server` 固定连接 External Local Proxy。
+- Proxy 默认地址为 `http://127.0.0.1:47892`，高级设置允许本地地址调整。
+- 模型目录动态读取 Proxy `/v1/models`，支持启动刷新和手动刷新。
+- AI 对话使用原生 Chat Editor，支持流式回复、工具调用和中文 IME。
+- Windows 成品随包携带 Codex JS 启动器、平台原生二进制和简体中文语言包。
 
-验收：在原生 VS Code 中可通过命令切换模式，并持久保存。
+### 阶段 3：会话与工作区恢复
 
-## 阶段 4：实现简约模式布局
+- 工作区恢复最近使用的 Codex 会话。
+- 保留 Codex Agent Host 原生多会话、新建、切换、重命名、归档和删除能力。
+- 历史对话入口和“当前文件夹任务”面板已完成。
+- 开发模式和简约模式复用同一个 Codex Session URI。
 
-目标：复用 VS Code 原生 Explorer 与 Editor Area，隐藏非必要区域。
+### 阶段 4：安全基线与中断恢复
 
-简约模式行为：
-- 保留 Explorer / 文件树。
-- 保留 Editor Area。
-- 隐藏 Activity Bar 非核心入口、Terminal、Debug、Extensions 等高级开发入口。
-- AI Chat 作为 Editor Tab 或 View，与文件标签同一区域。
+- 默认工作区可写、工作区外禁止写入、网络关闭、按需审批。
+- 每个 Turn 捕获 Git 基线，保留对话前已有 staged/unstaged/untracked 改动。
+- 非 Git 工作区安全退化，不覆盖或删除用户文件。
+- 记录工具/终端执行状态和 Proxy 请求转发状态。
+- 仅确认未转发的请求允许自动重试。
+- 不确定或已转发请求使用“检查状态并继续”创建新 Turn 核对现状。
 
-验收：用户切换到简约模式后，界面只保留文件树 + AI/文件编辑区域，且 VS Code 原生标签、拖拽、关闭、分屏能力仍可用。
+### 阶段 5：Windows MVP 验证
 
-## 阶段 5：Codex AI 对话集成
+- TypeScript、定向单元测试、开发版编译和 Windows 成品编译通过。
+- Windows 成品为中文界面，Codex Chat、Proxy 模型、会话恢复正常。
+- 模式切换二次确认、简约布局和简约菜单已通过隔离 Electron UI 验证。
+- 产品运行期间复用健康共享 Proxy，不调用危险的管理端重启接口。
 
-目标：在 VS Code 原生 Editor/View 系统中接入 Codex 插件能力，并复用其本地能力边界与会话机制。
+## 当前阶段：发布资源闭环
 
-计划：
-- 新增 AI Chat contribution。
-- AI Chat 可作为 Editor Tab 打开。
-- 支持文件上下文。
-- 支持流式输出。
-- 优先复用 Codex 插件/本地能力的已有会话与存储机制，不自行存完整对话。
+### G01 Proxy 运行时制品（Windows 本地闭环已完成）
 
-验收：AI Chat 可以和文件标签并列、可拖拽、可关闭、可分屏。
+- [x] 以独立仓库 `OscarYi9527/codex_proxy` 为源码来源。
+- [x] 构建时生成不包含配置、账号、日志和备份的干净运行时制品。
+- [x] 制品包含 `src/`、`package.json`、生产依赖、许可证、版本和逐文件校验值。
+- [x] Windows 成品将制品放入 Code 可发现的 `ai-editor-proxy` 目录。
+- [x] 发布构建拒绝未提交的 Proxy 工作树，不能静默复制个人运行目录。
+- [ ] macOS 成品接入并验证对应制品。
 
-## 阶段 6：后台服务接入
+### G02 安装与升级
 
-目标：将已有 `server/` 认证、邀请码、管理后台接到原生 workbench。
+- Windows 安装器安装 Code、Codex Agent Host 运行时、中文语言包和 Proxy。
+- 首次启动自动复用健康 Proxy；不存在时后台启动安装包内 Proxy。
+- 升级 Proxy 时不覆盖用户的账号、API Key、统计、配置和管理数据。
+- macOS 完成同等的制品、后台启动和退出后常驻验证。
 
-任务：
-- 登录状态与 VS Code 启动流程集成。
-- 静默续期。
-- 管理后台保留 Web 服务。
-- UsageRecord / VersionUpdate / SkillPublication 数据模型补齐。
+### G03 发布验收
 
-验收：首次启动要求登录，之后长期保持登录；管理员可生成邀请码、查看统计、推送版本。
+- 在无预装 Proxy 的干净 Windows 用户环境完成首次启动。
+- 验证 `/live`、`/ready`、`/v1/models`、`/v1/responses` 和 `/admin`。
+- 验证至少一个 ChatGPT Subscription 模型和一个非订阅模型。
+- 验证模式切换、会话恢复、中断恢复和产品完整性校验。
+- 生成安装包资源清单、版本清单和第三方许可证。
 
-## 阶段 7：测试与发布准备
+## MVP 后反馈项
 
-任务：
-- TypeScript typecheck。
-- Workbench 单元测试。
-- Electron smoke test。
-- 后台 API 测试。
-- Windows/macOS 启动验证。
-
-验收：核心路径可跑通：登录 → 打开项目 → 开发模式 → 简约模式 → AI Chat → 文件上下文 → 管理后台。
+- “文件编辑器是否固定避开 AI Chat 编辑器组”暂不修改，待 MVP 用户反馈后决定。
+- 后续将 Proxy 管理平台集成进 Code；MVP 仍通过本地 `/admin` 打开。
+- `server/` 旧登录/邀请码原型不属于当前 External Proxy MVP 启动链路。
