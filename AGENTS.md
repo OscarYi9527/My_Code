@@ -67,6 +67,13 @@ These ownership rules are persistent for the AI Editor account/Gateway MVP:
 - Before new Gateway implementation, audit Black's current branch against
   `specs/002-ai-editor-account-gateway/tasks.md`; reuse and validate existing
   work before marking covered tasks complete.
+- Oscar owns a Code-side contract simulator and injectable mock account
+  transport. Code UI, login callback, status, Turn gate and Webview development
+  must not wait for Black to deliver a mock server.
+- Black implements the real Edge/Gateway independently against the same
+  contracts and contract fixtures. Black is not a prerequisite for Oscar's
+  component-level development, and Oscar is not a prerequisite for Black's
+  server implementation.
 - The source of truth for cross-repository interfaces is:
   `specs/002-ai-editor-account-gateway/contracts/`.
   Any endpoint, JSON field, status code or security-semantics change must
@@ -82,6 +89,8 @@ These ownership rules are persistent for the AI Editor account/Gateway MVP:
   instance.
 - T112 (full isolated quickstart) and T113 (shared Proxy invariants) require
   validation by both Black and Oscar before they are marked complete.
+- Joint synchronization is limited to three gates: contract freeze, real
+  Edge/Gateway contract conformance, and final end-to-end acceptance.
 - Each person updates only their assigned task checkboxes. Ownership and task
   IDs are defined in `specs/002-ai-editor-account-gateway/tasks.md`.
 

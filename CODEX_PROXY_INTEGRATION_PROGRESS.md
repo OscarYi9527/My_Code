@@ -1322,5 +1322,18 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `master` 由现有分支测试和评审决定，当前不执行强制合并、rebase 或 reset。
 - 本轮只执行 `git fetch` 和只读差异检查，未切换本地工作树、未修改 Black 分支，也未
   停止或重启共享 `47892`。
+
+## 42. 2026-07-16 Black/Oscar 真并行计划修正
+
+- 识别到旧计划把“Black 先提供 Mock Edge”设为 Oscar 的前置条件，会造成 Code 开发
+  等待服务器，不是真正并行。
+- 修正后由 Oscar 在 My_Code 内维护可注入 Mock Transport 和本地合同模拟器，独立覆盖
+  安全状态、handoff、Webview ticket、logout 和模型目录。
+- Black 依据相同 `contracts/` 和共享 JSON 样例独立实现真实 Edge/Gateway，不等待
+  Oscar 完成 Code UI。
+- 双方只在三个节点产生同步阻塞：合同冻结、真实接口符合性、T112/T113 最终端到端
+  验收。
+- T008 已调整为同时交付 `scripts/mock-ai-editor-edge.mjs` 和安全调试启动 wrapper；
+  AGENTS.md 的持久协作规则已同步修正。
 - 新增 `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`，将全部 Code 原生账号管理界面
   记录为 MVP 后评估项。

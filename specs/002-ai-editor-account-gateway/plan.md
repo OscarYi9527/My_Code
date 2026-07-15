@@ -69,13 +69,23 @@ Oscar 维护 `contracts/code-edge-webview.md` 的 Code 端实现。
 ### 共同责任
 
 - 接口合同变更必须由 Black 与 Oscar 双方确认后再修改实现。
-- Black 先提供符合合同的 Mock/最小 Edge 接口，Oscar 可据此独立开发 Code 组件。
+- Oscar 在 My_Code 内维护可注入的账号 Transport 和本地合同模拟器，Code 组件开发不等待
+  Black 提供 Mock 服务。
+- Black 使用相同合同和测试样例独立实现真实 Edge/Gateway，不等待 Oscar 完成 UI。
 - Black 不需要重置、覆盖或放弃现有 `feature/custom-api-urls`；Gateway 分支应从
   `e3ed1d6` 或其后经双方确认的稳定提交创建。
 - 联调只使用 Gateway `47920` 和 Edge `47921`，双方都不得操作共享 `47892`。
 - T112 端到端 quickstart 和 T113 共享 Proxy 不变性验证由双方共同签字确认。
 - Black 不直接修改 Code 产品组件；Oscar 不直接修改 Gateway 业务逻辑，跨仓库修改通过
   明确 PR 交接。
+
+### 并行开发检查点
+
+1. **合同冻结**：双方确认 `contracts/`、错误码和共享 JSON 样例；随后各自独立编码。
+2. **真实接口符合性**：Black 的 Edge/Gateway 通过同一合同测试后，Oscar 只替换 Mock
+   Transport 为真实地址，不重写 UI。
+3. **端到端验收**：T112/T113 才需要双方同时参与，完成真实登录、模型回复和共享 Proxy
+   不变性确认。
 
 ## Technical Context
 

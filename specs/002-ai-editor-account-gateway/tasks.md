@@ -79,12 +79,15 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 
 ### Coordination Rules
 
-- Black 首先交付符合合同的 Mock/最小 Edge 状态、handoff 和 Webview ticket 接口，Oscar
-  不等待完整 Gateway 即可开发 Code。
+- Oscar 在 My_Code 内实现可注入 Mock Transport 和本地合同模拟器，覆盖状态、handoff、
+  Webview ticket、logout 和模型目录；Code 组件开发不等待 Black。
+- Black 独立实现真实 Edge/Gateway，并使用相同合同样例验证；服务器开发不等待 Oscar
+  完成 Code UI。
 - 接口路径、JSON 字段、状态码或安全语义变化时，先修改 `contracts/` 并由双方确认。
 - 每人只更新自己负责的任务复选框；共同任务必须双方验证后才能标记完成。
 - Black 的默认开发仓库为 `codex_proxy`，Oscar 的默认开发仓库为 `My_Code`，避免双方
   同时修改同一源文件。
+- 双方只在“合同冻结、真实接口符合性、最终端到端验收”三个检查点同步阻塞。
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -104,7 +107,7 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T005 Extend ignored local DB, PID, log and secret patterns in `D:\AI_prejoct\codex_proxy-dev\.gitignore`
 - [ ] T006 [P] Add fixed development Gateway/Edge configuration schema in `D:\AI_prejoct\codex_proxy-dev\gateway\src\config.ts` and `src\edge\edge-config.js`
 - [ ] T007 Add isolated start/stop/reset entry scripts in `D:\AI_prejoct\codex_proxy-dev\tools\start-ai-editor-dev.ps1`, `tools\stop-ai-editor-dev.ps1`, and `tools\reset-ai-editor-dev.ps1`
-- [ ] T008 Add the Code-side safe wrapper in `D:\AI_prejoct\My_code\scripts\start-ai-editor-account-dev.ps1` with path/port/data-root validation
+- [ ] T008 Add the injectable contract simulator and safe Code-side wrapper in `D:\AI_prejoct\My_code\scripts\mock-ai-editor-edge.mjs` and `scripts\start-ai-editor-account-dev.ps1` with state, handoff, Webview-ticket, model, path, port and data-root validation
 
 **Checkpoint**: 依赖可以安装，调试脚本只识别 `47920`/`47921` 和隔离数据目录。
 

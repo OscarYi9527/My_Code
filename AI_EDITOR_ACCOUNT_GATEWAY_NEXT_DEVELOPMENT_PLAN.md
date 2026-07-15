@@ -203,8 +203,22 @@ T090、T099、T110、T114–T119。
 - T112：完整隔离 quickstart 联调。
 - T113：确认共享 Proxy `47892` 的 PID、状态和数据保持不变。
 - 所有接口合同变更必须先由双方确认。
-- Black 先提供 Mock/最小 Edge 接口，Oscar 可并行开发 Code，不必等待服务器全部完成。
+- Oscar 在 My_Code 内维护本地合同 Mock 和可注入 Transport，Code 组件开发不等待 Black。
+- Black 按相同合同独立实现真实 Edge/Gateway，服务器开发不等待 Oscar 完成 UI。
 - 新 Gateway 分支应从 Black 当前稳定分支创建，而不是从 `master@06cd8d5` 创建。
+
+### 真正并行的工作方式
+
+```text
+Oscar：Mock Transport → 账号服务 → 状态/UI → Turn 门禁 → Webview
+Black：现有代码审计 → Gateway/Edge → 账号 API → 组织/积分 → Provider/管理页
+```
+
+双方只在以下三个节点需要同步：
+
+1. 冻结接口合同和 JSON 样例。
+2. Black 真实接口通过合同测试后，Oscar 切换到 `47920/47921`。
+3. 最终 T112/T113 端到端验收。
 
 ## 八、下一步实施阶段
 
