@@ -115,7 +115,7 @@ AI Editor
 - [x] F01 TypeScript typecheck。
 - [x] F02 Agent Host/Proxy 服务单元测试。
 - [x] F03 模型目录与路由集成测试。
-- [ ] F04 会话恢复和模式切换集成测试。
+- [x] F04 会话恢复和模式切换集成测试。
 - [ ] F05 Proxy 崩溃和重启恢复测试。
 - [ ] F06 Windows 隔离 Electron UI 验证。
 - [ ] F07 更新开发计划、测试文档和安装包资源清单。
@@ -844,3 +844,18 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - Codex session 配置范围与 app-server 路由契约。
 - 定向测试结果：`44 passing`。
 - 共享 Proxy `/live` 正常；本轮没有重启或停止 Proxy，也未修改产品运行时代码或 UI。
+
+## 27. 2026-07-15 F04 会话恢复与模式切换集成验证
+
+### 验证内容与结果
+
+- 新增 `AiEditorModeLayoutContribution` 定向测试，确认：
+  - 开发模式/简约模式切换重置编辑器组后，继续复用同一个 Codex session URI；
+  - 当前工作区没有打开会话时，恢复该工作区保存的最后一个 Codex session；
+  - 损坏、非 Codex 的工作区存储值会安全回退到新的 Codex 会话。
+- 同时运行 Agent Host 会话恢复定向测试，验证历史消息、工具调用、并发恢复合并及失败后
+  重试恢复。
+- `npm run typecheck-client` 与 `npm run compile`：通过。
+- 合并定向测试结果：`10 passing`。
+- 本轮生产行为没有变化；仅为既有会话复用逻辑提供可回归测试入口。Windows 成品仍沿用
+  已完成 E05 验证的构建，Proxy 未停止或重启。

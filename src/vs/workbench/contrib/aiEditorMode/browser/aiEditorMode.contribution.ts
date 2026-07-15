@@ -134,7 +134,7 @@ MenuRegistry.appendMenuItem(aiEditorSimpleFileMenu, {
 	});
 })();
 
-class AiEditorModeLayoutContribution extends Disposable implements IWorkbenchContribution {
+export class AiEditorModeLayoutContribution extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.aiEditorModeLayout';
 
 	private static readonly LAYOUT_MEMENTO_ID = 'aiEditorModeLayout';
