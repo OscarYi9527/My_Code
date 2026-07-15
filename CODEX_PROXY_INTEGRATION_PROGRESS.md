@@ -114,7 +114,7 @@ AI Editor
 
 - [x] F01 TypeScript typecheck。
 - [x] F02 Agent Host/Proxy 服务单元测试。
-- [ ] F03 模型目录与路由集成测试。
+- [x] F03 模型目录与路由集成测试。
 - [ ] F04 会话恢复和模式切换集成测试。
 - [ ] F05 Proxy 崩溃和重启恢复测试。
 - [ ] F06 Windows 隔离 Electron UI 验证。
@@ -830,3 +830,17 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 合并定向测试结果：`212 passing`。
 - 本轮只修改测试夹具，未修改产品运行时代码或 UI；无需替换正在运行的 Windows
   成品窗口。共享 Proxy 未停止或重启。
+
+## 26. 2026-07-15 F03 模型目录与路由集成验证
+
+### 验证结果
+
+- 直接读取共享 Proxy 的 `GET /v1/models`，当前返回 **20 个**可选模型；数量相较
+  之前的 13 个发生变化，证明目录来自 Proxy 当前管理配置而非 Code 内置静态列表。
+- 同时覆盖并通过以下路由配置测试：
+  - `buildAgentSdkEnv` 仅设置产品指定的 `external-local-proxy` 与
+    `http://127.0.0.1:47892`；
+  - `usesExternalCodexProxy` 仅接受显式产品模式，拒绝内部 Copilot 路径；
+  - Codex session 配置范围与 app-server 路由契约。
+- 定向测试结果：`44 passing`。
+- 共享 Proxy `/live` 正常；本轮没有重启或停止 Proxy，也未修改产品运行时代码或 UI。
