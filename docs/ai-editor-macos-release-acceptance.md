@@ -56,11 +56,11 @@ npm run verify-ai-editor-macos-release -- \
 
 ## GitHub Actions
 
-`.github/workflows/ai-editor-macos-release.yml` 使用标准 `macos-14` x64 运行器：
+`.github/workflows/ai-editor-macos-release.yml` 使用标准 `macos-14` arm64 运行器：
 
 1. 从固定 commit checkout Code 和 `codex_proxy`；
 2. 运行 Proxy 检查和测试；
-3. 生成并校验 `darwin-x64` Proxy 制品；
+3. 生成并校验 `darwin-arm64` Proxy 制品；
 4. 构建、打包并执行干净首次启动验收；
 5. 创建 DMG，执行 `hdiutil verify`；
 6. 挂载 DMG 后再次校验其中 `.app` 的资源完整性；
@@ -69,3 +69,7 @@ npm run verify-ai-editor-macos-release -- \
 公开 CI 生成的是未签名候选包，因此签名状态会记录为未验证，但不会阻断构建。正式发布
 提升必须在具备 Apple Developer ID 和公证凭据的受控流水线中使用
 `--require-signature`，并在公证后再次执行同一资源验收。
+
+Intel x64 和 universal 产物仍需在可用的 Intel macOS 构建环境完成同等级验收；标准
+`macos-14` GitHub Hosted 镜像当前为 arm64，不能把 arm64 Node 依赖缓存误作 x64
+发布输入。

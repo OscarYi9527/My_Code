@@ -26,15 +26,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  macos-x64:
-    name: macOS x64 product
+  macos-arm64:
+    name: macOS arm64 product
     runs-on: macos-14
     timeout-minutes: 90
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      NPM_ARCH: x64
+      NPM_ARCH: arm64
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-      VSCODE_ARCH: x64
+      VSCODE_ARCH: arm64
       VSCODE_REQUIRE_AI_EDITOR_PROXY: "1"
 
     steps:
@@ -131,7 +131,7 @@ jobs:
         run: >-
           npm run prepare-ai-editor-proxy --
           --source "${{ github.workspace }}/.build/codex_proxy-source"
-          --platform darwin-x64
+          --platform darwin-arm64
 
       - name: Validate build tooling
         shell: bash
@@ -143,11 +143,11 @@ jobs:
       - name: Build Code product sources
         run: npm run core-ci
 
-      - name: Package macOS x64 product
-        run: npm run gulp vscode-darwin-x64-min-ci
+      - name: Package macOS arm64 product
+        run: npm run gulp vscode-darwin-arm64-min-ci
 
       - name: Verify unpacked macOS product
-        run: npm run verify-ai-editor-macos-release -- --arch x64
+        run: npm run verify-ai-editor-macos-release -- --arch arm64
 
       - name: Create and verify DMG
         shell: bash
@@ -156,7 +156,7 @@ jobs:
           dmg_dir="${GITHUB_WORKSPACE}/.build/ai-editor-release/dmg"
           mkdir -p "$dmg_dir"
           node build/darwin/create-dmg.ts "$RUNNER_WORKSPACE" "$dmg_dir"
-          dmg_path="$dmg_dir/VSCode-darwin-x64.dmg"
+          dmg_path="$dmg_dir/VSCode-darwin-arm64.dmg"
           python3 build/darwin/patch-dmg.py "$dmg_path" resources/darwin/disk.icns
           hdiutil verify "$dmg_path"
           shasum -a 256 "$dmg_path" | tee "$dmg_path.sha256"
@@ -165,7 +165,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dmg_path="${GITHUB_WORKSPACE}/.build/ai-editor-release/dmg/VSCode-darwin-x64.dmg"
+          dmg_path="${GITHUB_WORKSPACE}/.build/ai-editor-release/dmg/VSCode-darwin-arm64.dmg"
           mount_point="$(mktemp -d)"
           cleanup() {
             hdiutil detach "$mount_point" -force >/dev/null 2>&1 || true
@@ -174,21 +174,21 @@ jobs:
           trap cleanup EXIT
           hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_point"
           npm run verify-ai-editor-macos-release -- \
-            --arch x64 \
+            --arch arm64 \
             --product-root "$mount_point/Code - OSS.app" \
-            --report "${GITHUB_WORKSPACE}/.build/ai-editor-release/macos-x64-dmg-report.json" \
+            --report "${GITHUB_WORKSPACE}/.build/ai-editor-release/macos-arm64-dmg-report.json" \
             --skip-clean-start
 
       - name: Publish acceptance summary
         if: success()
         shell: bash
-        run: cat .build/ai-editor-release/macos-x64-release-report.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat .build/ai-editor-release/macos-arm64-release-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload macOS release evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: ai-editor-macos-x64-release
+          name: ai-editor-macos-arm64-release
           path: |
             .build/ai-editor-release/**
           if-no-files-found: warn

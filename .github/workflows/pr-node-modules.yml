@@ -148,8 +148,8 @@ jobs:
     name: macOS
     runs-on: macos-14
     env:
-      NPM_ARCH: x64
-      VSCODE_ARCH: x64
+      NPM_ARCH: arm64
+      VSCODE_ARCH: arm64
     steps:
       - name: Checkout microsoft/vscode
         uses: actions/checkout@v6
