@@ -1126,3 +1126,13 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `git diff --check` 与 `actionlint 1.7.12` 检查通过。
 - 本轮只修改 CI 配置和进度文档，不涉及 AI Editor UI、运行时代码或 Proxy；无需重建
   `out` / `out-vscode-min`，也未停止或重启共享 Proxy。
+
+### GitHub 在线验证
+
+- 修复提交 `d9b3010208bb8f2f83859dcc48688faf870c3dbd` 已推送到 `origin/main`。
+- `Code OSS (node_modules)` 运行
+  [#24](https://github.com/OscarYi9527/My_Code/actions/runs/29402133955) 整体
+  `success`：Compile、Linux、macOS、Windows、Copilot Linux 和 Copilot Windows
+  六个任务全部通过。
+- 18 个由旧的微软内部运行器配置造成的过期排队任务已取消；当前该工作流
+  `queued=0`、`in_progress=0`。
