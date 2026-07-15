@@ -75,12 +75,15 @@ Code-OSS Workbench
 - [x] 发布构建拒绝未提交的 Proxy 工作树，不能静默复制个人运行目录。
 - [ ] macOS 成品接入并验证对应制品。
 
-### G02 安装与升级
+### G02 安装与升级（Windows 已完成）
 
-- Windows 安装器安装 Code、Codex Agent Host 运行时、中文语言包和 Proxy。
-- 首次启动自动复用健康 Proxy；不存在时后台启动安装包内 Proxy。
-- 升级 Proxy 时不覆盖用户的账号、API Key、统计、配置和管理数据。
-- macOS 完成同等的制品、后台启动和退出后常驻验证。
+- [x] Windows 用户级/系统级安装器安装 Code、Codex Agent Host 运行时、中文语言包和
+  Proxy。
+- [x] 产品和安装器打包均强制校验 Proxy 平台、清单、文件集合和逐文件 SHA-256。
+- [x] 首次启动自动复用健康 Proxy；不存在时后台启动安装包内 Proxy。
+- [x] Windows 重复安装/升级替换旧 Proxy 程序文件，不覆盖用户的账号、API Key、
+  统计、配置和备份。
+- [ ] macOS 完成同等的制品、后台启动和退出后常驻验证。
 
 ### G03 发布验收
 

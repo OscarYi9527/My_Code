@@ -145,6 +145,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
 4. 连续启动失败三次后确认 AI 会话暂停并显示修复提示。
 5. 打开 Proxy 管理平台并完成配置后，确认 Code 可恢复为 Ready。
 
+### TC-11 Windows 安装与升级
+
+1. 分别构建 Windows 用户级和系统级 Inno Setup 安装器。
+2. 使用用户级安装器安装到隔离目录，确认 Code、Codex Agent Host、简体中文语言包和
+   `resources/app/ai-editor-proxy` 均存在。
+3. 在安装目录的 Proxy 程序目录加入旧版本哨兵文件；在安装目录外的隔离
+   `CODEX_PROXY_DATA_DIR` 写入配置、账号、API Key、统计和备份哨兵。
+4. 用同一安装器重复安装模拟升级，确认旧程序哨兵被删除、捆绑 Proxy 清单仍校验通过。
+5. 确认用户数据目录在首次安装、升级和卸载后的逐文件 SHA-256 均未变化。
+6. 确认整个过程不停止或重启共享 `47892` Proxy。
+
 ## 4. 自动化回归
 
 最低检查：
@@ -163,6 +174,7 @@ npm run core-ci
 - 会话恢复、归档和删除测试；
 - Git checkpoint 真实仓库集成测试；
 - Windows 产品打包与 `product.json` checksum 校验；
+- Windows 用户级/系统级安装器编译与隔离升级保留测试；
 - 隔离 Electron UI 自动化。
 
 ## 5. 发布阻断条件

@@ -73,6 +73,8 @@ Type: filesandordirs; Name: "{app}\{#VersionedResourcesFolder}\resources\app\ext
 Type: filesandordirs; Name: "{app}\{#VersionedResourcesFolder}\resources\app\node_modules"; Check: IsNotBackgroundUpdate
 Type: filesandordirs; Name: "{app}\{#VersionedResourcesFolder}\resources\app\node_modules.asar.unpacked"; Check: IsNotBackgroundUpdate
 Type: files; Name: "{app}\{#VersionedResourcesFolder}\resources\app\node_modules.asar"; Check: IsNotBackgroundUpdate
+; Proxy program files are replaceable application resources. Its mutable data remains outside {app}.
+Type: filesandordirs; Name: "{app}\{#VersionedResourcesFolder}\resources\app\ai-editor-proxy"; Check: IsNotBackgroundUpdate
 Type: files; Name: "{app}\{#VersionedResourcesFolder}\resources\app\Credits_45.0.2454.85.html"; Check: IsNotBackgroundUpdate
 
 [UninstallDelete]

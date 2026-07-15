@@ -983,3 +983,54 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 冷启动首次初始化超过原 10 秒窗口时会产生一次重复启动尝试；Code 启动等待已调整为
   30 秒。最终成品使用全新数据目录复测，等待超过 30 秒后启动日志仍只有 1 条，关闭
   Code 后备用端口 Proxy 保持 `/live: ok`。
+
+## 32. 2026-07-15 G02 Windows 安装与升级闭环
+
+### 安装器与发布门禁
+
+- `product.json` 新增 `aiEditorProxyBundled: true`，产品打包不再允许静默生成缺少
+  Proxy 的发布成品。
+- 新增统一 Proxy 制品校验器，同时用于制品生成、Code 产品打包和 Windows 安装器打包：
+  - 校验 schema、版本、Proxy commit、目标平台和入口点；
+  - 校验文件集合和逐文件 SHA-256；
+  - 校验 `package.json` 与发布清单版本一致；
+  - 拒绝符号链接、凭据、配置、日志、PID、账号备份和配置备份。
+- Windows Inno Setup 在非后台安装/升级前只清理
+  `{app}\resources\app\ai-editor-proxy` 程序目录，用户数据继续位于安装目录外的
+  `~/.claude/proxy`。
+- 新增构建脚本定向测试，覆盖正确制品、平台不匹配、用户数据混入、程序文件被篡改和
+  安装器路径边界，共 `5 passing`。
+
+### 构建和成品验证
+
+- `npm run prepare-ai-editor-proxy -- --platform win32-x64`：通过，制品固定为
+  `codex_proxy 2.2.0`、commit
+  `d8c9097d0690455a65d2e74c331d5c0d1b33b3ae`，包含 247 个受校验载荷文件和 1 个发布
+  清单。
+- `npm --prefix build run typecheck`、`npm run typecheck-client`、
+  `npm run compile` 和 `npm run core-ci`：通过。
+- 开发版通过 `scripts\code.bat` 使用隔离用户/扩展/共享数据目录启动，CDP 返回
+  1 个 Workbench target；关闭该隔离实例后共享 Proxy `/live` 仍为 `ok`。
+- `npm run gulp vscode-win32-x64-min-ci`：通过，
+  `D:\AI_prejoct\VSCode-win32-x64` 已同步。
+- Windows 成品的 Proxy 制品校验通过，未发现配置/凭据/日志/统计；`product.json`
+  10/10 checksum 匹配。
+- Windows 成品使用隔离目录启动成功；关闭成品后共享 Proxy `/live` 保持 `ok`。
+- 用户级与系统级 Inno Setup 安装器均编译成功：
+  - `.build/win32-x64/user-setup/VSCodeSetup.exe`
+  - `.build/win32-x64/system-setup/VSCodeSetup.exe`
+
+### 真实安装与升级保留测试
+
+- 用户级安装器在工作区内的隔离目录完成首次静默安装、同版本重复安装模拟升级和静默
+  卸载，三次进程退出码均为 `0`。
+- 首次安装日志确认实际写入：
+  - `resources/app/ai-editor-proxy/src/server.js`；
+  - `@openai/codex-win32-x64/.../codex.exe`；
+  - `extensions/vscode-language-pack-zh-hans`。
+- 首次安装后在 Proxy 程序目录加入旧版本哨兵；重复安装后该文件已被删除，新的捆绑
+  Proxy 清单和逐文件 SHA-256 再次校验通过。
+- 独立 `CODEX_PROXY_DATA_DIR` 中预置配置、账号、DPAPI Key、统计、配置备份和账号备份；
+  首次安装、重复安装和卸载后的逐文件 SHA-256 均与安装前完全一致。
+- 验证期间共享 `http://127.0.0.1:47892` Proxy 始终保持 `/live: ok`，未执行停止或
+  重启。

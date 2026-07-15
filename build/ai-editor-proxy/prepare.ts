@@ -7,6 +7,7 @@ import * as cp from 'child_process';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { validateAiEditorProxyArtifact } from '../lib/aiEditorProxyArtifact.ts';
 
 interface IArguments {
 	source?: string;
@@ -182,6 +183,7 @@ function main(): void {
 		`${JSON.stringify(releaseManifest, null, '\t')}\n`,
 		'utf8'
 	);
+	validateAiEditorProxyArtifact(artifactRoot, releaseManifest.platform);
 	console.log(JSON.stringify({
 		artifactRoot,
 		name: releaseManifest.name,

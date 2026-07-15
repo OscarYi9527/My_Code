@@ -14,6 +14,7 @@ import product from '../product.json' with { type: 'json' };
 import { getVersion } from './lib/getVersion.ts';
 import * as task from './lib/gulp/task.ts';
 import * as util from './lib/util.ts';
+import { validateAiEditorProxyArtifact } from './lib/aiEditorProxyArtifact.ts';
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -79,6 +80,16 @@ function buildWin32Setup(arch: string, target: string): task.CallbackTask {
 		const productJsonPath = path.join(outputPath, 'product.json');
 		const productJson = JSON.parse(fs.readFileSync(originalProductJsonPath, 'utf8'));
 		productJson['target'] = target;
+		const aiEditorProxyRoot = path.join(
+			sourcePath,
+			versionedResourcesFolder,
+			'resources',
+			'app',
+			'ai-editor-proxy'
+		);
+		if ((product as typeof product & { aiEditorProxyBundled?: boolean }).aiEditorProxyBundled === true) {
+			validateAiEditorProxyArtifact(aiEditorProxyRoot, `win32-${arch}`);
+		}
 
 		const definitions: Record<string, unknown> = {
 			NameLong: product.nameLong,
