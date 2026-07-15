@@ -131,18 +131,15 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	restart(): Promise<IAiEditorProxyStatus> {
 		this.circuitOpen = false;
 		return this.runExclusive(async () => {
-			const baseUrl = this.readBaseUrl();
-			this.updateStatus({
-				state: AiEditorProxyLifecycleState.Restarting,
-				baseUrl,
-				restartAttempts: 0
-			});
-			try {
-				await requestJson(`${baseUrl}/admin/api/proxy/restart`, 'POST');
-			} catch {
-				// A graceful restart can close the connection before sending a response.
+			// The Proxy is shared by all local Codex clients. Its admin restart
+			// endpoint terminates the running process before a replacement is
+			// guaranteed to be alive, so using it here could leave every client
+			// offline. A user-initiated retry therefore only starts a missing
+			// Proxy; an already healthy shared Proxy is deliberately reused.
+			const current = await this.refreshStatus();
+			if (current.state === AiEditorProxyLifecycleState.Ready || current.state === AiEditorProxyLifecycleState.RunningUnconfigured) {
+				return current;
 			}
-			await timeout(500);
 			return this.doEnsureRunning();
 		});
 	}
@@ -289,9 +286,9 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	}
 }
 
-function requestJson(url: string, method = 'GET'): Promise<IHttpJsonResponse> {
+function requestJson(url: string): Promise<IHttpJsonResponse> {
 	return new Promise((resolve, reject) => {
-		const request = http.request(url, { method, timeout: 3_000 }, response => {
+		const request = http.request(url, { method: 'GET', timeout: 3_000 }, response => {
 			const chunks: Buffer[] = [];
 			let length = 0;
 			response.on('data', (chunk: Buffer) => {
