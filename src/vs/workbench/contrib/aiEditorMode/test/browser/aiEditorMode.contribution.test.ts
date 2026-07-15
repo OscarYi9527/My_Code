@@ -6,6 +6,7 @@ import assert from 'assert';
 import { URI } from '../../../../../base/common/uri.js';
 import { StorageScope, StorageTarget } from '../../../../../platform/storage/common/storage.js';
 import { AiEditorModeLayoutContribution } from '../../browser/aiEditorMode.contribution.js';
+import { AiEditorMode } from '../../../../services/aiEditorMode/common/aiEditorMode.js';
 
 const LAST_CODEX_SESSION_STORAGE_KEY = 'aiEditor.codex.lastSession';
 
@@ -94,5 +95,37 @@ suite('AiEditorModeLayoutContribution', () => {
 			assert.strictEqual(harness.stored, resolved.toString());
 			assert.strictEqual(harness.writes.length, 1);
 		}
+	});
+
+	test('serializes overlapping layout applications while the workbench is restoring editors', async () => {
+		const contribution = Object.create(AiEditorModeLayoutContribution.prototype) as {
+			modeApplication: Promise<void>;
+			applyMode(mode: AiEditorMode, captureCurrentLayout: boolean): Promise<void>;
+			doApplyMode(mode: AiEditorMode, captureCurrentLayout: boolean): Promise<void>;
+		};
+		const calls: string[] = [];
+		let finishDevelopmentLayout: (() => void) | undefined;
+		contribution.modeApplication = Promise.resolve();
+		contribution.doApplyMode = async mode => {
+			calls.push(`start:${mode}`);
+			if (mode === AiEditorMode.Dev) {
+				await new Promise<void>(resolve => finishDevelopmentLayout = resolve);
+			}
+			calls.push(`finish:${mode}`);
+		};
+
+		const development = contribution.applyMode(AiEditorMode.Dev, false);
+		const simple = contribution.applyMode(AiEditorMode.Simple, true);
+		await Promise.resolve();
+		assert.deepStrictEqual(calls, ['start:dev']);
+
+		finishDevelopmentLayout?.();
+		await Promise.all([development, simple]);
+		assert.deepStrictEqual(calls, [
+			'start:dev',
+			'finish:dev',
+			'start:simple',
+			'finish:simple',
+		]);
 	});
 });

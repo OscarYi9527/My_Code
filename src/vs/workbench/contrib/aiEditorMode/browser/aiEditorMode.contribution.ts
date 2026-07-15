@@ -144,6 +144,7 @@ export class AiEditorModeLayoutContribution extends Disposable implements IWorkb
 	private readonly layoutSnapshot: Partial<IAiEditorLayoutSnapshot>;
 	private readonly modeDisposables = this._register(new DisposableStore());
 	private codexSessionResource: URI | undefined;
+	private modeApplication = Promise.resolve();
 
 	constructor(
 		@IAiEditorModeService aiEditorModeService: IAiEditorModeService,
@@ -179,13 +180,33 @@ export class AiEditorModeLayoutContribution extends Disposable implements IWorkb
 			});
 		}
 
-		void this.applyMode(aiEditorModeService.getMode(), false);
+		void this.applyMode(aiEditorModeService.getMode(), false).catch(() => {
+			// A later mode application is queued independently, so a transient
+			// startup failure must not prevent the selected mode from being
+			// applied on the next configuration change.
+		});
 		this._register(aiEditorModeService.onDidChangeMode(mode => {
-			void this.applyMode(mode, true);
+			void this.applyMode(mode, true).catch(() => {
+				// Keep the workbench responsive if a layout operation is
+				// interrupted while editors are being restored.
+			});
 		}));
 	}
 
-	private async applyMode(mode: AiEditorMode, captureCurrentLayout: boolean): Promise<void> {
+	private applyMode(mode: AiEditorMode, captureCurrentLayout: boolean): Promise<void> {
+		// Mode changes can arrive while the workbench is still restoring its
+		// initial editors. Do not let reset/open editor operations overlap:
+		// overlapping calls can dispose an editor pane that another call is
+		// trying to activate, leaving the requested layout only partly applied.
+		const application = this.modeApplication.then(
+			() => this.doApplyMode(mode, captureCurrentLayout),
+			() => this.doApplyMode(mode, captureCurrentLayout)
+		);
+		this.modeApplication = application.catch(() => undefined);
+		return application;
+	}
+
+	private async doApplyMode(mode: AiEditorMode, captureCurrentLayout: boolean): Promise<void> {
 		this.modeDisposables.clear();
 
 		if (mode === AiEditorMode.Simple) {
