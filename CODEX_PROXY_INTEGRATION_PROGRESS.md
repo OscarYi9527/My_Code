@@ -1099,3 +1099,30 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 静默卸载退出码 0。
 - 两轮备用测试 Proxy 均已清理，无残留监听；共享
   `http://127.0.0.1:47892/live` 始终为 `ok`，未停止或重启。
+
+## 34. 2026-07-15 GitHub Actions 公开仓库运行器修复
+
+### 根因
+
+- `Code OSS (node_modules)` 运行 `29318651259` 的 macOS 任务在执行 Checkout 前
+  即被 GitHub 拒绝，注释明确指出账户付款失败或付费额度不足。
+- 该任务使用付费大型运行器 `macos-14-xlarge`；Linux、Windows 和 Copilot 任务则
+  使用仅微软内部可用的 `1ES.Pool` 自托管运行器。当前公开仓库没有这些运行器，
+  因此任务会长期排队或被取消。
+- 这次故障发生在用户代码、`npm ci` 和缓存脚本运行之前，不是新的源码或锁文件错误。
+
+### 修复与本地验证
+
+- `.github/workflows/pr-node-modules.yml` 已切换到公开仓库可用的标准 GitHub Hosted
+  运行器：
+  - Linux/Compile/Copilot Linux：`ubuntu-22.04`；
+  - Windows/Copilot Windows：`windows-2022`；
+  - macOS：`macos-14`，目标架构相应改为 `x64`。
+- 工作流最小权限设置为 `contents: read`，下载内置扩展和安装依赖改用当前运行自带的
+  `${{ github.token }}`，不再依赖仓库中不存在的 `VSCODE_OSS` Secret。
+- 新增同一分支只保留最新运行的 concurrency 配置，避免后续连续推送继续积压过期任务。
+- 本地缓存动作审核通过：Linux/macOS 使用标准环境的 `zstd`，Windows 使用标准环境的
+  `7-Zip`，未发现额外微软内部服务依赖。
+- `git diff --check` 与 `actionlint 1.7.12` 检查通过。
+- 本轮只修改 CI 配置和进度文档，不涉及 AI Editor UI、运行时代码或 Proxy；无需重建
+  `out` / `out-vscode-min`，也未停止或重启共享 Proxy。
