@@ -107,8 +107,8 @@ AI Editor
 - [x] E03 记录 Proxy 请求的未转发、已转发和已完成状态。
 - [x] E04 仅自动重试可确认未转发的请求。
 - [x] E05 实现“检查状态并继续”恢复流程。
-- [ ] E06 验证预先存在的 Git 改动不会被错误归因或覆盖。
-- [ ] E07 验证非 Git 工作区文件基线。
+- [x] E06 验证预先存在的 Git 改动不会被错误归因或覆盖。
+- [x] E07 验证非 Git 工作区文件基线。
 
 ### 阶段 F：验证与打包
 
@@ -767,3 +767,44 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `blocks-ci-screenshots.md` 基线。
 - 本机 Monaco 测试 TypeScript 编译通过；完整浏览器测试受本机未安装 Playwright
   Chromium 限制未执行，GitHub Actions 运行器具备该浏览器并会执行完整验证。
+
+## 23. 2026-07-15 E06 对话前已有 Git 改动的基线归因验证
+
+### 验证内容
+
+- 新增真实 Git 仓库定向测试，分别准备 AI 对话开始前已经存在的：
+  - 已暂存修改；
+  - 未暂存修改；
+  - 未跟踪文件。
+- 创建 Turn 0 基线时断言 `git status --porcelain` 完全不变，确保基线捕获不会
+  暂存、取消暂存、覆盖或丢弃用户已有改动。
+- 随后模拟第一轮 AI 修改一个已有文件并新建一个文件，断言：
+  - Turn 1 的 checkpoint 父引用是 Turn 0 基线；
+  - Turn 0 到 Turn 1 的差异只包含 AI 后续修改的两个文件；
+  - 对话前已存在的已暂存文件、未跟踪文件和原有未暂存修改不会被归因给 AI。
+
+### 验证结果
+
+- `npm run typecheck-client`：通过。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- `scripts\test.bat --run src/vs/platform/agentHost/test/node/agentHostGitService.integrationTest.ts --grep "keeps pre-existing staged"`：
+  `1 passing`。
+- 本轮仅新增测试与测试辅助能力，没有修改产品运行时代码或 UI；Windows 成品的
+  E05 验证与 `product.json` 10/10 checksum 校验继续有效，无需重新替换正在运行的
+  用户成品窗口。
+- 共享 Proxy 未停止或重启；验证后 `/live` 仍返回 `status: ok`。
+
+## 24. 2026-07-15 E07 非 Git 工作区安全退化验证
+
+### 验证内容与结果
+
+- 新增非 Git 临时工作区定向测试，工作区只包含已有用户文件。
+- 断言基线和 Turn checkpoint 都返回 `undefined`，不会伪造 Git checkpoint 或
+  产生 Git 归因结果。
+- 断言用户文件内容保持不变，确保非 Git 回退路径不会覆盖、删除或修改工作区文件。
+- `npm run typecheck-client`：通过。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- `scripts\test.bat --run src/vs/platform/agentHost/test/node/agentHostGitService.integrationTest.ts --grep "AgentHostCheckpointService - existing Git changes"`：
+  `2 passing`（包含 E06 与 E07）。
+- 本轮继续仅新增测试与测试辅助能力，未修改产品运行时代码或 UI；无需替换正在运行的
+  Windows 成品窗口。共享 Proxy 未停止或重启。

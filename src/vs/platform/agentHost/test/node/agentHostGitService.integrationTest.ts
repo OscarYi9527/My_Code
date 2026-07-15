@@ -28,6 +28,9 @@ import { Schemas } from '../../../../base/common/network.js';
 import { DiskFileSystemProvider } from '../../../files/node/diskFileSystemProvider.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { AgentHostGitService } from '../../node/agentHostGitService.js';
+import { AgentHostCheckpointService } from '../../node/agentHostCheckpointService.js';
+import { AgentSession } from '../../common/agentService.js';
+import { createSessionDataService, TestSessionDatabase } from '../common/sessionTestHelpers.js';
 
 function createGitService(disposables: Pick<DisposableStore, 'add'>): AgentHostGitService {
 	const logService = new NullLogService();
@@ -377,6 +380,127 @@ suite('AgentHostGitService - computeSessionFileDiffs (real git)', () => {
 		const blob = await svc!.showBlob(URI.file(dir), sha, 'a.txt');
 		assert.ok(blob);
 		assert.strictEqual(blob.toString(), 'original\n');
+	});
+});
+
+suite('AgentHostCheckpointService - existing Git changes (real git)', () => {
+	const disposables = ensureNoDisposablesAreLeakedInTestSuite();
+
+	const hasGit = (() => {
+		try {
+			cp.execFileSync('git', ['--version'], { stdio: 'ignore' });
+			return true;
+		} catch {
+			return false;
+		}
+	})();
+
+	let tmpRoot: string | undefined;
+	let gitService: AgentHostGitService | undefined;
+
+	setup(() => {
+		tmpRoot = undefined;
+		gitService = createGitService(disposables);
+	});
+
+	teardown(() => {
+		rmDirWithRetry(tmpRoot);
+	});
+
+	(hasGit ? test : test.skip)('keeps pre-existing staged, unstaged and untracked changes in the baseline and attributes only later AI edits to turn 1', async function () {
+		this.timeout(20_000);
+		tmpRoot = mkdtempSync(join(tmpdir(), 'agent-host-checkpoint-'));
+		const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
+		const run = (...args: string[]) => cp.execFileSync('git', args, { cwd: tmpRoot!, env, stdio: 'pipe' });
+		const fs = await import('fs/promises');
+
+		run('init', '-q', '-b', 'main');
+		run('config', 'user.name', 't');
+		run('config', 'user.email', 't@t');
+		await fs.writeFile(join(tmpRoot, 'unstaged.txt'), 'original\n');
+		await fs.writeFile(join(tmpRoot, 'staged.txt'), 'original\n');
+		run('add', '.');
+		run('commit', '-q', '-m', 'initial');
+
+		// These three changes existed before the conversation started. The
+		// baseline must include all of them without altering the user's index.
+		await fs.writeFile(join(tmpRoot, 'unstaged.txt'), 'original\nuser change\n');
+		await fs.writeFile(join(tmpRoot, 'staged.txt'), 'original\nuser staged change\n');
+		run('add', 'staged.txt');
+		await fs.writeFile(join(tmpRoot, 'user-untracked.txt'), 'user file\n');
+		const statusBeforeBaseline = run('status', '--porcelain=v1').toString();
+
+		const session = AgentSession.uri('codex', 'existing-user-git-changes');
+		const database = new TestSessionDatabase();
+		const checkpoints = disposables.add(new AgentHostCheckpointService(
+			createSessionDataService(database),
+			gitService!,
+			new NullLogService(),
+		));
+		const workingDirectory = URI.file(tmpRoot);
+
+		const baselineRef = await checkpoints.captureBaseline(session, workingDirectory);
+		assert.strictEqual(baselineRef, 'refs/agents/existing-user-git-changes/checkpoints/turn/0');
+		assert.strictEqual(
+			run('status', '--porcelain=v1').toString(),
+			statusBeforeBaseline,
+			'capturing a baseline must not stage, unstage, overwrite, or discard pre-existing user changes',
+		);
+
+		// Simulate only the edits produced during the first AI turn.
+		await fs.writeFile(join(tmpRoot, 'unstaged.txt'), 'original\nuser change\nAI change\n');
+		await fs.writeFile(join(tmpRoot, 'ai-created.txt'), 'AI file\n');
+		await database.createTurn('turn-1');
+		const turnRef = await checkpoints.captureTurnCheckpoint(session, 'turn-1');
+
+		assert.strictEqual(turnRef, 'refs/agents/existing-user-git-changes/checkpoints/turn/1');
+		assert.deepStrictEqual(await checkpoints.getTurnCheckpointPair(session, 'turn-1'), {
+			parent: baselineRef,
+			current: turnRef,
+		});
+
+		const diffs = await gitService!.computeFileDiffsBetweenRefs(workingDirectory, {
+			sessionUri: session.toString(),
+			fromRef: baselineRef!,
+			toRef: turnRef!,
+		});
+		assert.ok(diffs, 'expected a checkpoint-to-checkpoint diff');
+		const changedPaths = diffs.map(diff => URI.parse(diff.after?.uri ?? diff.before?.uri ?? '').path.split('/').pop()).sort();
+		assert.deepStrictEqual(
+			changedPaths,
+			['ai-created.txt', 'unstaged.txt'],
+			'turn 1 must exclude all changes that were already present in the conversation baseline',
+		);
+	});
+
+	(hasGit ? test : test.skip)('skips checkpoints in a non-Git workspace without changing user files', async function () {
+		this.timeout(20_000);
+		tmpRoot = mkdtempSync(join(tmpdir(), 'agent-host-nongit-checkpoint-'));
+		const fs = await import('fs/promises');
+		const userFile = join(tmpRoot, 'user-note.txt');
+		await fs.writeFile(userFile, 'keep this user content\n');
+
+		const session = AgentSession.uri('codex', 'non-git-workspace');
+		const database = new TestSessionDatabase();
+		const checkpoints = disposables.add(new AgentHostCheckpointService(
+			createSessionDataService(database),
+			gitService!,
+			new NullLogService(),
+		));
+
+		const baselineRef = await checkpoints.captureBaseline(session, URI.file(tmpRoot));
+		await database.createTurn('turn-1');
+		const turnRef = await checkpoints.captureTurnCheckpoint(session, 'turn-1');
+
+		assert.strictEqual(baselineRef, undefined);
+		assert.strictEqual(turnRef, undefined);
+		assert.strictEqual(await checkpoints.getBaselineCheckpointRef(session), undefined);
+		assert.strictEqual(await checkpoints.getTurnCheckpointPair(session, 'turn-1'), undefined);
+		assert.strictEqual(
+			await fs.readFile(userFile, 'utf8'),
+			'keep this user content\n',
+			'checkpoint fallback must not modify files in a non-Git workspace',
+		);
 	});
 });
 

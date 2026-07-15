@@ -15,6 +15,8 @@ export class TestSessionDatabase implements ISessionDatabase {
 	private readonly _edits: (IFileEditRecord & IFileEditContent)[] = [];
 	private readonly _metadata = new Map<string, string>();
 	private readonly _drafts = new Map<string, Message>();
+	private readonly _turnCheckpointRefs = new Map<string, string>();
+	private readonly _turnOrder: string[] = [];
 
 	getAllFileEditsCalls = 0;
 	getFileEditsByTurnCalls = 0;
@@ -25,9 +27,18 @@ export class TestSessionDatabase implements ISessionDatabase {
 		this._edits.push(edit);
 	}
 
-	async createTurn(): Promise<void> { }
+	async createTurn(turnId: string): Promise<void> {
+		if (!this._turnOrder.includes(turnId)) {
+			this._turnOrder.push(turnId);
+		}
+	}
 
 	async deleteTurn(turnId: string): Promise<void> {
+		this._turnCheckpointRefs.delete(turnId);
+		const turnIndex = this._turnOrder.indexOf(turnId);
+		if (turnIndex >= 0) {
+			this._turnOrder.splice(turnIndex, 1);
+		}
 		for (let i = this._edits.length - 1; i >= 0; i--) {
 			if (this._edits[i].turnId === turnId) {
 				this._edits.splice(i, 1);
@@ -115,13 +126,31 @@ export class TestSessionDatabase implements ISessionDatabase {
 
 	async remapTurnIds(_mapping: ReadonlyMap<string, string>): Promise<void> { }
 
-	async setTurnCheckpointRef(_turnId: string, _ref: string): Promise<void> { }
+	async setTurnCheckpointRef(turnId: string, ref: string): Promise<void> {
+		await this.createTurn(turnId);
+		this._turnCheckpointRefs.set(turnId, ref);
+	}
 
-	async getTurnCheckpointRef(_turnId: string): Promise<string | undefined> { return undefined; }
+	async getTurnCheckpointRef(turnId: string): Promise<string | undefined> {
+		return this._turnCheckpointRefs.get(turnId);
+	}
 
-	async getPreviousCheckpointRef(_turnId: string): Promise<string | undefined> { return undefined; }
+	async getPreviousCheckpointRef(turnId: string): Promise<string | undefined> {
+		const turnIndex = this._turnOrder.indexOf(turnId);
+		for (let i = turnIndex - 1; i >= 0; i--) {
+			const ref = this._turnCheckpointRefs.get(this._turnOrder[i]);
+			if (ref) {
+				return ref;
+			}
+		}
+		return undefined;
+	}
 
-	async getAllCheckpointRefs(): Promise<string[]> { return []; }
+	async getAllCheckpointRefs(): Promise<string[]> {
+		return this._turnOrder
+			.map(turnId => this._turnCheckpointRefs.get(turnId))
+			.filter((ref): ref is string => !!ref);
+	}
 
 	async whenIdle(): Promise<void> { }
 
