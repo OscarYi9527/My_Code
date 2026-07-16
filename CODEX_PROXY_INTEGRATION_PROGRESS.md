@@ -1571,3 +1571,56 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     `248`、共享模型目录 `20`，隔离空数据首次启动 `cleanStart=true`，测试 Proxy 在
     Code 退出后保持存活并由验收脚本安全清理。
 - 共享 `http://127.0.0.1:47892/live` 始终为 `ok`，未停止或重启。
+
+## 50. 2026-07-16 T116/T118 最终 Edge 发布门禁基础设施
+
+### Windows 最终 Edge 负向门禁（T116 基础）
+
+- `scripts/verify-ai-editor-windows-release.ps1` 新增 `-RequireEdgeTarget`：
+  - 默认模式继续验收当前可用的 `legacy-standalone` 迁移产品；
+  - 最终发布模式强制要求 `release.json productTarget=edge`、制品
+    `target=edge`、schema 2 和 `src/launcher.js` 入口；
+  - 最终发布模式拒绝 Gateway、管理后台、Provider route、凭据仓库、迁移脚本和
+    SQLite/数据库资源。
+- 边界判断提取到 `scripts/lib/ai-editor-final-edge-release.ps1`，并新增
+  `scripts/test-verify-ai-editor-windows-final-edge.ps1`。
+- 负向测试覆盖 legacy target、Gateway 文件、数据库文件和合法 Edge 文件集，共
+  `4 passing`。
+- 当前 Windows 迁移成品使用 `-RequireEdgeTarget` 时按预期失败：
+  `Final Edge-only release requires release.json productTarget=edge; found legacy-standalone.`。
+  这项失败是安全门禁生效，不是当前迁移成品回归。
+
+### macOS 账号与 Edge 静态门禁（T118 基础）
+
+- 新增 `build/darwin/verify-ai-editor-account-release.ts`，检查：
+  - Edge/Gateway allowlist 相互隔离；
+  - 最终产品必须使用 Edge target；
+  - 正式 `aiEditorAccountGatewayOrigin` 必须是固定、非 loopback、无路径的 HTTPS origin；
+  - 开发环境变量覆盖不能进入 built product；
+  - 固定 Proxy 源码必须包含生产 Edge launcher/server/local account store；
+  - macOS local account store 必须存在可静态识别的 Keychain 读、写、删除路径。
+- 新增 `verify-ai-editor-account-release` npm 命令和 4 个 TypeScript 测试；macOS
+  GitHub Actions 在打包前记录静态报告到
+  `.build/ai-editor-release/macos-account-static-report.json`。
+- 非最终模式允许 CI 继续构建迁移产品，但报告结果为 `BLOCKED`，不会伪装成最终
+  Edge `PASS`；加入 `--require-final-edge` 后，任何阻塞项都会使发布任务失败。
+- 对当前固定 Proxy `master@06cd8d5` 的真实检查准确报告四项前置条件：
+  `productTarget` 仍是 legacy、正式 HTTPS Gateway 地址未冻结、生产 Edge 文件缺失、
+  macOS Keychain store 缺失。
+- T116、T118 任务复选框继续保持未完成；只有 Black 交付生产 Edge/Keychain、
+  冻结中央 HTTPS Gateway、切换发布 pin 并让最终模式实际通过后才能勾选。
+
+### 本轮验证
+
+- `npm --prefix build run typecheck`：通过。
+- AI Editor 构建/发布测试：`19 passing`。
+- 新增 TypeScript 定向 ESLint：0 告警；3 个 PowerShell 文件语法解析通过。
+- `npm run compile`、`npm run core-ci`：通过。
+- `npm run gulp vscode-win32-x64-min-ci`：首次仅因本机 PATH 缺少
+  `signtool.exe` 失败；临时加入 Windows SDK x64 目录后通过并更新
+  `D:\AI_prejoct\VSCode-win32-x64`。
+- Windows 默认迁移产品验收：`PASS`，Workbench checksum `10/10`、Proxy payload
+  `248` 个文件、模型目录 `20`、`cleanStart=true`。
+- `scripts\code.bat` 开发版已实际启动到 Workbench/Agent Host；验收后只关闭本轮
+  启动的开发 Code 进程。
+- 共享 Proxy `/live` 最终仍为 `ok`，本轮未停止或重启共享 Proxy。

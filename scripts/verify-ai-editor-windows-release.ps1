@@ -10,11 +10,14 @@ param(
 	[string]$SubscriptionModel,
 	[string]$NonSubscriptionModel,
 	[int]$ResponseTimeoutSec = 300,
-	[switch]$KeepCleanStartArtifacts
+	[switch]$KeepCleanStartArtifacts,
+	[switch]$RequireEdgeTarget
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot 'lib\ai-editor-final-edge-release.ps1')
 
 function Get-FullPath([string]$Path, [string]$BasePath) {
 	if ([System.IO.Path]::IsPathRooted($Path)) {
@@ -888,6 +891,9 @@ if (
 ) {
 	throw 'Bundled Proxy does not match the pinned release source.'
 }
+if ($RequireEdgeTarget) {
+	Assert-AiEditorFinalEdgeRelease $proxyReleaseSource $proxyValidation
+}
 
 $productNotices = Get-Content -Raw -LiteralPath (Join-Path $appRoot 'ThirdPartyNotices.txt') -Encoding UTF8
 if ($productNotices -notmatch '(?im)^codex\s*$' -or $productNotices -notmatch 'github\.com/openai/codex') {
@@ -927,6 +933,7 @@ $report = [ordered]@{
 	generatedAt = (Get-Date).ToUniversalTime().ToString('o')
 	result = 'PASS'
 	platform = 'win32-x64'
+	finalEdgeRequired = [bool]$RequireEdgeTarget
 	versions = [ordered]@{
 		code = [ordered]@{
 			name = $productJson.nameLong

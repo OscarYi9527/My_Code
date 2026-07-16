@@ -127,6 +127,12 @@ jobs:
           npm --prefix .build/codex_proxy-source test
           test -z "$(git -C .build/codex_proxy-source status --porcelain --untracked-files=all)"
 
+      - name: Record account and final Edge release prerequisites
+        run: >-
+          npm run verify-ai-editor-account-release --
+          --proxy-source "${{ github.workspace }}/.build/codex_proxy-source"
+          --report "${{ github.workspace }}/.build/ai-editor-release/macos-account-static-report.json"
+
       - name: Prepare macOS Proxy artifact
         run: >-
           npm run prepare-ai-editor-proxy --

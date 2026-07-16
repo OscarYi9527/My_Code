@@ -189,3 +189,18 @@ Code-OSS Workbench
 - 将普通用户高频账号操作改造为 Code 原生 Workbench 界面，复杂管理能力继续使用
   Gateway Web UI；具体范围见 `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。
 - `server/` 旧登录/邀请码原型不属于当前 External Proxy MVP 启动链路。
+
+## 当前最终 Edge 发布门禁
+
+- Windows 验收脚本已提供 `-RequireEdgeTarget` 最终模式；当前默认模式仍验证可用的
+  `legacy-standalone` 迁移产品，禁止在 Black 的真实 Edge `/v1/responses` 完成前提前切换。
+- macOS 已增加账号/Edge 静态检查器，持续检查 Edge/Gateway 打包隔离、正式固定 HTTPS
+  Gateway、生产 Edge 源码和 Keychain 安全存储。
+- 当前静态报告必须显示 `BLOCKED`，原因是生产 Edge、Keychain 和正式 HTTPS Gateway
+  尚未齐备；这属于已知前置条件，不允许改成虚假通过。
+- Black 提交并验证 T032、T038–T046 后，Oscar 再执行：
+  1. 审计并固定 Black 的稳定 commit；
+  2. 冻结正式中央 HTTPS Gateway origin；
+  3. 把 `productTarget` 切换为 `edge`；
+  4. 让 Windows `-RequireEdgeTarget` 和 macOS `--require-final-edge` 同时通过；
+  5. 完成安装器、Windows 成品和 macOS 制品的最终 Edge-only 验收。
