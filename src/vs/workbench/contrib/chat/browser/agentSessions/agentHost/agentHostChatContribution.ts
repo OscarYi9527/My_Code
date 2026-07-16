@@ -13,8 +13,10 @@ import { type ProtectedResourceMetadata } from '../../../../../../platform/agent
 import { type AgentInfo, type RootState } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
 import { IDefaultAccountService } from '../../../../../../platform/defaultAccount/common/defaultAccount.js';
+import { IAiEditorAccountService } from '../../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { IInstantiationService, ServicesAccessor } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
+import { IProductService } from '../../../../../../platform/product/common/productService.js';
 import { Registry } from '../../../../../../platform/registry/common/platform.js';
 import { IWorkbenchContribution } from '../../../../../common/contributions.js';
 import { IAgentHostFileSystemService } from '../../../../../services/agentHost/common/agentHostFileSystemService.js';
@@ -111,12 +113,13 @@ export class AgentHostContribution extends Disposable implements IWorkbenchContr
 		@IAgentHostFileSystemService _agentHostFileSystemService: IAgentHostFileSystemService,
 		@IConfigurationService private readonly _configurationService: IConfigurationService,
 		@ICustomizationHarnessService private readonly _customizationHarnessService: ICustomizationHarnessService,
-		@IWorkbenchEnvironmentService environmentService: IWorkbenchEnvironmentService,
+		@IWorkbenchEnvironmentService private readonly _environmentService: IWorkbenchEnvironmentService,
 		@IAgentHostActiveClientService private readonly _activeClientService: IAgentHostActiveClientService,
+		@IProductService private readonly _productService: IProductService,
 	) {
 		super();
-		this._isSessionsWindow = environmentService.isSessionsWindow;
-		this._enableSmokeTestDriver = !!environmentService.enableSmokeTestDriver;
+		this._isSessionsWindow = this._environmentService.isSessionsWindow;
+		this._enableSmokeTestDriver = !!this._environmentService.enableSmokeTestDriver;
 
 		if (!this._configurationService.getValue<boolean>(AgentHostEnabledSettingId)) {
 			return;
@@ -262,6 +265,9 @@ export class AgentHostContribution extends Disposable implements IWorkbenchContr
 		}));
 
 		// Session handler
+		const accountService = this._isProductAccountGateEnabled(agent.provider)
+			? this._instantiationService.invokeFunction(accessor => accessor.get(IAiEditorAccountService))
+			: undefined;
 		const sessionHandler = store.add(this._instantiationService.createInstance(AgentHostSessionHandler, {
 			provider: agent.provider,
 			agentId,
@@ -271,6 +277,9 @@ export class AgentHostContribution extends Disposable implements IWorkbenchContr
 			connection: this._agentHostService,
 			connectionAuthority: 'local',
 			resolveAuthentication: (resources) => this._resolveAuthenticationInteractively(resources),
+			canStartTurn: accountService
+				? request => accountService.canStartTurn(request)
+				: undefined,
 		}));
 		store.add(this._chatSessionsService.registerChatSessionContentProvider(sessionType, sessionHandler));
 
@@ -295,6 +304,17 @@ export class AgentHostContribution extends Disposable implements IWorkbenchContr
 			const agents = this._getRootAgents();
 			this._authenticateWithServer(agents).catch(() => { /* best-effort */ });
 		}));
+	}
+
+	private _isProductAccountGateEnabled(provider: AgentProvider): boolean {
+		if (provider !== 'codex') {
+			return false;
+		}
+		// Development always uses the isolated contract simulator. A packaged
+		// product enables the fail-closed gate only after a signed central
+		// Gateway origin is present, so an intermediate Oscar-only build does
+		// not silently disable the existing shared-Proxy Codex path.
+		return !this._environmentService.isBuilt || !!this._productService.aiEditorAccountGatewayOrigin;
 	}
 
 	private _getRootAgents(): readonly AgentInfo[] {

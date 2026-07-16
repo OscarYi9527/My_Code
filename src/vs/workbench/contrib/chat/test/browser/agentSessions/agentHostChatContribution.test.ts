@@ -27,6 +27,13 @@ import { ChatInputAnswerState, ChatInputAnswerValueKind, ChatInputQuestionKind, 
 import { CompletionItemKind as AhpCompletionItemKind, type CompletionsParams, type CompletionsResult } from '../../../../../../platform/agentHost/common/state/protocol/commands.js';
 import { sessionReducer, chatReducer } from '../../../../../../platform/agentHost/common/state/sessionReducers.js';
 import { IDefaultAccountService } from '../../../../../../platform/defaultAccount/common/defaultAccount.js';
+import {
+	AiEditorAccountState,
+	createAiEditorAccountUnavailableStatus,
+	createAiEditorTurnGateResult,
+	IAiEditorAccountService,
+	IAiEditorTurnGateRequest
+} from '../../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { IAuthenticationService } from '../../../../../services/authentication/common/authentication.js';
 import { ChatEntitlement, IChatEntitlementService } from '../../../../../services/chat/common/chatEntitlementService.js';
 import { IChatAgentData, IChatAgentImplementation, IChatAgentRequest, IChatAgentService } from '../../../common/participants/chatAgents.js';
@@ -557,6 +564,13 @@ function createTestServices(disposables: DisposableStore, workingDirectoryResolv
 		getSession: () => undefined,
 	});
 	instantiationService.stub(IDefaultAccountService, { onDidChangeDefaultAccount: Event.None, getDefaultAccount: async () => null });
+	instantiationService.stub(IAiEditorAccountService, {
+		canStartTurn: async () => createAiEditorTurnGateResult({
+			state: AiEditorAccountState.Ready,
+			checkedAt: 1,
+			actions: []
+		})
+	} as Partial<IAiEditorAccountService> as IAiEditorAccountService);
 	instantiationService.stub(IAuthenticationService, { onDidChangeSessions: Event.None, ...authServiceOverride });
 	instantiationService.stub(ILanguageModelsService, {
 		deltaLanguageModelChatProviderDescriptors: () => { },
@@ -2460,6 +2474,52 @@ suite('AgentHostChatContribution', () => {
 	// ---- Workspace trust gating -----------------------------------------
 
 	suite('workspace trust', () => {
+
+		test('account gate denial creates no Codex session or Turn', async () => {
+			const { instantiationService, agentHostService, chatAgentService, trustController } = createTestServices(disposables);
+			let gateRequest: IAiEditorTurnGateRequest | undefined;
+			const sessionType = 'agent-host-codex-gated';
+			const agentId = sessionType;
+			disposables.add(instantiationService.createInstance(AgentHostSessionHandler, {
+				provider: 'codex',
+				agentId,
+				sessionType,
+				fullName: 'Codex',
+				description: 'Codex account gate test',
+				connection: agentHostService,
+				connectionAuthority: 'local',
+				canStartTurn: async request => {
+					gateRequest = request;
+					return createAiEditorTurnGateResult(createAiEditorAccountUnavailableStatus(
+						AiEditorAccountState.LoginRequired,
+						1,
+						'login_required'
+					));
+				},
+			}));
+
+			const sessionResource = URI.from({ scheme: sessionType, path: '/account-gated' });
+			const registered = chatAgentService.registeredAgents.get(agentId)!;
+			const result = await registered.impl.invoke(
+				makeRequest({
+					agentId,
+					message: 'Do not dispatch this Turn',
+					sessionResource,
+					userSelectedModelId: `${sessionType}:mock-gpt`,
+				}),
+				() => { }, [], CancellationToken.None,
+			);
+
+			assert.ok(result.errorDetails?.message.includes('Sign in to AI Editor'));
+			assert.deepStrictEqual(gateRequest, {
+				modelId: 'mock-gpt',
+				sessionId: sessionResource.toString(),
+				clientTurnId: 'req-1',
+			});
+			assert.strictEqual(agentHostService.createSessionCalls.length, 0);
+			assert.strictEqual(agentHostService.dispatchedActions.some(entry => entry.action.type === 'chat/turnStarted'), false);
+			assert.strictEqual(trustController.workspaceTrustCalls + trustController.resourcesTrustCalls, 0);
+		});
 
 		test('aborts the turn without creating a session when trust is declined', async () => {
 			const { sessionHandler, agentHostService, chatAgentService, trustController } = createContribution(disposables);

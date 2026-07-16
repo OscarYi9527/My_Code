@@ -1364,3 +1364,37 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   同步验证。
 - 新增 `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`，将全部 Code 原生账号管理界面
   记录为 MVP 后评估项。
+
+## 44. 2026-07-16 Oscar T027/T034–T037 账号运行时与 Turn 门禁
+
+- 完成 T027、T034、T035、T036、T037：
+  - 在 Electron 主进程注册 AI Editor 账号服务和 IPC channel；
+  - 实现受限 Edge/Gateway HTTP Transport，渲染层只接收安全状态和稳定错误 ID；
+  - 实现随机 loopback 回调端口、PKCE、state 校验、系统浏览器登录、授权码换 Token 和
+    一次性 Edge handoff；
+  - 实现 30 秒后台状态刷新、窗口聚焦刷新、并发刷新合并和重复登录合并；
+  - 在 Codex 新 Turn 创建会话、请求工作区信任及发送 `chat/turnStarted` 前执行
+    fail-closed 账号门禁，拒绝新 Turn 时不取消已经运行的 Turn。
+- 产品启用边界：
+  - 开发版始终连接隔离 Mock Edge `47921` 和 Gateway `47920`；
+  - 正式成品只有在产品配置包含固定 HTTPS `aiEditorAccountGatewayOrigin` 时才启用账号
+    Turn 门禁；
+  - 未配置中央 Gateway 的 Oscar 中间成品不会访问共享 `47892` 的账号接口，也不会改变
+    当前 Codex/Proxy 路径；账号服务改为按需实例化，避免无意义的 404 和周期日志。
+- 代码与测试验证：
+  - 定向 ESLint：通过；
+  - `npm run typecheck-client`：通过；
+  - 账号 Electron 定向测试：19 passing；
+  - Agent Host 账号门禁 Chromium/系统 Chrome 定向测试：1 passing；
+  - `npm run compile`：通过；
+  - 开发版通过 `scripts\code.bat`、隔离 profile 和 Mock Edge `ready` 状态启动，未发现
+    `Unknown service`、模块加载或账号启动错误。
+- Windows 成品验证：
+  - `npm run core-ci`：通过；
+  - `npm run gulp vscode-win32-x64-min-ci`：通过；
+  - `D:\AI_prejoct\VSCode-win32-x64` 的 `product.json` Workbench checksum 为
+    `10/10`；
+  - 成品使用隔离 profile 启动成功，未发现 `Unknown service`、模块加载错误或
+    `[aiEditorAccount]` 错误日志。
+- 验证期间只关闭本轮隔离 Code/Mock 进程；共享 Proxy 始终为 PID `18120`，
+  `http://127.0.0.1:47892/live` 持续返回 `ok`，未停止或重启。

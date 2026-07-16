@@ -102,6 +102,8 @@ export interface IProductConfiguration {
 	readonly applicationName: string;
 	readonly embedderIdentifier?: string;
 	readonly agentsTelemetryAppName?: string;
+	readonly aiEditorAccountEdgeOrigin?: string;
+	readonly aiEditorAccountGatewayOrigin?: string;
 
 	readonly urlProtocol: string;
 	readonly dataFolderName: string; // location for extensions (e.g. ~/.vscode-insiders)

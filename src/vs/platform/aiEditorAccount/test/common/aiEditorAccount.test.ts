@@ -10,7 +10,8 @@ import {
 	AiEditorAccountRole,
 	AiEditorAccountState,
 	createAiEditorTurnGateResult,
-	normalizeAiEditorAccountEdgeUrl
+	normalizeAiEditorAccountEdgeUrl,
+	normalizeAiEditorAccountGatewayUrl
 } from '../../common/aiEditorAccount.js';
 import { parseAiEditorSafeStatus } from '../../common/aiEditorAccountIpc.js';
 
@@ -89,6 +90,19 @@ suite('AI Editor Account', () => {
 		]) {
 			assert.throws(() => normalizeAiEditorAccountEdgeUrl(value));
 		}
+	});
+
+	test('allows an insecure Gateway only for loopback development', () => {
+		assert.strictEqual(
+			normalizeAiEditorAccountGatewayUrl('http://127.0.0.1:47920', true),
+			'http://127.0.0.1:47920'
+		);
+		assert.strictEqual(
+			normalizeAiEditorAccountGatewayUrl('https://gateway.example.test', false),
+			'https://gateway.example.test'
+		);
+		assert.throws(() => normalizeAiEditorAccountGatewayUrl('http://127.0.0.1:47920', false));
+		assert.throws(() => normalizeAiEditorAccountGatewayUrl('http://gateway.example.test', true));
 	});
 
 	test('rejects malformed safe status payloads', () => {

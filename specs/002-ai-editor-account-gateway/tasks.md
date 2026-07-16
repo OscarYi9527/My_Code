@@ -151,7 +151,7 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T024 [P] [US1] Add Argon2id password/bootstrap and registration tests in `D:\AI_prejoct\codex_proxy-dev\gateway\tests\unit\password-registration.test.ts`
 - [ ] T025 [P] [US1] Add Refresh Token rotation/replay integration tests in `D:\AI_prejoct\codex_proxy-dev\gateway\tests\integration\refresh-rotation.test.ts`
 - [ ] T026 [P] [US1] Add Edge local handoff and secure-store tests in `D:\AI_prejoct\codex_proxy-dev\tests\test-edge-account-handoff.js`
-- [ ] T027 [P] [US1] Add Code account service, loopback callback and Turn-gate tests in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\test\`
+- [x] T027 [P] [US1] Add Code account service, loopback callback and Turn-gate tests in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\test\`
 
 ### Implementation for User Story 1
 
@@ -161,10 +161,10 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T031 [US1] Implement five-minute Access Token and rolling Refresh Token family rotation in `D:\AI_prejoct\codex_proxy-dev\gateway\src\auth\token-service.ts`
 - [ ] T032 [US1] Implement Edge OS secure-store adapters, single-flight refresh and account binding in `D:\AI_prejoct\codex_proxy-dev\src\edge\local-account-store.js` and `gateway-client.js`
 - [ ] T033 [US1] Implement loopback-only one-time account handoff in `D:\AI_prejoct\codex_proxy-dev\src\edge\local-handoff.js` and `edge-server.js`
-- [ ] T034 [US1] Add Code account service contracts and IPC in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\common\aiEditorAccount.ts` and `aiEditorAccountIpc.ts`
-- [ ] T035 [US1] Implement main-process PKCE callback, system-browser login and Edge handoff in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\electron-main\`
-- [ ] T036 [US1] Implement renderer account service, 30-second refresh and safe state events in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\electron-browser\aiEditorAccountService.ts`
-- [ ] T037 [US1] Integrate fail-closed pre-Turn gate without cancelling running Turns in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\chat\browser\agentSessions\agentHostChatContribution.ts`
+- [x] T034 [US1] Add Code account service contracts and IPC in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\common\aiEditorAccount.ts` and `aiEditorAccountIpc.ts`
+- [x] T035 [US1] Implement main-process PKCE callback, system-browser login and Edge handoff in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\electron-main\`
+- [x] T036 [US1] Implement renderer account service, 30-second refresh and safe state events in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\electron-browser\aiEditorAccountService.ts`
+- [x] T037 [US1] Integrate fail-closed pre-Turn gate without cancelling running Turns in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\chat\browser\agentSessions\agentHostChatContribution.ts`
 
 **Checkpoint**: US1 可独立演示，未登录和服务故障不会影响本地编辑。
 

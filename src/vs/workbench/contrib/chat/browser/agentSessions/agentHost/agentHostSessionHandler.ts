@@ -38,6 +38,12 @@ import { ExtensionIdentifier } from '../../../../../../platform/extensions/commo
 import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
+import {
+	AiEditorAccountState,
+	createAiEditorAccountUnavailableStatus,
+	IAiEditorTurnGateRequest,
+	IAiEditorTurnGateResult
+} from '../../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { IWorkspaceTrustRequestService } from '../../../../../../platform/workspace/common/workspaceTrust.js';
 import { IAgentHostTerminalService } from '../../../../terminal/browser/agentHostTerminalService.js';
@@ -550,6 +556,12 @@ export interface IAgentHostSessionHandlerConfig {
 	 *   state that require authentication.
 	 */
 	readonly resolveAuthentication?: (protectedResources: ProtectedResourceMetadata[]) => Promise<boolean>;
+	/**
+	 * Optional product-account gate invoked before a new Turn can create or
+	 * dispatch any Agent Host session state. The Code contribution supplies
+	 * this only for the Codex provider.
+	 */
+	readonly canStartTurn?: (request: IAiEditorTurnGateRequest) => Promise<IAiEditorTurnGateResult>;
 }
 
 /**
@@ -1071,6 +1083,11 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 	): Promise<IChatAgentResult> {
 		this._logService.info(`[AgentHost] _invokeAgent called for resource: ${request.sessionResource.toString()}`);
 
+		const accountGateError = await this._getAccountGateError(request);
+		if (accountGateError) {
+			return { errorDetails: accountGateError };
+		}
+
 		// Gate spawning an agent on workspace trust. Viewing chat and the
 		// agent list does not require trust, but sending a message does, since
 		// the agent reads files, runs commands, and makes changes in the
@@ -1141,6 +1158,50 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 			...(details ? { details } : {}),
 			...(errorDetails ? { errorDetails } : {}),
 		};
+	}
+
+	private async _getAccountGateError(request: IChatAgentRequest): Promise<IChatResponseErrorDetails | undefined> {
+		if (!this._config.canStartTurn) {
+			return undefined;
+		}
+
+		let result: IAiEditorTurnGateResult;
+		try {
+			result = await this._config.canStartTurn({
+				modelId: this._extractRawModelId(request.userSelectedModelId) ?? 'default',
+				sessionId: request.sessionResource.toString(),
+				clientTurnId: request.requestId,
+			});
+		} catch {
+			const status = createAiEditorAccountUnavailableStatus(
+				AiEditorAccountState.ServiceUnavailable,
+				Date.now(),
+				'account_turn_gate_unavailable'
+			);
+			result = { allowed: false, status, reason: AiEditorAccountState.ServiceUnavailable };
+		}
+		if (result.allowed) {
+			return undefined;
+		}
+
+		const errorId = result.status.errorId;
+		this._logService.warn(`[AgentHost] AI Editor account gate denied a new Turn (${errorId ?? result.reason ?? 'unknown'}).`);
+		switch (result.reason ?? result.status.state) {
+			case AiEditorAccountState.LoginRequired:
+				return { message: localize('aiEditor.accountGate.loginRequired', "Sign in to AI Editor before starting a new AI task.") };
+			case AiEditorAccountState.AccountUnavailable:
+				return { message: localize('aiEditor.accountGate.accountUnavailable', "Your AI Editor account is unavailable. Open AI Editor account management to check its status.") };
+			case AiEditorAccountState.PasswordChangeRequired:
+				return { message: localize('aiEditor.accountGate.passwordChangeRequired', "Change your AI Editor account password before starting a new AI task.") };
+			default:
+				return {
+					message: localize(
+						'aiEditor.accountGate.serviceUnavailable',
+						"AI Editor account service is unavailable. Retry from the server status menu. Error ID: {0}",
+						errorId ?? 'account_service_unavailable'
+					)
+				};
+		}
 	}
 
 	/**

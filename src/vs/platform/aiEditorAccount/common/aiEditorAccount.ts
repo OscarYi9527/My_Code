@@ -9,8 +9,12 @@ import { createDecorator } from '../../instantiation/common/instantiation.js';
 export const AI_EDITOR_ACCOUNT_DEFAULT_EDGE_URL = 'http://127.0.0.1:47892';
 export const AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL = 'http://127.0.0.1:47921';
 export const AI_EDITOR_ACCOUNT_DEVELOPMENT_GATEWAY_URL = 'http://127.0.0.1:47920';
+export const AI_EDITOR_ACCOUNT_STATUS_REFRESH_INTERVAL = 30_000;
+export const AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT = 5_000;
+export const AI_EDITOR_ACCOUNT_OPEN_MANAGEMENT_COMMAND_ID = 'aiEditor.account.openManagement';
 
 export const IAiEditorAccountService = createDecorator<IAiEditorAccountService>('aiEditorAccountService');
+export const IAiEditorAccountMainService = createDecorator<IAiEditorAccountMainService>('aiEditorAccountMainService');
 
 export const enum AiEditorAccountState {
 	Ready = 'ready',
@@ -89,7 +93,13 @@ export interface IAiEditorAccountTransport {
 	getStatus(options?: { readonly force?: boolean }): Promise<IAiEditorSafeStatus>;
 	login(kind: 'login' | 'register'): Promise<IAiEditorSafeStatus>;
 	logout(): Promise<void>;
+	canStartTurn(request: IAiEditorTurnGateRequest): Promise<IAiEditorTurnGateResult>;
+	retryStatus(): Promise<IAiEditorSafeStatus>;
 	requestWebviewTicket(): Promise<IAiEditorWebviewTicket>;
+}
+
+export interface IAiEditorAccountMainService extends IAiEditorAccountTransport {
+	readonly _serviceBrand: undefined;
 }
 
 export function createAiEditorTurnGateResult(status: IAiEditorSafeStatus): IAiEditorTurnGateResult {
@@ -115,6 +125,45 @@ export function normalizeAiEditorAccountEdgeUrl(value: string | undefined, fallb
 		throw new Error('The AI Editor Edge address cannot contain credentials, a path, a query, or a fragment.');
 	}
 	return url.origin;
+}
+
+export function normalizeAiEditorAccountGatewayUrl(value: string, allowInsecureLoopback: boolean): string {
+	let url: URL;
+	try {
+		url = new URL(value.trim());
+	} catch {
+		throw new Error('The AI Editor Gateway address must be a valid URL.');
+	}
+
+	const isInsecureDevelopmentOrigin = url.protocol === 'http:' && allowInsecureLoopback && isLoopbackHostname(url.hostname);
+	if (url.protocol !== 'https:' && !isInsecureDevelopmentOrigin) {
+		throw new Error('The AI Editor Gateway address must use HTTPS outside loopback development.');
+	}
+	if (url.username || url.password || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) {
+		throw new Error('The AI Editor Gateway address cannot contain credentials, a path, a query, or a fragment.');
+	}
+	return url.origin;
+}
+
+export function createAiEditorAccountUnavailableStatus(
+	state: Exclude<AiEditorAccountState, AiEditorAccountState.Ready>,
+	checkedAt: number,
+	errorId?: string
+): IAiEditorSafeStatus {
+	let actions: readonly AiEditorAccountAction[];
+	switch (state) {
+		case AiEditorAccountState.LoginRequired:
+			actions = [AiEditorAccountAction.Login];
+			break;
+		case AiEditorAccountState.ServiceUnavailable:
+			actions = [AiEditorAccountAction.Retry];
+			break;
+		case AiEditorAccountState.AccountUnavailable:
+		case AiEditorAccountState.PasswordChangeRequired:
+			actions = [AiEditorAccountAction.OpenAccount];
+			break;
+	}
+	return { state, checkedAt, errorId, actions };
 }
 
 function isLoopbackHostname(hostname: string): boolean {
