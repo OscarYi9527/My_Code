@@ -24,6 +24,33 @@ suite('AI Editor Account loopback callback', () => {
 		assert.deepStrictEqual(await callback.waitForResult(), { code: 'one-time-code' });
 	});
 
+	test('allocates isolated random loopback ports for concurrent login flows', async () => {
+		const first = store.add(await AiEditorLoopbackCallbackServer.start('first-state', 5_000));
+		const second = store.add(await AiEditorLoopbackCallbackServer.start('second-state', 5_000));
+		const firstUrl = new URL(first.redirectUri);
+		const secondUrl = new URL(second.redirectUri);
+
+		assert.strictEqual(firstUrl.protocol, 'http:');
+		assert.strictEqual(firstUrl.hostname, '127.0.0.1');
+		assert.strictEqual(firstUrl.pathname, '/callback');
+		assert.ok(Number.isInteger(Number(firstUrl.port)) && Number(firstUrl.port) > 0);
+		assert.strictEqual(secondUrl.protocol, 'http:');
+		assert.strictEqual(secondUrl.hostname, '127.0.0.1');
+		assert.strictEqual(secondUrl.pathname, '/callback');
+		assert.ok(Number.isInteger(Number(secondUrl.port)) && Number(secondUrl.port) > 0);
+		assert.notStrictEqual(firstUrl.port, secondUrl.port);
+
+		assert.deepStrictEqual(
+			await Promise.all([
+				requestCallback(`${first.redirectUri}?state=first-state&code=first-code`),
+				requestCallback(`${second.redirectUri}?state=second-state&code=second-code`)
+			]),
+			[200, 200]
+		);
+		assert.deepStrictEqual(await first.waitForResult(), { code: 'first-code' });
+		assert.deepStrictEqual(await second.waitForResult(), { code: 'second-code' });
+	});
+
 	test('returns a stable safe error for an OAuth denial', async () => {
 		const callback = store.add(await AiEditorLoopbackCallbackServer.start('expected-state', 5_000));
 		const result = assert.rejects(callback.waitForResult(), error =>

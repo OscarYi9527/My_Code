@@ -89,7 +89,7 @@ suite('AI Editor Account HTTP client', () => {
 	});
 
 	teardown(async () => {
-		await new Promise<void>(resolve => server.close(() => resolve()));
+		await closeServer(server);
 	});
 
 	test('implements status, PKCE exchange, handoff, ticket and logout contracts', async () => {
@@ -163,6 +163,19 @@ suite('AI Editor Account HTTP client', () => {
 			error instanceof AiEditorAccountHttpError &&
 			error.errorId === 'provider_unavailable' &&
 			!error.message.includes('secret upstream')
+		);
+	});
+
+	test('fails closed with a stable error when the Edge process exits between requests', async () => {
+		const client = new AiEditorAccountHttpClient(origin, origin);
+		assert.strictEqual((await client.getStatus()).state, AiEditorAccountState.LoginRequired);
+
+		await closeServer(server);
+
+		await assert.rejects(client.getStatus(), error =>
+			error instanceof AiEditorAccountHttpError &&
+			error.errorId === 'account_edge_unreachable' &&
+			error.statusCode === undefined
 		);
 	});
 
@@ -248,4 +261,13 @@ function sendJson(response: http.ServerResponse, statusCode: number, body: objec
 function sendNoContent(response: http.ServerResponse): void {
 	response.writeHead(204);
 	response.end();
+}
+
+async function closeServer(server: http.Server): Promise<void> {
+	if (!server.listening) {
+		return;
+	}
+	await new Promise<void>((resolve, reject) => {
+		server.close(error => error ? reject(error) : resolve());
+	});
 }

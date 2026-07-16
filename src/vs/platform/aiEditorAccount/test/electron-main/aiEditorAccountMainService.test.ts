@@ -79,6 +79,27 @@ suite('AI Editor Account main service', () => {
 		assert.strictEqual(invalid.status.errorId, 'account_turn_gate_request_invalid');
 	});
 
+	test('blocks a new Turn with a stable state after the Edge process exits', async () => {
+		const service = store.add(new AiEditorAccountMainServiceCore({
+			client: createClient({
+				getStatus: async () => {
+					throw new AiEditorAccountHttpError('account_edge_unreachable');
+				}
+			}),
+			login: async () => readyStatus(),
+			now: () => 100
+		}));
+
+		const result = await service.canStartTurn({
+			modelId: 'mock-gpt',
+			sessionId: 'session',
+			clientTurnId: 'turn'
+		});
+		assert.strictEqual(result.allowed, false);
+		assert.strictEqual(result.status.state, AiEditorAccountState.ServiceUnavailable);
+		assert.strictEqual(result.status.errorId, 'account_edge_unreachable');
+	});
+
 	test('coalesces duplicate login clicks', async () => {
 		const loginResult = new DeferredPromise<IAiEditorSafeStatus>();
 		let loginCalls = 0;

@@ -370,7 +370,7 @@ Turn 可结算为负积分。
 **Purpose**: 完成安全、回归、双构建、制品边界和本地进度闭环。
 
 - [ ] T109 [P] Run secret scans against DB/API/log/export fixtures and add regression cases in `D:\AI_prejoct\codex_proxy-dev\gateway\tests\security\secret-leak.test.ts`
-- [ ] T110 [P] Run boundary tests for callback ports, Unicode/path spaces, duplicate clicks, timeouts and process crashes in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\test\`
+- [x] T110 [P] Run boundary tests for callback ports, Unicode/path spaces, duplicate clicks, timeouts and process crashes in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\test\`
 - [ ] T111 Run existing standalone `npm test` and Gateway/admin coverage suites in `D:\AI_prejoct\codex_proxy-dev\`
 - [ ] T112 Run the full isolated quickstart and save a sanitized report under `D:\AI_prejoct\My_code\.build\ai-editor-account-gateway\`
 - [ ] T113 Verify shared `47892` PID, `/live` and selected data hashes remained unchanged using `D:\AI_prejoct\My_code\scripts\start-ai-editor-account-dev.ps1`

@@ -1518,3 +1518,20 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     `Sign In` `0`，中文 Workbench 正常，运行日志无模块、服务或 disposable 错误。
 - 验证结束后只停止本轮隔离 Mock Edge；共享 Proxy 保持 PID `18120`、`/live=ok`，
   未停止或重启。
+
+## 48. 2026-07-16 Oscar T110 账号边界与进程故障回归
+
+- 完成 T110，并将既有与新增测试整理为明确的边界覆盖：
+  - 两个并行登录流程分别监听 `127.0.0.1` 的随机端口，端口与 OAuth state 相互隔离；
+  - Edge-local nonce 每次从绝对 Unicode/空格路径重新读取，支持安全轮换；
+  - 重复点击登录合并为同一个登录操作，不重复打开授权流程；
+  - loopback 回调在有界超时后关闭并返回稳定错误；
+  - Edge 在两次状态请求之间退出时只返回 `account_edge_unreachable`，新 Turn 保持
+    fail-closed；主进程 IPC 不可用时同样只暴露稳定的 `account_ipc_unavailable`。
+- 验证：
+  - 两个新增测试文件定向 ESLint：通过；
+  - `npm run typecheck-client`：通过；
+  - `npm run compile`：通过；
+  - AI Editor Account platform Electron 测试：`33 passing`。
+- 本轮只增加回归测试和进度记录，没有修改运行时代码、成品资源或 Proxy；共享
+  `http://127.0.0.1:47892/live` 未停止或重启。
