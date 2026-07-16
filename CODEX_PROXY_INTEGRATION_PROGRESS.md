@@ -1448,3 +1448,47 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     checksum `10/10`；
   - 开发版与 Windows 成品版均使用隔离 profile 启动通过，未发现账号服务、模块加载或
     `Unknown service` 错误。
+
+## 46. 2026-07-16 Oscar T051/T056–T059/T099 产品账户与管理界面
+
+- 完成 T051、T056、T057、T058、T059、T099：
+  - 左下角账户入口在开发版或配置了正式 Gateway 的成品中替换为
+    `AI Editor 账户`，普通用户、二级管理员、一级管理员只看到各自允许的菜单；
+  - Chat 输入框下方显示安全账号状态，只包含账号显示名、当前模型、可用积分和稳定
+    错误编号，不向普通用户暴露 Provider、路由、熔断、端口或凭据；
+  - 新增单实例、只读的 `AI Editor 管理` 标签页，没有通用浏览器地址栏和导航控件；
+  - 管理页使用私有 ephemeral BrowserView，并从浏览器发现、浏览器工具、扩展 Browser
+    API、聊天附件和 Agent 上下文中排除；
+  - 实现退出登录与 password-change-required 入口。
+- 管理票据安全边界：
+  - Workbench renderer 只提交固定 view ID 和 route，不接收一次性票据；
+  - Electron main 通过 isolated world 注入
+    `ai-editor-management-bootstrap` version 1 envelope；
+  - 只允许 Gateway 同源 `/admin` 路由；已批准的登录/帮助链接交给系统浏览器，任意
+    跨源跳转、新窗口和下载被阻止；
+  - 关闭标签页时最佳努力调用 `DELETE /api/v1/webview/session`，清理 ephemeral
+    BrowserView 存储并销毁私有视图，不退出产品设备会话。
+- 本轮合同同步点已写入 `contracts/code-edge-webview.md` 与
+  `contracts/auth-account-api.md`。Black 需要确认并实现：
+  - 固定 `/admin` 管理入口；
+  - `POST /api/v1/webview/session` 与 `DELETE /api/v1/webview/session`；
+  - 页面校验 `event.source === window`、Gateway `event.origin`、type、version 和固定
+    route enum 后再兑换一次性票据。
+- 成品验证发现并修复一处启用边界回归：原账户菜单/状态 contribution 会在检查产品
+  Gateway 配置前由依赖注入实例化账号服务，导致未配置 Gateway 的中间成品每 30 秒向
+  共享 Proxy 请求账号状态并记录 `account_http_404`。现已改成通过启用判断后才延迟
+  获取服务，并新增“禁用成品不实例化服务”回归测试。
+- 最终验证：
+  - 定向 ESLint、`npm run typecheck-client`、`npm run compile`：通过；
+  - AI Editor Account Electron 测试：`42 passing`；
+  - 开发版使用 Oscar Mock Edge `47921` 的 `ready` 状态验证：账户菜单、账号/模型/积分
+    状态、单实例管理标签和 Gateway 不可用提示均正确；
+  - 管理标签关闭后等待 75 秒，未再出现 `[LEAKED DISPOSABLE]`；
+  - `npm run core-ci` 与 `npm run gulp vscode-win32-x64-min-ci`：通过；
+  - `D:\AI_prejoct\VSCode-win32-x64` Workbench checksum：`10/10`；
+  - 成品已包含管理 bootstrap 和 `/api/v1/webview/session` 撤销路径；当前
+    `product.json` 未配置正式 Gateway，因此安全保留原生“账户”入口；
+  - 成品隔离启动并持续运行 40 秒，未出现账号轮询、`account_http_404`、模块加载、
+    `Unknown service` 或 leaked-disposable 错误。
+- 所有开发/成品验证只关闭本轮隔离 Code 与 Mock。共享 Proxy 始终为 PID `18120`，
+  `/live=ok`，未停止、重启、迁移或读取其凭据。

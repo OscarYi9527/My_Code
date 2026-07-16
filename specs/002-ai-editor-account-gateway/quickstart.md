@@ -168,9 +168,13 @@ Expected:
 - No generic browser address/back/forward controls.
 - User sees only own profile, credits, devices and usage.
 - Reopen does not require product re-login.
+- Workbench renderer receives only the private view ID and route; the one-time ticket is injected by
+  Electron main using the `ai-editor-management-bootstrap` version 1 envelope.
 - Cross-origin navigation/new window/unapproved download is blocked; approved external links use the
   system browser.
 - URL and localStorage contain no product Token or Webview ticket.
+- Closing the tab best-effort calls `DELETE /api/v1/webview/session`, clears ephemeral BrowserView
+  storage and destroys the private view without logging out the product device session.
 
 ## 9. Validate Status and Fail-Closed Behavior
 

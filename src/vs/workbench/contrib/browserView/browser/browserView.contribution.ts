@@ -30,6 +30,10 @@ class WebBrowserViewWorkbenchService implements IBrowserViewWorkbenchService {
 		return this._known;
 	}
 
+	getOrCreatePrivateLazy(_id: string, _state?: IBrowserEditorViewState): BrowserEditorInput {
+		throw new Error('Integrated Browser is not available in web.');
+	}
+
 	registerContextualFilter(_filter: IBrowserViewContextualFilter): IDisposable {
 		return Disposable.None;
 	}

@@ -12,6 +12,7 @@ export const AI_EDITOR_ACCOUNT_DEVELOPMENT_GATEWAY_URL = 'http://127.0.0.1:47920
 export const AI_EDITOR_ACCOUNT_STATUS_REFRESH_INTERVAL = 30_000;
 export const AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT = 5_000;
 export const AI_EDITOR_ACCOUNT_OPEN_MANAGEMENT_COMMAND_ID = 'aiEditor.account.openManagement';
+export const AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID = 'ai-editor-management';
 
 export const IAiEditorAccountService = createDecorator<IAiEditorAccountService>('aiEditorAccountService');
 export const IAiEditorAccountMainService = createDecorator<IAiEditorAccountMainService>('aiEditorAccountMainService');
@@ -100,6 +101,9 @@ export interface IAiEditorAccountTransport {
 
 export interface IAiEditorAccountMainService extends IAiEditorAccountTransport {
 	readonly _serviceBrand: undefined;
+
+	prepareManagementView(viewId: string, route: AiEditorManagementRoute): Promise<void>;
+	disposeManagementView(viewId: string): Promise<void>;
 }
 
 export function createAiEditorTurnGateResult(status: IAiEditorSafeStatus): IAiEditorTurnGateResult {

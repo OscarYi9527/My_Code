@@ -215,7 +215,7 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 
 - [ ] T049 [P] [US3] Add Webview ticket, HttpOnly session and expiry tests in `D:\AI_prejoct\codex_proxy-dev\gateway\tests\integration\webview-session.test.ts`
 - [ ] T050 [P] [US3] Add admin shell role navigation tests in `D:\AI_prejoct\codex_proxy-dev\gateway\admin-web\src\app\app.test.tsx`
-- [ ] T051 [P] [US3] Add Code account menu, status action and management editor tests in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\test\browser\`
+- [x] T051 [P] [US3] Add Code account menu, status action and management editor tests in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\test\browser\`
 
 ### Implementation for User Story 3
 
@@ -223,10 +223,10 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T053 [US3] Implement Edge safe status and Webview ticket endpoints in `D:\AI_prejoct\codex_proxy-dev\src\edge\safe-status.js` and `edge-server.js`
 - [ ] T054 [US3] Create React management shell, API client and role navigation in `D:\AI_prejoct\codex_proxy-dev\gateway\admin-web\src\app\`
 - [ ] T055 [US3] Implement ordinary user profile, credits, devices and usage pages in `D:\AI_prejoct\codex_proxy-dev\gateway\admin-web\src\pages\account\`
-- [ ] T056 [US3] Replace the lower-left account contribution with AI Editor account actions in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorAccountMenu.ts`
-- [ ] T057 [US3] Implement safe status contribution and context actions under Chat input in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorStatusContribution.ts`
-- [ ] T058 [US3] Implement the single-instance `AI Editor 管理` editor input/pane in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorManagementInput.ts` and `aiEditorManagementEditor.ts`
-- [ ] T059 [US3] Enforce fixed-origin navigation, external-browser links, popup and download policy in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\electron-main\gatewayOriginPolicy.ts`
+- [x] T056 [US3] Replace the lower-left account contribution with AI Editor account actions in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorAccountMenu.ts`
+- [x] T057 [US3] Implement safe status contribution and context actions under Chat input in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorStatusContribution.ts`
+- [x] T058 [US3] Implement the single-instance `AI Editor 管理` editor input/pane in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorManagementInput.ts` and `aiEditorManagementEditor.ts`
+- [x] T059 [US3] Enforce fixed-origin navigation, external-browser links, popup and download policy in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\electron-main\gatewayOriginPolicy.ts`
 
 **Checkpoint**: US3 在 Code 内完整可见，且页面可见性与 Gateway API 权限双重验证。
 
@@ -333,7 +333,7 @@ Turn 可结算为负积分。
 - [ ] T096 [US7] Expose own-device, password and Level 1 reset routes in `D:\AI_prejoct\codex_proxy-dev\gateway\src\api\account-security-routes.ts`
 - [ ] T097 [US7] Implement account security/device pages and confirmation flows in `D:\AI_prejoct\codex_proxy-dev\gateway\admin-web\src\pages\account\security.tsx`
 - [ ] T098 [US7] Implement Edge logout/secure deletion and in-flight binding preservation in `D:\AI_prejoct\codex_proxy-dev\src\edge\local-account-store.js`
-- [ ] T099 [US7] Wire Code logout and password-required actions in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorAccountMenu.ts`
+- [x] T099 [US7] Wire Code logout and password-required actions in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorAccountMenu.ts`
 
 **Checkpoint**: US7 可独立完成账号恢复和设备失窃处置。
 

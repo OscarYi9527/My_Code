@@ -141,16 +141,37 @@ Bootstrap:
 
 1. Editor loads the fixed management shell without credentials in URL.
 2. Code requests a one-time ticket through Edge.
-3. After origin and nonce handshake, Code sends the ticket using `postMessage`.
+3. The Workbench renderer sends only the fixed private-view ID and requested route to Electron main.
+   Electron main applies the origin policy, loads the fixed shell, requests the ticket, and injects the
+   following message from an isolated world. The Workbench renderer never receives the ticket:
+
+   ```json
+   {
+     "type": "ai-editor-management-bootstrap",
+     "version": 1,
+     "route": "account",
+     "ticket": "one-time-ticket",
+     "expiresIn": 60
+   }
+   ```
+
+   The page MUST accept this message only when `event.source === window`, `event.origin` equals its
+   configured Gateway origin, `type` and `version` match, and the route is in the fixed route enum.
 4. Page POSTs ticket to Gateway and receives HttpOnly Cookie.
 5. Page acknowledges role and initial route; Code never receives page data beyond safe lifecycle
    events.
+
+The management view uses a dedicated ephemeral BrowserView session and is excluded from integrated
+browser discovery, browser tools, extension browser APIs, chat attachments and agent context.
+Closing the tab best-effort calls `DELETE /webview/session`, clears the ephemeral browser storage,
+and destroys the private view without logging out the product device session.
 
 Navigation policy:
 
 - Same-origin Gateway routes allowed.
 - Login/help external links open with the system default browser.
 - Cross-origin in-Webview navigation, arbitrary new windows and unapproved downloads are denied.
+- Generic integrated-browser context menus, sharing, inspection and browser actions are unavailable.
 - CSP disallows inline/eval script and restricts connect/frame/form targets to the Gateway origin.
 
 ## 8. Configuration

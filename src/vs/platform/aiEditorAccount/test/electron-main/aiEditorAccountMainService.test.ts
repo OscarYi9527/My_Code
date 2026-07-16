@@ -7,7 +7,9 @@ import * as assert from 'assert';
 import { DeferredPromise } from '../../../../base/common/async.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import {
+	AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
 	AiEditorAccountState,
+	AiEditorManagementRoute,
 	createAiEditorAccountUnavailableStatus,
 	IAiEditorSafeStatus
 } from '../../common/aiEditorAccount.js';
@@ -17,7 +19,9 @@ import {
 } from '../../electron-main/aiEditorAccountHttpClient.js';
 import {
 	AiEditorAccountMainServiceCore,
-	performAiEditorAccountLogin
+	disposeAiEditorManagementView,
+	performAiEditorAccountLogin,
+	prepareAiEditorManagementView
 } from '../../electron-main/aiEditorAccountMainService.js';
 
 suite('AI Editor Account main service', () => {
@@ -164,6 +168,85 @@ suite('AI Editor Account main service', () => {
 			'status'
 		]);
 		assert.strictEqual(callbackDisposed, true);
+	});
+
+	test('injects the one-time management ticket from the main process without placing it in the URL', async () => {
+		let currentUrl = 'about:blank';
+		let injectedCode = '';
+		let ticketCalls = 0;
+		let destroyedListener: (() => void) | undefined;
+		const webContents = {
+			isDestroyed: () => false,
+			getURL: () => currentUrl,
+			executeJavaScriptInIsolatedWorld: async (_worldId: number, scripts: readonly { readonly code: string }[]) => {
+				injectedCode = scripts[0].code;
+			},
+			on: () => undefined,
+			once: (event: string, listener: () => void) => {
+				if (event === 'destroyed') {
+					destroyedListener = listener;
+				}
+			},
+			removeListener: () => undefined,
+			removeAllListeners: () => undefined,
+			setWindowOpenHandler: () => undefined,
+			session: {
+				on: () => undefined,
+				removeListener: () => undefined
+			}
+		} as unknown as Electron.WebContents;
+		const view = {
+			webContents,
+			loadURL: async (url: string) => { currentUrl = url; }
+		};
+
+		await prepareAiEditorManagementView({
+			viewId: AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			route: AiEditorManagementRoute.Account,
+			gatewayOrigin: 'http://127.0.0.1:47920',
+			client: {
+				requestWebviewTicket: async () => {
+					ticketCalls++;
+					return { ticket: 'one-time-secret', expiresIn: 60 };
+				}
+			},
+			browserViewMainService: {
+				tryGetBrowserView: () => view
+			},
+			openExternal: async () => undefined
+		});
+
+		assert.strictEqual(new URL(currentUrl).search, '');
+		assert.ok(!currentUrl.includes('one-time-secret'));
+		assert.ok(injectedCode.includes('one-time-secret'));
+		assert.ok(injectedCode.includes('ai-editor-management-bootstrap'));
+
+		await prepareAiEditorManagementView({
+			viewId: AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			route: AiEditorManagementRoute.Security,
+			gatewayOrigin: 'http://127.0.0.1:47920',
+			client: {
+				requestWebviewTicket: async () => {
+					ticketCalls++;
+					return { ticket: 'unused', expiresIn: 60 };
+				}
+			},
+			browserViewMainService: {
+				tryGetBrowserView: () => view
+			},
+			openExternal: async () => undefined
+		});
+		assert.strictEqual(ticketCalls, 1);
+		assert.strictEqual(new URL(currentUrl).hash, '#security');
+
+		await disposeAiEditorManagementView(
+			AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			'http://127.0.0.1:47920',
+			{ tryGetBrowserView: () => view }
+		);
+		assert.match(injectedCode, /method: 'DELETE'/);
+		assert.ok(injectedCode.includes('/api/v1/webview/session'));
+		destroyedListener?.();
 	});
 });
 

@@ -118,10 +118,17 @@ Code-OSS Workbench
   Mock 合同适配。开发态账号请求使用 Electron-main 独占的
   `X-AI-Editor-Local-Nonce`，logout 204 和 handoff acknowledgement 后重新刷新安全
   状态。
-- 下一 Oscar 顺序调整为：先完成账户菜单/状态操作/管理 Webview 的
-  T051、T056–T059、T099；Black 完成真实认证 T023–T033 后做登录端到端；Black 完成
-  `/v1/responses` T038–T046 后再执行 T047、T048 和 T090，避免提前切换 Edge 导致 AI
-  对话不可用。
+- Oscar 已完成账户菜单、安全状态操作、受限单实例管理 BrowserView、退出登录与
+  password-required 入口（T051、T056–T059、T099）。管理票据只在 Electron main
+  获取并注入，Workbench renderer 不接收票据；管理页关闭时按 `/api/v1/webview/session`
+  最佳努力撤销会话、清理临时存储并销毁私有 BrowserView。
+- 下一 Oscar 顺序调整为：等待 Black 完成真实认证 T023–T033 后执行登录端到端；等待
+  Black 完成 `/v1/responses` T038–T046 后再执行 T047、T048 和 T090，避免提前切换
+  Edge 导致 AI 对话不可用。双方下一次同步点是本轮 Webview bootstrap envelope 与
+  `/api/v1/webview/session` 合同确认。
+- 当前 Windows 中间成品尚未配置正式 HTTPS `aiEditorAccountGatewayOrigin`，因此继续
+  显示原生“账户”入口且不实例化账号服务、不轮询共享 Proxy；待中央 Gateway 地址冻结
+  后再启用成品账户 UI，禁止为本地演示静默写入不安全 HTTP 地址。
 - Code 原生账号管理界面延期到 MVP 后评估，见
   `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。
 - 上游凭据的信封加密延期到 MVP 验证后实施，具体边界、迁移和发布阻断条件见

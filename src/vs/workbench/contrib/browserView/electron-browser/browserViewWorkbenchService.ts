@@ -11,7 +11,7 @@ import { IInstantiationService } from '../../../../platform/instantiation/common
 import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
-import { Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
+import { Disposable, DisposableMap, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { AUX_WINDOW_GROUP, IEditorService, PreferredGroup } from '../../../services/editor/common/editorService.js';
 import { mainWindow } from '../../../../base/browser/window.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
@@ -58,6 +58,8 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 
 	private readonly _browserViewService: IBrowserViewService;
 	private readonly _known = new Map<string, BrowserEditorInput>();
+	private readonly _privateIds = new Set<string>();
+	private readonly _inputDisposeListeners = this._register(new DisposableMap<string>());
 	private readonly _contextualFilters = new Set<IBrowserViewContextualFilter>();
 	private readonly _openHandlers = new Set<IBrowserViewOpenHandler>();
 	private readonly _mainWindowId: number;
@@ -186,7 +188,7 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 	}
 
 	getKnownBrowserViews(): Map<string, BrowserEditorInput> {
-		return this._known;
+		return new Map([...this._known].filter(([id]) => !this._privateIds.has(id)));
 	}
 
 	registerContextualFilter(filter: IBrowserViewContextualFilter): IDisposable {
@@ -202,11 +204,14 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 
 	getContextualBrowserViews(context?: IBrowserViewFilterContext): Map<string, BrowserEditorInput> {
 		if (this._contextualFilters.size === 0) {
-			return this._known;
+			return this.getKnownBrowserViews();
 		}
 		const filters = [...this._contextualFilters];
 		const result = new Map<string, BrowserEditorInput>();
 		for (const [id, input] of this._known) {
+			if (this._privateIds.has(id)) {
+				continue;
+			}
 			if (filters.every(filter => filter.include(input, { ...context }))) {
 				result.set(id, input);
 			}
@@ -221,7 +226,7 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 		});
 	}
 
-	getOrCreateLazy(id: string, initialState?: IBrowserEditorViewState, model?: IBrowserViewModel): BrowserEditorInput {
+	getOrCreateLazy(id: string, initialState?: IBrowserEditorViewState, model?: IBrowserViewModel, storageScope?: BrowserViewStorageScope): BrowserEditorInput {
 		if (!this._known.has(id)) {
 			const input = this.instantiationService.createInstance(BrowserEditorInput, { id, ...initialState }, async () => {
 				const state = await this._browserViewService.getOrCreateBrowserView(
@@ -229,7 +234,7 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 					{
 						owner: this._getDefaultOwner(),
 						sessionOptions: {
-							scope: await this._resolveStorageScope()
+							scope: storageScope ?? await this._resolveStorageScope()
 						},
 						initialState: {
 							url: initialState?.url,
@@ -240,10 +245,12 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 				);
 				return this._createModel(id, this._getDefaultOwner(), state);
 			});
-			input.onWillDispose(() => {
+			this._inputDisposeListeners.set(id, input.onWillDispose(() => {
+				this._inputDisposeListeners.deleteAndDispose(id);
 				this._known.delete(id);
+				this._privateIds.delete(id);
 				this._onDidChangeBrowserViews.fire();
-			});
+			}));
 			if (model) {
 				input.model = model;
 			}
@@ -252,6 +259,11 @@ export class BrowserViewWorkbenchService extends Disposable implements IBrowserV
 		}
 
 		return this._known.get(id)!;
+	}
+
+	getOrCreatePrivateLazy(id: string, initialState?: IBrowserEditorViewState): BrowserEditorInput {
+		this._privateIds.add(id);
+		return this.getOrCreateLazy(id, initialState, undefined, BrowserViewStorageScope.Ephemeral);
 	}
 
 	async clearGlobalStorage(): Promise<void> {

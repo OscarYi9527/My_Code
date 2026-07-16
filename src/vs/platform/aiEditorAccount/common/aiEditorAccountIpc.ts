@@ -67,11 +67,11 @@ export function parseAiEditorSafeStatus(value: unknown): IAiEditorSafeStatus {
 	return {
 		state,
 		checkedAt,
-		accountDisplay: readOptionalString(account, 'display'),
+		accountDisplay: readOptionalSafeString(account, 'display', 120),
 		role,
-		currentModel: readOptionalString(record, 'currentModel'),
-		availableCredits: readOptionalString(record, 'availableCredits'),
-		errorId: readOptionalString(record, 'errorId'),
+		currentModel: readOptionalSafeString(record, 'currentModel', 160),
+		availableCredits: readOptionalSafeString(record, 'availableCredits', 64),
+		errorId: readOptionalErrorId(record, 'errorId'),
 		actions: safeActions
 	};
 }
@@ -94,10 +94,23 @@ function readString(value: Record<string, unknown>, key: string, required: boole
 	return '';
 }
 
-function readOptionalString(value: Record<string, unknown> | undefined, key: string): string | undefined {
+function readOptionalSafeString(value: Record<string, unknown> | undefined, key: string, maxLength: number): string | undefined {
 	if (!value) {
 		return undefined;
 	}
 	const candidate = value[key];
-	return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
+	if (typeof candidate !== 'string') {
+		return undefined;
+	}
+	const normalized = candidate.trim();
+	return normalized.length > 0 && normalized.length <= maxLength && !/[\u0000-\u001F\u007F]/.test(normalized)
+		? normalized
+		: undefined;
+}
+
+function readOptionalErrorId(value: Record<string, unknown>, key: string): string | undefined {
+	const candidate = value[key];
+	return typeof candidate === 'string' && /^[a-z0-9][a-z0-9_.-]{0,63}$/i.test(candidate)
+		? candidate
+		: undefined;
 }

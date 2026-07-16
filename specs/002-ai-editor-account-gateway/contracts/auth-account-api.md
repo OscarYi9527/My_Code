@@ -269,6 +269,9 @@ The management page receives the ticket from Code via `postMessage` and exchange
 Success sets an HttpOnly, SameSite management Cookie and returns the permitted navigation model.
 The ticket cannot be reused.
 
+The `postMessage` envelope and main-process-only ticket injection are defined in
+`code-edge-webview.md`. The Workbench renderer is not a ticket recipient.
+
 ### `DELETE /webview/session`
 
 Revokes the current Webview management session. Closing the tab invokes this best-effort; expiry is

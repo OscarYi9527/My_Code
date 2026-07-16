@@ -241,6 +241,12 @@ export interface IBrowserViewWorkbenchService {
 	getKnownBrowserViews(): Map<string, BrowserEditorInput>;
 
 	/**
+	 * Create a browser-backed input that is excluded from browser tools, extension browser APIs,
+	 * chat attachments, and normal browser tab discovery.
+	 */
+	getOrCreatePrivateLazy(id: string, initialState?: IBrowserEditorViewState): BrowserEditorInput;
+
+	/**
 	 * Register a contextual filter that restricts which browser views are
 	 * returned by {@link getContextualBrowserViews}. A view is part of the
 	 * contextual set only when every registered filter includes it.

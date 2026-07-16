@@ -110,4 +110,21 @@ suite('AI Editor Account', () => {
 		assert.throws(() => parseAiEditorSafeStatus({ state: 'unknown', checkedAt: 1, actions: [] }));
 		assert.throws(() => parseAiEditorSafeStatus({ state: 'ready', checkedAt: 'not-a-date', actions: [] }));
 	});
+
+	test('drops unsafe renderer status strings and error identifiers', () => {
+		const status = parseAiEditorSafeStatus({
+			state: 'service_unavailable',
+			checkedAt: 1,
+			account: { display: `Oscar\u0000${'x'.repeat(200)}` },
+			currentModel: 'model\nsecret',
+			availableCredits: 'x'.repeat(100),
+			errorId: 'http://127.0.0.1/token=secret',
+			actions: []
+		});
+
+		assert.strictEqual(status.accountDisplay, undefined);
+		assert.strictEqual(status.currentModel, undefined);
+		assert.strictEqual(status.availableCredits, undefined);
+		assert.strictEqual(status.errorId, undefined);
+	});
 });

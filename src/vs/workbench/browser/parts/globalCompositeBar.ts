@@ -259,6 +259,7 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
 
 	static readonly ACCOUNTS_VISIBILITY_PREFERENCE_KEY = 'workbench.activity.showAccounts';
 
+	private readonly aiEditorAccountEnabled: boolean;
 	private readonly groupedAccounts: Map<string, (AuthenticationSessionAccount & { canSignOut: boolean })[]> = new Map();
 	private readonly problematicProviders: Set<string> = new Set();
 
@@ -287,15 +288,19 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
 		@IInstantiationService instantiationService: IInstantiationService,
 		@ICommandService private readonly commandService: ICommandService
 	) {
+		const aiEditorAccountEnabled = !environmentService.isBuilt || !!productService.aiEditorAccountGatewayOrigin;
 		const action = instantiationService.createInstance(CompositeBarAction, {
 			id: ACCOUNTS_ACTIVITY_ID,
-			name: localize('accounts', "Accounts"),
+			name: aiEditorAccountEnabled ? localize('aiEditorAccounts', "AI Editor 账户") : localize('accounts', "Accounts"),
 			classNames: ThemeIcon.asClassNameArray(GlobalCompositeBar.ACCOUNTS_ICON)
 		});
 		super(MenuId.AccountsContext, action, options, contextMenuActionsProvider, contextMenuAlignmentOptions, themeService, hoverService, menuService, contextMenuService, contextKeyService, configurationService, keybindingService, activityService);
+		this.aiEditorAccountEnabled = aiEditorAccountEnabled;
 		this._register(action);
-		this.registerListeners();
-		this.initialize();
+		if (!this.aiEditorAccountEnabled) {
+			this.registerListeners();
+			this.initialize();
+		}
 	}
 
 	private registerListeners(): void {
@@ -356,6 +361,14 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
 	//#region overrides
 
 	protected override async resolveMainMenuActions(accountsMenu: IMenu, disposables: DisposableStore): Promise<IAction[]> {
+		if (this.aiEditorAccountEnabled) {
+			const aiEditorAccountActions = accountsMenu.getActions({ renderShortTitle: true })
+				.find(([group]) => group === '0_aiEditorAccount')?.[1];
+			return aiEditorAccountActions?.length
+				? aiEditorAccountActions
+				: [disposables.add(new Action('aiEditor.account.loading', localize('aiEditorAccountLoading', "正在加载 AI Editor 账户..."), undefined, false))];
+		}
+
 		await super.resolveMainMenuActions(accountsMenu, disposables);
 
 		const providers = this.authenticationService.getProviderIds().filter(p => !p.startsWith(INTERNAL_AUTH_PROVIDER_PREFIX));

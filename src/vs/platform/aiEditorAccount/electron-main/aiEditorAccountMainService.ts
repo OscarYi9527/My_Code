@@ -7,14 +7,17 @@ import { raceTimeout } from '../../../base/common/async.js';
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable, IDisposable } from '../../../base/common/lifecycle.js';
 import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
+import { IInstantiationService } from '../../instantiation/common/instantiation.js';
 import { ILogService } from '../../log/common/log.js';
 import { IProductService } from '../../product/common/productService.js';
 import {
 	AI_EDITOR_ACCOUNT_DEFAULT_EDGE_URL,
 	AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL,
 	AI_EDITOR_ACCOUNT_DEVELOPMENT_GATEWAY_URL,
+	AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
 	AI_EDITOR_ACCOUNT_STATUS_REFRESH_INTERVAL,
 	AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT,
+	AiEditorManagementRoute,
 	AiEditorAccountState,
 	createAiEditorAccountUnavailableStatus,
 	createAiEditorTurnGateResult,
@@ -40,6 +43,12 @@ import {
 	AiEditorLoopbackCallbackServer,
 	IAiEditorAuthorizationCallback
 } from './loopbackCallbackServer.js';
+import {
+	AiEditorGatewayOriginPolicy,
+	AiEditorGatewayNavigationDecision,
+	decideAiEditorGatewayNavigation,
+	createAiEditorManagementUrl
+} from './gatewayOriginPolicy.js';
 
 interface IAiEditorAccountLoginCallback extends IDisposable {
 	readonly redirectUri: string;
@@ -57,6 +66,8 @@ export interface IAiEditorAccountLoginDependencies {
 export interface IAiEditorAccountMainServiceDependencies {
 	readonly client: IAiEditorAccountHttpClient;
 	readonly login: (kind: 'login' | 'register') => Promise<IAiEditorSafeStatus>;
+	readonly prepareManagementView?: (viewId: string, route: AiEditorManagementRoute) => Promise<void>;
+	readonly disposeManagementView?: (viewId: string) => Promise<void>;
 	readonly now?: () => number;
 	readonly logSafeError?: (errorId: string) => void;
 }
@@ -140,6 +151,17 @@ export class AiEditorAccountMainServiceCore extends Disposable implements IAiEdi
 		return this.dependencies.client.requestWebviewTicket();
 	}
 
+	prepareManagementView(viewId: string, route: AiEditorManagementRoute): Promise<void> {
+		if (!this.dependencies.prepareManagementView) {
+			throw new AiEditorAccountHttpError('account_management_unavailable');
+		}
+		return this.dependencies.prepareManagementView(viewId, route);
+	}
+
+	disposeManagementView(viewId: string): Promise<void> {
+		return this.dependencies.disposeManagementView?.(viewId) ?? Promise.resolve();
+	}
+
 	private refreshStatus(operation: () => Promise<IAiEditorSafeStatus>): Promise<IAiEditorSafeStatus> {
 		if (!this.statusOperation) {
 			this.statusOperation = operation()
@@ -181,9 +203,10 @@ export class AiEditorAccountMainService extends AiEditorAccountMainServiceCore {
 	constructor(
 		@IEnvironmentMainService environmentMainService: IEnvironmentMainService,
 		@IProductService productService: IProductService,
-		@ILogService logService: ILogService
+		@ILogService logService: ILogService,
+		@IInstantiationService instantiationService: IInstantiationService
 	) {
-		super(createRuntimeDependencies(environmentMainService, productService, logService));
+		super(createRuntimeDependencies(environmentMainService, productService, logService, instantiationService));
 	}
 }
 
@@ -234,7 +257,8 @@ async function createPkce(): Promise<IAiEditorPkce> {
 function createRuntimeDependencies(
 	environmentMainService: IEnvironmentMainService,
 	productService: IProductService,
-	logService: ILogService
+	logService: ILogService,
+	instantiationService: IInstantiationService
 ): IAiEditorAccountMainServiceDependencies {
 	const edgeOrigin = resolveEdgeOrigin(environmentMainService, productService);
 	const gatewayOrigin = resolveGatewayOrigin(environmentMainService, productService, logService);
@@ -259,11 +283,127 @@ function createRuntimeDependencies(
 			};
 		}
 	};
+	const getBrowserViewMainService = async () => {
+		const { IBrowserViewMainService } = await import('../../browserView/electron-main/browserViewMainService.js');
+		return instantiationService.invokeFunction(accessor => accessor.get(IBrowserViewMainService));
+	};
 	return {
 		client,
 		login: kind => performAiEditorAccountLogin(kind, loginDependencies),
+		prepareManagementView: async (viewId, route) => {
+			return prepareAiEditorManagementView({
+				viewId,
+				route,
+				gatewayOrigin,
+				client,
+				browserViewMainService: await getBrowserViewMainService(),
+				openExternal: loginDependencies.openExternal
+			});
+		},
+		disposeManagementView: async viewId => disposeAiEditorManagementView(
+			viewId,
+			gatewayOrigin,
+			await getBrowserViewMainService()
+		),
 		logSafeError: errorId => logService.warn(`[aiEditorAccount] Account operation failed (${errorId}).`)
 	};
+}
+
+const managementPolicies = new WeakMap<Electron.WebContents, AiEditorGatewayOriginPolicy>();
+
+export async function prepareAiEditorManagementView(options: {
+	readonly viewId: string;
+	readonly route: AiEditorManagementRoute;
+	readonly gatewayOrigin: string | undefined;
+	readonly client: Pick<IAiEditorAccountHttpClient, 'requestWebviewTicket'>;
+	readonly browserViewMainService: {
+		tryGetBrowserView(id: string): {
+			readonly webContents: Electron.WebContents;
+			loadURL(url: string): Promise<void>;
+		} | undefined;
+	};
+	readonly openExternal: (url: string) => Promise<void>;
+}): Promise<void> {
+	if (options.viewId !== AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID || !isAiEditorManagementRoute(options.route)) {
+		throw new AiEditorAccountHttpError('account_management_request_invalid');
+	}
+	if (!options.gatewayOrigin) {
+		throw new AiEditorAccountHttpError('account_management_unavailable');
+	}
+
+	const view = options.browserViewMainService.tryGetBrowserView(options.viewId);
+	if (!view || view.webContents.isDestroyed()) {
+		throw new AiEditorAccountHttpError('account_management_view_missing');
+	}
+
+	if (!managementPolicies.has(view.webContents)) {
+		managementPolicies.set(
+			view.webContents,
+			new AiEditorGatewayOriginPolicy(view.webContents, options.gatewayOrigin, options.openExternal)
+		);
+	}
+
+	const managementUrl = createAiEditorManagementUrl(options.gatewayOrigin, options.route);
+	const currentUrl = view.webContents.getURL();
+	if (decideAiEditorGatewayNavigation(currentUrl, options.gatewayOrigin) === AiEditorGatewayNavigationDecision.AllowInView) {
+		await view.loadURL(managementUrl);
+		return;
+	}
+
+	await view.loadURL(managementUrl);
+	if (new URL(view.webContents.getURL()).origin !== options.gatewayOrigin) {
+		throw new AiEditorAccountHttpError('account_management_origin_mismatch');
+	}
+
+	let ticket: IAiEditorWebviewTicket | undefined = await options.client.requestWebviewTicket();
+	try {
+		const payload = JSON.stringify({
+			type: 'ai-editor-management-bootstrap',
+			version: 1,
+			route: options.route,
+			ticket: ticket.ticket,
+			expiresIn: ticket.expiresIn
+		});
+		const targetOrigin = JSON.stringify(options.gatewayOrigin);
+		await view.webContents.executeJavaScriptInIsolatedWorld(
+			1001,
+			[{ code: `window.postMessage(${payload}, ${targetOrigin});` }]
+		);
+	} finally {
+		ticket = undefined;
+	}
+}
+
+export async function disposeAiEditorManagementView(
+	viewId: string,
+	gatewayOrigin: string | undefined,
+	browserViewMainService: {
+		tryGetBrowserView(id: string): {
+			readonly webContents: Electron.WebContents;
+		} | undefined;
+	}
+): Promise<void> {
+	if (viewId !== AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID) {
+		throw new AiEditorAccountHttpError('account_management_request_invalid');
+	}
+	const view = browserViewMainService.tryGetBrowserView(viewId);
+	if (!view || view.webContents.isDestroyed()) {
+		return;
+	}
+
+	try {
+		if (
+			gatewayOrigin &&
+			decideAiEditorGatewayNavigation(view.webContents.getURL(), gatewayOrigin) === AiEditorGatewayNavigationDecision.AllowInView
+		) {
+			await view.webContents.executeJavaScriptInIsolatedWorld(1001, [{
+				code: `fetch(new URL('/api/v1/webview/session', location.origin).toString(), { method: 'DELETE', credentials: 'include', keepalive: true }).catch(() => undefined);`
+			}]);
+		}
+	} finally {
+		managementPolicies.get(view.webContents)?.dispose();
+		managementPolicies.delete(view.webContents);
+	}
 }
 
 function resolveEdgeLocalAuthorization(
@@ -321,6 +461,21 @@ function isValidTurnGateRequest(request: IAiEditorTurnGateRequest): boolean {
 	return typeof request?.modelId === 'string' && request.modelId.length > 0 &&
 		typeof request.sessionId === 'string' && request.sessionId.length > 0 &&
 		typeof request.clientTurnId === 'string' && request.clientTurnId.length > 0;
+}
+
+function isAiEditorManagementRoute(route: AiEditorManagementRoute): boolean {
+	switch (route) {
+		case AiEditorManagementRoute.Account:
+		case AiEditorManagementRoute.Security:
+		case AiEditorManagementRoute.Organization:
+		case AiEditorManagementRoute.Invitations:
+		case AiEditorManagementRoute.Usage:
+		case AiEditorManagementRoute.Providers:
+		case AiEditorManagementRoute.Diagnostics:
+			return true;
+		default:
+			return false;
+	}
 }
 
 function accountPlatform(): string {
