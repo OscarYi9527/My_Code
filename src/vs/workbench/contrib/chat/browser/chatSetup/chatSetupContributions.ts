@@ -33,6 +33,7 @@ import { IMarkerService } from '../../../../../platform/markers/common/markers.j
 import { IOpenerService } from '../../../../../platform/opener/common/opener.js';
 import product from '../../../../../platform/product/common/product.js';
 import { GitHubPaths, IDefaultAccountService } from '../../../../../platform/defaultAccount/common/defaultAccount.js';
+import { isAiEditorProduct } from '../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { IProductService } from '../../../../../platform/product/common/productService.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { ToggleTitleBarConfigAction } from '../../../../browser/parts/titlebar/titlebarActions.js';
@@ -94,11 +95,14 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 		}
 
 		const controller = new Lazy(() => this._register(this.instantiationService.createInstance(ChatSetupController, context, requests)));
+		const allowOfficialSignIn = !isAiEditorProduct(product.aiEditorProxyBundled);
 
 		this.registerSetupAgents(context, controller);
 		this.registerGrowthSession(chatEntitlementService);
-		this.registerActions(context, requests, controller);
-		this.registerSignInTitleBarEntry(actionViewItemService);
+		this.registerActions(context, requests, controller, allowOfficialSignIn);
+		if (allowOfficialSignIn) {
+			this.registerSignInTitleBarEntry(actionViewItemService);
+		}
 		this.registerUrlLinkHandler();
 		this.checkExtensionInstallation(context);
 	}
@@ -217,7 +221,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 		updateGrowthSession();
 	}
 
-	private registerActions(context: ChatEntitlementContext, requests: ChatEntitlementRequests, controller: Lazy<ChatSetupController>): void {
+	private registerActions(context: ChatEntitlementContext, requests: ChatEntitlementRequests, controller: Lazy<ChatSetupController>, allowOfficialSignIn: boolean): void {
 
 		//#region Global Chat Setup Actions
 
@@ -557,9 +561,11 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 
 		registerAction2(ChatSetupTriggerAction);
 		registerAction2(ChatSetupTriggerForceSignInDialogAction);
-		registerAction2(ChatSetupFromAccountsAction);
-		registerAction2(ChatSetupSignInTitleBarAction);
-		registerAction2(ToggleSignInTitleBarAction);
+		if (allowOfficialSignIn) {
+			registerAction2(ChatSetupFromAccountsAction);
+			registerAction2(ChatSetupSignInTitleBarAction);
+			registerAction2(ToggleSignInTitleBarAction);
+		}
 		registerAction2(ChatSetupTriggerAnonymousWithoutDialogAction);
 		registerAction2(ChatSetupTriggerSupportAnonymousAction);
 		registerAction2(UpgradePlanAction);

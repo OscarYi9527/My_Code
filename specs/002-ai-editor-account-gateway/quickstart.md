@@ -142,6 +142,8 @@ $env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE = `
 Expected before login:
 
 - File editing, terminal and Git work.
+- No `Welcome to Visual Studio Code` / GitHub Copilot sign-in modal or title-bar `Sign In` action is
+  shown; AI Editor uses only the product account entry for its own login flow.
 - AI status shows `需要登录`.
 - Sending a Turn is blocked before Codex/Provider forwarding.
 - Electron main sends the nonce only in `X-AI-Editor-Local-Nonce`; renderer storage and IPC do not

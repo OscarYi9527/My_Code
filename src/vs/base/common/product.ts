@@ -102,6 +102,7 @@ export interface IProductConfiguration {
 	readonly applicationName: string;
 	readonly embedderIdentifier?: string;
 	readonly agentsTelemetryAppName?: string;
+	readonly aiEditorProxyBundled?: boolean;
 	readonly aiEditorAccountEdgeOrigin?: string;
 	readonly aiEditorAccountGatewayOrigin?: string;
 

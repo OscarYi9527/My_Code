@@ -17,6 +17,10 @@ export const AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID = 'ai-editor-management';
 export const IAiEditorAccountService = createDecorator<IAiEditorAccountService>('aiEditorAccountService');
 export const IAiEditorAccountMainService = createDecorator<IAiEditorAccountMainService>('aiEditorAccountMainService');
 
+export function isAiEditorProduct(aiEditorProxyBundled: boolean | undefined): boolean {
+	return aiEditorProxyBundled === true;
+}
+
 export const enum AiEditorAccountState {
 	Ready = 'ready',
 	LoginRequired = 'loginRequired',

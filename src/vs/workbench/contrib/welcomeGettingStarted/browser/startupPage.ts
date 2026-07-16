@@ -35,6 +35,7 @@ import { isWeb } from '../../../../base/common/platform.js';
 import { IOnboardingService } from '../../welcomeOnboarding/common/onboardingService.js';
 import { ONBOARDING_STORAGE_KEY } from '../../welcomeOnboarding/common/onboardingTypes.js';
 import { IChatEntitlementService } from '../../../services/chat/common/chatEntitlementService.js';
+import { isAiEditorProduct } from '../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 
 export const restoreWalkthroughsConfigurationKey = 'workbench.welcomePage.restorableWalkthroughs';
 export type RestoreWalkthroughsConfigurationValue = { folder: string; category?: string; step?: string };
@@ -236,6 +237,10 @@ export class StartupPageRunnerContribution extends Disposable implements IWorkbe
 	private tryShowOnboarding(): void {
 		if (this.environmentService.skipWelcome) {
 			return; // skip welcome flag is set
+		}
+
+		if (isAiEditorProduct(this.productService.aiEditorProxyBundled)) {
+			return; // AI Editor uses its own product account flow, never the GitHub Copilot sign-in onboarding
 		}
 
 		if (isWeb) {

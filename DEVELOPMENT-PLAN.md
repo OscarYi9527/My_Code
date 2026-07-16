@@ -129,6 +129,9 @@ Code-OSS Workbench
 - 当前 Windows 中间成品尚未配置正式 HTTPS `aiEditorAccountGatewayOrigin`，因此继续
   显示原生“账户”入口且不实例化账号服务、不轮询共享 Proxy；待中央 Gateway 地址冻结
   后再启用成品账户 UI，禁止为本地演示静默写入不安全 HTTP 地址。
+- `aiEditorProxyBundled=true` 作为 AI Editor 产品标记：首次启动不显示 GitHub Copilot
+  官方登录 Onboarding，标题栏也不注册官方 `Sign In` 主动入口；第三方扩展明确发起的
+  按需 Authentication 授权能力仍保留，不影响本地编辑功能。
 - Code 原生账号管理界面延期到 MVP 后评估，见
   `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。
 - 上游凭据的信封加密延期到 MVP 验证后实施，具体边界、迁移和发布阻断条件见

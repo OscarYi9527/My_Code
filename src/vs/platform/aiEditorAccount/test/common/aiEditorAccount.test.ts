@@ -10,6 +10,7 @@ import {
 	AiEditorAccountRole,
 	AiEditorAccountState,
 	createAiEditorTurnGateResult,
+	isAiEditorProduct,
 	normalizeAiEditorAccountEdgeUrl,
 	normalizeAiEditorAccountGatewayUrl
 } from '../../common/aiEditorAccount.js';
@@ -67,6 +68,12 @@ suite('AI Editor Account', () => {
 			allowed: true,
 			status
 		});
+	});
+
+	test('identifies AI Editor products from the bundled Proxy marker', () => {
+		assert.strictEqual(isAiEditorProduct(true), true);
+		assert.strictEqual(isAiEditorProduct(false), false);
+		assert.strictEqual(isAiEditorProduct(undefined), false);
 	});
 
 	test('normalizes loopback Edge URLs', () => {

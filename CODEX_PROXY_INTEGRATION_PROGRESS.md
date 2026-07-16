@@ -1492,3 +1492,29 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     `Unknown service` 或 leaked-disposable 错误。
 - 所有开发/成品验证只关闭本轮隔离 Code 与 Mock。共享 Proxy 始终为 PID `18120`，
   `/live=ok`，未停止、重启、迁移或读取其凭据。
+
+## 47. 2026-07-16 AI Editor 首次启动官方登录提示移除
+
+- 使用全新开发 profile 复现用户反馈：首次打开会自动显示
+  `Welcome to Visual Studio Code` 三步 Onboarding，第一步要求
+  `Sign in to use GitHub Copilot`；标题栏同时显示官方 `Sign In` 按钮。
+- 根因是 VS Code 2026 Welcome Onboarding 和 Chat Setup title-bar action 仍按默认产品
+  行为注册，与 Codex Agent Host、Proxy 和 AI Editor 产品账号状态无关。
+- 修复：
+  - 将已有 `product.json` 的 `aiEditorProxyBundled=true` 纳入产品类型并作为 AI Editor
+    产品标记；
+  - AI Editor 产品不再自动显示 GitHub Copilot 登录 Onboarding；
+  - AI Editor 产品不再注册标题栏官方 `Sign In`、账户菜单 Copilot 登录和对应标题栏
+    开关；
+  - 普通 VS Code 产品行为保持不变，扩展明确发起的按需 Authentication 授权能力仍保留。
+- 验证：
+  - 定向 ESLint、`npm run typecheck-client`、`npm run compile`：通过；
+  - AI Editor Account 测试：`43 passing`；
+  - 开发版使用全新 profile 启动：官方登录弹窗 `0`、标题栏官方 `Sign In` `0`，
+    `AI Editor 账户` 与账号/模型/积分状态正常；
+  - `npm run core-ci`、`npm run gulp vscode-win32-x64-min-ci`：通过；
+  - Windows 成品 Workbench checksum：`10/10`；
+  - Windows 成品使用全新 profile 启动：官方登录弹窗 `0`、标题栏官方
+    `Sign In` `0`，中文 Workbench 正常，运行日志无模块、服务或 disposable 错误。
+- 验证结束后只停止本轮隔离 Mock Edge；共享 Proxy 保持 PID `18120`、`/live=ok`，
+  未停止或重启。
