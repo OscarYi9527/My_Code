@@ -1,0 +1,173 @@
+# Oscar → Black AI Editor Gateway 同步回执
+
+日期：2026-07-17
+
+## 1. 同步结论
+
+- Black 的阶段 0 和阶段 1 交付已核对，可以继续复用，不需要从旧 `master` 重做。
+- Black 的阶段 2 可以确认成“第一轮 Mock 合同交付完成”。
+- Oscar 已完成第一轮 Code/Black Mock 联合验收，不再等待这批 Mock 接口。
+- 阶段 2不能称为“真实账号链路完成”：真实 PKCE、Token 轮换、DPAPI/Keychain、
+  组织积分、Provider 路由和 `/v1/responses` 仍未实现。
+- T112/T113 是完整真实链路和共享 Proxy 不变性的最终联合验收，本轮不能勾选。
+
+## 2. 双方同步坐标
+
+```text
+My_Code 仓库：
+  分支：codex/account-gateway-mvp
+  commit：ff20d206c
+
+codex_proxy 仓库：
+  分支：feature/ai-editor-account-gateway
+  最新文档 commit：37e61d9bb6e705c40dc322b7319eb874508d18c2
+  第一轮 Mock 运行时基线：84ab6445bb4b557dc379815776bcd784f34676c1
+  依赖基线：feature/custom-api-urls@e3ed1d6
+
+当前合同事实来源：
+  My_Code@ff20d206c/specs/002-ai-editor-account-gateway/contracts/
+```
+
+Black 的 `AI_EDITOR_GATEWAY_OSCAR_HANDOFF.md` 仍引用旧
+`My_Code@788f3921`，后续真实功能开发前需要改为上述最新合同坐标。
+
+## 3. Oscar 已完成的 Code 任务
+
+已完成并推送：
+
+- T008：可注入合同模拟器、安全调试 wrapper 和 Black 隔离栈连接脚本；
+- T022：legacy/Edge/Gateway 发布 allowlist 分离；
+- T027、T034–T037：账号服务、IPC、系统浏览器回调、状态刷新和新 Turn 门禁；
+- T051、T056–T059：左下角产品账号入口、安全状态、管理标签页和导航策略；
+- T099：退出登录和强制改密入口；
+- T110：并发回调、重复点击、超时和进程故障边界测试；
+- T116/T118 基础设施：Windows/macOS 最终 Edge 发布门禁。
+
+当前 Code 正式产品仍使用 `productTarget=legacy-standalone`。Black 未交付真实
+Edge `/v1/responses` 前，不允许切换正式发布 target。
+
+## 4. 第一轮 Mock 联合验收证据
+
+Oscar 已使用真实 Black checkout
+`D:\AI_prejoct\codex_proxy-gateway-dev@37e61d9` 完成过 Code 联调：
+
+- Gateway `127.0.0.1:47920`、Edge `127.0.0.1:47921` 可隔离启动；
+- `logout` 返回 204 后状态变为 `login_required`；
+- handoff 返回 `status=completed` 和正数 `bindingVersion`；
+- handoff 后状态变为 `ready`；
+- `/v1/models` 返回 `gpt-mock`；
+- Code Electron main 从受保护 nonce 文件读取 nonce，只放入
+  `X-AI-Editor-Local-Nonce`，renderer 不接收 nonce；
+- Code 开发版启动和 30 秒刷新未出现 `local_authorization_required`。
+
+2026-07-17 又执行了一轮隔离复核：
+
+- 五种 Mock 状态全部通过：
+  `ready`、`login_required`、`account_unavailable`、
+  `service_unavailable`、`password_change_required`；
+- 不带 nonce 请求 `/ai-editor/status` 返回 HTTP 401；
+- 验收结束后只停止 `47920/47921`；
+- 共享 Proxy `47892` 始终为 PID `18120` 且 `/live=ok`。
+
+本轮确认的是 Mock 合同兼容性，不包含真实浏览器账号登录、真实管理会话或真实 AI
+回复。
+
+## 5. Black 必须同步的合同更新
+
+Black 审计时使用的是 `My_Code@788f3921`。此后合同有两次更新：
+
+### `e415847c4`：按 Black Mock 行为冻结本机合同
+
+- `/ai-editor/*` 使用 `X-AI-Editor-Local-Nonce`；
+- handoff complete 返回 acknowledgement，Code 随后刷新安全状态；
+- logout 成功返回 HTTP 204，Code 随后刷新安全状态。
+
+Black 当前 Mock 已符合这些行为，只需更新合同基线和交接文档。
+
+### `400c245b2`：管理标签页安全合同
+
+- Webview ticket 只由 Electron main 获取和注入；
+- Workbench renderer 只发送私有 view ID 和固定 route，不接收 ticket；
+- bootstrap envelope 为 `ai-editor-management-bootstrap` version 1；
+- 管理页面验证 `event.source`、固定 Gateway origin、版本和 route；
+- 使用隔离的临时 BrowserView session；
+- 关闭标签页时尽力调用 `DELETE /api/v1/webview/session`、清理临时存储并销毁 view；
+- 管理标签页不能被通用 Browser、扩展或 Agent 上下文发现。
+
+Black 后续 T049、T050、T054、T055 必须按该最新版合同实现，不能继续只返回 Mock
+ticket。
+
+## 6. Black 下一阶段应执行
+
+### 第一优先级：真实账号链路
+
+完成 T023–T026、T028–T033：
+
+1. 注册、Argon2id 密码、bootstrap 强制改密；
+2. Authorization Code + PKCE；
+3. Access Token/Refresh Token 签发、轮换和重放撤销；
+4. Edge Windows DPAPI/macOS Keychain 安全存储；
+5. 真实一次性本机 handoff 和账号绑定。
+
+交付时提供分支、完整 SHA、任务编号、测试命令、迁移和合同变化。Oscar 收到稳定
+commit 后执行真实系统浏览器登录联合验收。
+
+### 第二优先级：真实模型和回复链路
+
+完成 T038–T046：
+
+1. Edge `/v1/models` 和 `/v1/responses` 合同测试；
+2. Edge-to-Gateway 身份和流式转发；
+3. Gateway 账号/组织/模型预检；
+4. 复用现有 Provider adapter；
+5. 动态模型目录和真实 Responses 流式完成。
+
+这批任务完成前，Mock `gpt-mock` 不能作为真实模型链路通过证据。
+
+### 第三优先级：真实管理页面
+
+按最新版 Webview 合同完成 T049、T050、T054、T055，提供 HttpOnly 管理 session、
+角色导航和普通用户账号页面。
+
+## 7. Oscar 后续动作
+
+- Black 交付 T023–T033 后：验证真实 PKCE、Token handoff、状态刷新、退出和
+  DPAPI/Keychain 边界；
+- Black 交付 T038–T046 后：执行 T047、T048 和两类 Provider 真实流式回复验收；
+- Black 交付 T049/T050/T054/T055 后：验证管理 bootstrap envelope、HttpOnly
+  session 和角色页面；
+- 只有生产 Edge、真实 Responses、固定中央 HTTPS Gateway 和最终发布门禁全部通过，
+  才更新 `build/ai-editor-proxy/release.json` 的 commit 并切换
+  `productTarget=edge`。
+
+## 8. 后续每次同步格式
+
+Black 每个集成检查点提供：
+
+```text
+codex_proxy 分支：
+commit SHA：
+完成的 Black 任务编号：
+测试命令和结果：
+数据库迁移：
+API/JSON/状态码变化：
+是否修改合同：
+已知问题：
+```
+
+Oscar 回传：
+
+```text
+My_Code 分支：
+commit SHA：
+完成的 Oscar 任务编号：
+Code 测试和构建结果：
+实际 Edge/Gateway 地址：
+联合验收结果：
+共享 47892 不变性：
+合同差异：
+```
+
+任何 endpoint、字段、状态码或安全语义变化必须先更新
+`specs/002-ai-editor-account-gateway/contracts/` 并由双方确认，禁止分别静默兼容两套
+合同。

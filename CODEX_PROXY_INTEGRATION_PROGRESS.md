@@ -1624,3 +1624,28 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `scripts\code.bat` 开发版已实际启动到 Workbench/Agent Host；验收后只关闭本轮
   启动的开发 Code 进程。
 - 共享 Proxy `/live` 最终仍为 `ok`，本轮未停止或重启共享 Proxy。
+
+## 51. 2026-07-17 Black 第一轮 Mock 同步回执
+
+- 再次获取并只读核对 Black 远程分支：
+  `feature/ai-editor-account-gateway@37e61d9bb6e705c40dc322b7319eb874508d18c2`；
+  远程内容与 Black 的阶段 0、阶段 1、阶段 2 说明一致。
+- Black 阶段 2的准确性质是“第一轮 Mock 合同交付完成”，其交接文档明确说明真实
+  PKCE、Token 轮换、DPAPI/Keychain、组织积分、Provider 路由、管理 session 和
+  `/v1/responses` 尚未实现。
+- Oscar 侧此前已在 `e415847c4` 完成真实 Black Mock 联调，并在后续提交完成
+  T008、T022、T027、T034–T037、T051、T056–T059、T099 和 T110；因此不需要等待或
+  重复实现 Black 的第一轮 Mock。
+- 2026-07-17 使用隔离 checkout 又复核一次：
+  - 五种 Mock 状态全部通过；
+  - 无 nonce 的 `/ai-editor/status` 返回 HTTP 401；
+  - 只停止本轮 `47920/47921` Gateway/Edge；
+  - 共享 `47892` 始终为 PID `18120` 且 `/live=ok`。
+- 新增 `specs/002-ai-editor-account-gateway/OSCAR_TO_BLACK_SYNC.md`，作为可直接提供给
+  Black 的同步回执，记录：
+  - 当前双方分支和 SHA；
+  - 第一轮 Mock 联调证据；
+  - Black 审计基线之后 `e415847c4`、`400c245b2` 两次合同更新；
+  - Black 下一步 T023–T033、T038–T046、T049/T050/T054/T055 的交付顺序；
+  - Oscar 后续真实登录、真实 Responses、管理页面和最终 Edge 发布验收动作。
+- T112/T113 继续保持未完成；第一轮 Mock 兼容不能替代完整真实链路联合验收。
