@@ -107,7 +107,7 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T005 Extend ignored local DB, PID, log and secret patterns in `D:\AI_prejoct\codex_proxy-dev\.gitignore`
 - [ ] T006 [P] Add fixed development Gateway/Edge configuration schema in `D:\AI_prejoct\codex_proxy-dev\gateway\src\config.ts` and `src\edge\edge-config.js`
 - [ ] T007 Add isolated start/stop/reset entry scripts in `D:\AI_prejoct\codex_proxy-dev\tools\start-ai-editor-dev.ps1`, `tools\stop-ai-editor-dev.ps1`, and `tools\reset-ai-editor-dev.ps1`
-- [ ] T008 Add the injectable contract simulator and safe Code-side wrapper in `D:\AI_prejoct\My_code\scripts\mock-ai-editor-edge.mjs` and `scripts\start-ai-editor-account-dev.ps1` with state, handoff, Webview-ticket, model, path, port and data-root validation
+- [x] T008 Add the injectable contract simulator and safe Code-side wrapper in `D:\AI_prejoct\My_code\scripts\mock-ai-editor-edge.ts` and `scripts\start-ai-editor-account-dev.ps1` with state, handoff, Webview-ticket, model, path, port and data-root validation
 
 **Checkpoint**: 依赖可以安装，调试脚本只识别 `47920`/`47921` 和隔离数据目录。
 

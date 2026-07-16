@@ -1333,7 +1333,34 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   Oscar 完成 Code UI。
 - 双方只在三个节点产生同步阻塞：合同冻结、真实接口符合性、T112/T113 最终端到端
   验收。
-- T008 已调整为同时交付 `scripts/mock-ai-editor-edge.mjs` 和安全调试启动 wrapper；
+- T008 已调整为同时交付 `scripts/mock-ai-editor-edge.ts` 和安全调试启动 wrapper；
   AGENTS.md 的持久协作规则已同步修正。
+
+## 43. 2026-07-16 Oscar T008 合同模拟器与账号合同基础
+
+- 完成 T008：
+  - 新增 `scripts/mock-ai-editor-edge.ts`，提供 loopback-only、内存态的安全合同模拟器；
+  - 支持 safe status、状态切换、一次性 handoff、Webview ticket、logout、模型目录和
+    管理页占位；
+  - 新增 `scripts/start-ai-editor-account-dev.ps1`，只管理隔离 `47921` Mock，校验端口、
+    PID、命令行和数据目录，后台进程使用隐藏窗口；
+  - 脚本只读检查共享 `47892`，拒绝停止非 Mock 进程。
+- 新增 Code 账号合同基础：
+  - `IAiEditorAccountService`、安全状态、角色、动作、Turn 门禁和可注入 Transport；
+  - 固定 IPC endpoint 常量及不可信状态响应解析；
+  - 相关 T027/T034 尚未标记完成，仍需补齐 loopback callback、真实 IPC 注册和服务实现。
+- 验证结果：
+  - Mock Node 测试：4 passing；
+  - Code 账号合同定向测试：6 passing；
+  - 新增文件定向 ESLint：通过；
+  - `npm run typecheck-client`：通过；
+  - `npm run compile`：通过；
+  - 全量 node test 调用因本机 Kerberos 无可用凭据出现 1 个既有环境失败，同时有
+    11728 passing / 182 pending；与本次账号代码无关。
+- Mock 启动、状态切换、复用和安全停止均通过；共享 Proxy PID `18120` 在测试前后不变，
+  `/live` 持续为 `ok`。
+- 本轮未注册 UI/runtime contribution，T008 仅为开发脚本，因此尚未运行
+  `npm run core-ci` 或 Windows 成品打包；首次实际 Code runtime 接入完成时按双构建规则
+  同步验证。
 - 新增 `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`，将全部 Code 原生账号管理界面
   记录为 MVP 后评估项。
