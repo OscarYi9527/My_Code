@@ -564,7 +564,10 @@ async function main(): Promise<void> {
 	const productJsonPath = path.join(appRoot, 'product.json');
 	const packageJsonPath = path.join(appRoot, 'package.json');
 	const proxyRoot = path.join(appRoot, 'ai-editor-proxy');
-	const proxyEntryPoint = path.join(proxyRoot, 'src', 'server.js');
+	const releaseSource = readAiEditorProxyReleaseSource(path.join(repositoryRoot, 'build', 'ai-editor-proxy', 'release.json'));
+	const proxyManifest = validateAiEditorProxyArtifact(proxyRoot, `darwin-${arch}`, releaseSource.productTarget);
+	assertAiEditorProxyReleaseIdentity(proxyManifest, releaseSource);
+	const proxyEntryPoint = path.join(proxyRoot, ...proxyManifest.entryPoint.split('/'));
 	const codexRoot = path.join(appRoot, 'node_modules', '@openai');
 	const nativePackageName = `codex-darwin-${arch}`;
 	const nativeTarget = arch === 'x64' ? 'x86_64-apple-darwin' : 'aarch64-apple-darwin';
@@ -598,9 +601,6 @@ async function main(): Promise<void> {
 		throw new Error('Product does not require the bundled AI Editor Proxy.');
 	}
 	const checksums = productChecksums(appRoot, productJson);
-	const proxyManifest = validateAiEditorProxyArtifact(proxyRoot, `darwin-${arch}`);
-	const releaseSource = readAiEditorProxyReleaseSource(path.join(repositoryRoot, 'build', 'ai-editor-proxy', 'release.json'));
-	assertAiEditorProxyReleaseIdentity(proxyManifest, releaseSource);
 
 	const productNotices = fs.readFileSync(path.join(appRoot, 'ThirdPartyNotices.txt'), 'utf8');
 	if (!/^codex\s*$/im.test(productNotices) || !productNotices.includes('github.com/openai/codex')) {
@@ -643,7 +643,8 @@ async function main(): Promise<void> {
 				version: proxyManifest.version,
 				commit: proxyManifest.commit,
 				builtAt: proxyManifest.builtAt,
-				repository: releaseSource.repository
+				repository: releaseSource.repository,
+				target: proxyManifest.target ?? 'legacy-standalone'
 			},
 			codex: {
 				version: codexPackage.version,

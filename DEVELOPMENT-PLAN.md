@@ -95,6 +95,11 @@ Code-OSS Workbench
 - 正式 Code 安装包只携带本地 Edge Proxy，不在普通用户电脑部署中央 Gateway、账号
   服务或管理 Web UI；调试阶段才由统一脚本在开发机同时启动 Gateway `47920` 和隔离
   测试 Edge `47921`，共享 Proxy `47892` 保持不变。
+- Oscar 已完成 T022 发布白名单分离：构建清单分别定义迁移期 standalone、Edge 和
+  Gateway target，Edge 不能包含 Gateway、管理后台、Provider route、凭据仓库或数据库
+  资源，并以 `--workspaces=false` 防止安装 Gateway 依赖。当前固定发布输入仍是
+  `codex_proxy 2.2.1`，因此 `productTarget=legacy-standalone`；只有 Black 的生产 Edge
+  和真实响应链路稳定后，T047/T116 才允许把正式产品切换到 `edge`。
 - `codex_proxy` 保留现有 standalone 管理页和兼容链路；同一仓库新增 React +
   TypeScript + Vite 管理前端，构建后由 Gateway 作为静态资源提供，不整体重写现有
   Proxy 主体。

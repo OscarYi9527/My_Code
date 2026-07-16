@@ -8,24 +8,37 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { validateAiEditorProxyArtifact } from '../lib/aiEditorProxyArtifact.ts';
-import { readAiEditorProxyReleaseSource } from '../lib/aiEditorProxyRelease.ts';
+import {
+	type AiEditorProxyReleaseTargetName,
+	type IAiEditorProxyReleaseTarget,
+	isAiEditorProxyReleaseTargetName,
+	readAiEditorProxyReleaseSource
+} from '../lib/aiEditorProxyRelease.ts';
 
 interface IArguments {
 	source?: string;
 	out?: string;
 	platform?: string;
+	target?: AiEditorProxyReleaseTargetName;
 }
 
 function parseArguments(argv: string[]): IArguments {
 	const result: IArguments = {};
 	for (let index = 0; index < argv.length; index++) {
 		const argument = argv[index];
-		if (argument === '--source' || argument === '--out' || argument === '--platform') {
+		if (argument === '--source' || argument === '--out' || argument === '--platform' || argument === '--target') {
 			const value = argv[++index];
 			if (!value) {
 				throw new Error(`Missing value for ${argument}.`);
 			}
-			result[argument.slice(2) as keyof IArguments] = value;
+			if (argument === '--target') {
+				if (!isAiEditorProxyReleaseTargetName(value)) {
+					throw new Error(`Unsupported AI Editor Proxy release target: ${value}.`);
+				}
+				result.target = value;
+			} else {
+				result[argument.slice(2) as 'source' | 'out' | 'platform'] = value;
+			}
 		} else {
 			throw new Error(`Unknown argument: ${argument}`);
 		}
@@ -47,14 +60,42 @@ function run(command: string, args: string[], cwd: string): string {
 	}).trim();
 }
 
-function copyRequiredFile(sourceRoot: string, artifactRoot: string, relativePath: string): void {
-	const source = path.join(sourceRoot, relativePath);
-	if (!fs.statSync(source).isFile()) {
-		throw new Error(`Required Proxy runtime file is not a file: ${source}`);
+export function copyAiEditorProxyTargetFiles(
+	sourceRoot: string,
+	artifactRoot: string,
+	targetName: AiEditorProxyReleaseTargetName,
+	target: IAiEditorProxyReleaseTarget
+): void {
+	const resolvedSourceRoot = path.resolve(sourceRoot);
+	const resolvedArtifactRoot = path.resolve(artifactRoot);
+	for (const include of target.include) {
+		const recursiveDirectory = include.endsWith('/**');
+		const relativePath = recursiveDirectory ? include.slice(0, -3) : include;
+		const source = path.resolve(resolvedSourceRoot, ...relativePath.split('/'));
+		const destination = path.resolve(resolvedArtifactRoot, ...relativePath.split('/'));
+		if (!isInsideOrEqual(resolvedSourceRoot, source) || !isInsideOrEqual(resolvedArtifactRoot, destination)) {
+			throw new Error(`Unsafe ${targetName} release path: ${include}.`);
+		}
+
+		let stat: fs.Stats;
+		try {
+			stat = fs.lstatSync(source);
+		} catch {
+			throw new Error(`Required ${targetName} release path is missing: ${source}.`);
+		}
+		if (recursiveDirectory) {
+			if (!stat.isDirectory()) {
+				throw new Error(`Required ${targetName} release directory is not a directory: ${source}.`);
+			}
+			fs.cpSync(source, destination, { recursive: true });
+		} else {
+			if (!stat.isFile()) {
+				throw new Error(`Required ${targetName} release file is not a file: ${source}.`);
+			}
+			fs.mkdirSync(path.dirname(destination), { recursive: true });
+			fs.copyFileSync(source, destination);
+		}
 	}
-	const destination = path.join(artifactRoot, relativePath);
-	fs.mkdirSync(path.dirname(destination), { recursive: true });
-	fs.copyFileSync(source, destination);
 }
 
 function assertCleanSource(sourceRoot: string): string {
@@ -127,13 +168,15 @@ function artifactChecksums(artifactRoot: string): Record<string, string> {
 	return Object.fromEntries(Object.entries(checksums).sort(([left], [right]) => left.localeCompare(right)));
 }
 
-function main(): void {
+export function main(): void {
 	const args = parseArguments(process.argv.slice(2));
 	const repositoryRoot = path.resolve(import.meta.dirname, '..', '..');
 	const buildRoot = path.join(repositoryRoot, '.build');
 	const sourceRoot = path.resolve(args.source ?? process.env['VSCODE_AI_EDITOR_PROXY_ROOT'] ?? '');
 	const artifactRoot = path.resolve(args.out ?? path.join(buildRoot, 'ai-editor-proxy'));
 	const releaseSource = readAiEditorProxyReleaseSource(path.join(import.meta.dirname, 'release.json'));
+	const targetName = args.target ?? releaseSource.productTarget;
+	const target = releaseSource.targets[targetName];
 
 	if (!args.source && !process.env['VSCODE_AI_EDITOR_PROXY_ROOT']) {
 		throw new Error('Pass --source or set VSCODE_AI_EDITOR_PROXY_ROOT to the codex_proxy checkout.');
@@ -141,8 +184,8 @@ function main(): void {
 	if (!isInside(buildRoot, artifactRoot)) {
 		throw new Error(`Proxy artifact output must stay inside ${buildRoot}: ${artifactRoot}`);
 	}
-	if (!fs.existsSync(path.join(sourceRoot, 'src', 'server.js'))) {
-		throw new Error(`codex_proxy entry point was not found under ${sourceRoot}.`);
+	if (!fs.existsSync(path.join(sourceRoot, ...target.entryPoint.split('/')))) {
+		throw new Error(`codex_proxy ${targetName} entry point was not found under ${sourceRoot}.`);
 	}
 
 	const commit = assertCleanSource(sourceRoot);
@@ -169,26 +212,28 @@ function main(): void {
 	fs.rmSync(artifactRoot, { recursive: true, force: true });
 	fs.mkdirSync(artifactRoot, { recursive: true });
 
-	for (const file of ['package.json', 'package-lock.json', 'LICENSE', 'ThirdPartyNotices.txt', 'README.md', 'SECURITY.md']) {
-		copyRequiredFile(sourceRoot, artifactRoot, file);
-	}
-	fs.cpSync(path.join(sourceRoot, 'src'), path.join(artifactRoot, 'src'), { recursive: true });
+	copyAiEditorProxyTargetFiles(sourceRoot, artifactRoot, targetName, target);
 
 	const npmCli = process.env['npm_execpath'];
 	if (!npmCli) {
 		throw new Error('npm_execpath is unavailable. Run this preparer through npm run prepare-ai-editor-proxy.');
 	}
-	run(process.execPath, [npmCli, 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], artifactRoot);
+	const npmArguments = [npmCli, 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'];
+	if (!target.npmWorkspaces) {
+		npmArguments.push('--workspaces=false');
+	}
+	run(process.execPath, npmArguments, artifactRoot);
 
 	assertArtifactSafe(artifactRoot);
 	const releaseManifest = {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		name: 'codex_proxy',
 		version: packageJson.version,
 		commit,
 		builtAt: sourceDate(),
 		platform: args.platform ?? `${process.platform}-${process.arch}`,
-		entryPoint: 'src/server.js',
+		target: targetName,
+		entryPoint: target.entryPoint,
 		files: artifactChecksums(artifactRoot)
 	};
 	fs.writeFileSync(
@@ -196,15 +241,22 @@ function main(): void {
 		`${JSON.stringify(releaseManifest, null, '\t')}\n`,
 		'utf8'
 	);
-	validateAiEditorProxyArtifact(artifactRoot, releaseManifest.platform);
+	validateAiEditorProxyArtifact(artifactRoot, releaseManifest.platform, targetName);
 	console.log(JSON.stringify({
 		artifactRoot,
 		name: releaseManifest.name,
 		version: releaseManifest.version,
 		commit: releaseManifest.commit,
 		platform: releaseManifest.platform,
+		target: releaseManifest.target,
 		fileCount: Object.keys(releaseManifest.files).length
 	}));
 }
 
-main();
+function isInsideOrEqual(parent: string, candidate: string): boolean {
+	return parent === candidate || isInside(parent, candidate);
+}
+
+if (import.meta.main) {
+	main();
+}

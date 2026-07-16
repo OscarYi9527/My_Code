@@ -241,13 +241,12 @@ function getAiEditorProxyRuntimeStream(platform: string, arch: string): NodeJS.R
 		process.env['VSCODE_AI_EDITOR_PROXY_ARTIFACT_DIR'] ??
 		path.join(root, '.build', 'ai-editor-proxy')
 	);
-	const entryPoint = path.join(artifactRoot, 'src', 'server.js');
 	const releaseManifestPath = path.join(artifactRoot, 'release-manifest.json');
 	const requireArtifact =
 		process.env['VSCODE_REQUIRE_AI_EDITOR_PROXY'] === '1' ||
 		(product as typeof product & { aiEditorProxyBundled?: boolean }).aiEditorProxyBundled === true;
 
-	if (!fs.existsSync(entryPoint) || !fs.existsSync(releaseManifestPath)) {
+	if (!fs.existsSync(releaseManifestPath)) {
 		if (requireArtifact) {
 			throw new Error(
 				`AI Editor Proxy artifact is required but missing at ${artifactRoot}. ` +

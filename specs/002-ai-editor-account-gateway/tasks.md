@@ -137,7 +137,7 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T019 [P] Add mode selection and standalone compatibility tests in `D:\AI_prejoct\codex_proxy-dev\tests\test-proxy-modes.js`
 - [ ] T020 Implement isolated PID/data-root/port guards and health checks in `D:\AI_prejoct\codex_proxy-dev\tools\start-ai-editor-dev.ps1`
 - [ ] T021 Add reset target canonicalization and confirmation tests in `D:\AI_prejoct\codex_proxy-dev\tests\test-dev-scripts.ps1`
-- [ ] T022 Split Edge and Gateway release allowlists in `D:\AI_prejoct\My_code\build\ai-editor-proxy\release.json` and `build\ai-editor-proxy\prepare-ai-editor-proxy.ts`
+- [x] T022 Split Edge and Gateway release allowlists in `D:\AI_prejoct\My_code\build\ai-editor-proxy\release.json` and `build\ai-editor-proxy\prepare-ai-editor-proxy.ts`
 
 **Checkpoint**: Gateway 空服务、三模式、双数据库 repository 合同和隔离脚本基础全部通过。
 

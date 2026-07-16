@@ -6,6 +6,13 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+	AI_EDITOR_PROXY_EDGE_TARGET,
+	AI_EDITOR_PROXY_GATEWAY_TARGET,
+	AI_EDITOR_PROXY_LEGACY_STANDALONE_TARGET,
+	type AiEditorProxyReleaseTargetName,
+	isAiEditorProxyReleaseTargetName
+} from './aiEditorProxyRelease.ts';
 
 export interface IAiEditorProxyReleaseManifest {
 	schemaVersion: number;
@@ -14,6 +21,7 @@ export interface IAiEditorProxyReleaseManifest {
 	commit: string;
 	builtAt: string;
 	platform: string;
+	target?: AiEditorProxyReleaseTargetName;
 	entryPoint: string;
 	files: Record<string, string>;
 }
@@ -39,12 +47,30 @@ const forbiddenDirectoryNames = new Set([
 	'tests'
 ]);
 
-const requiredFiles = [
+const requiredMetadataFiles = [
 	'LICENSE',
 	'ThirdPartyNotices.txt',
 	'package-lock.json',
-	'package.json',
+	'package.json'
+];
+
+const forbiddenEdgeFiles = new Set([
+	'src/admin.html',
+	'src/admin.js',
+	'src/admin_app.js',
+	'src/admin_html_head.txt',
+	'src/admin_ui_behaviors.cjs',
+	'src/chatgpt-accounts.js',
+	'src/credential-store.js',
+	'src/migrations.js',
 	'src/server.js'
+]);
+
+const forbiddenEdgePrefixes = [
+	'gateway/',
+	'src/admin/',
+	'src/admin_modules/',
+	'src/routes/'
 ];
 
 function sha256(filePath: string): string {
@@ -110,13 +136,13 @@ function collectArtifactFiles(artifactRoot: string, releaseManifestPath: string)
 
 export function validateAiEditorProxyArtifact(
 	artifactRoot: string,
-	expectedPlatform?: string
+	expectedPlatform?: string,
+	expectedTarget?: AiEditorProxyReleaseTargetName
 ): IAiEditorProxyReleaseManifest {
 	const resolvedRoot = path.resolve(artifactRoot);
 	const releaseManifestPath = path.join(resolvedRoot, 'release-manifest.json');
-	const entryPointPath = path.join(resolvedRoot, 'src', 'server.js');
 
-	if (!fs.existsSync(entryPointPath) || !fs.existsSync(releaseManifestPath)) {
+	if (!fs.existsSync(releaseManifestPath)) {
 		throw new Error(`AI Editor Proxy artifact is missing at ${resolvedRoot}.`);
 	}
 
@@ -127,12 +153,17 @@ export function validateAiEditorProxyArtifact(
 		throw new Error(`Unable to read AI Editor Proxy release manifest: ${releaseManifestPath}`, { cause: error });
 	}
 
+	const target = metadata.schemaVersion === 1
+		? AI_EDITOR_PROXY_LEGACY_STANDALONE_TARGET
+		: metadata.target;
 	if (
-		metadata.schemaVersion !== 1 ||
+		(metadata.schemaVersion !== 1 && metadata.schemaVersion !== 2) ||
 		metadata.name !== 'codex_proxy' ||
 		typeof metadata.version !== 'string' ||
 		!metadata.version ||
-		metadata.entryPoint !== 'src/server.js' ||
+		!isAiEditorProxyReleaseTargetName(target) ||
+		typeof metadata.entryPoint !== 'string' ||
+		!metadata.entryPoint ||
 		!/^[0-9a-f]{40}$/i.test(metadata.commit) ||
 		!Number.isFinite(Date.parse(metadata.builtAt)) ||
 		typeof metadata.platform !== 'string' ||
@@ -144,21 +175,37 @@ export function validateAiEditorProxyArtifact(
 	) {
 		throw new Error(`Invalid AI Editor Proxy release manifest: ${releaseManifestPath}`);
 	}
+	if (
+		(metadata.schemaVersion === 1 && metadata.entryPoint !== 'src/server.js') ||
+		(metadata.schemaVersion === 2 && metadata.target !== target) ||
+		(target === AI_EDITOR_PROXY_LEGACY_STANDALONE_TARGET && metadata.entryPoint !== 'src/server.js') ||
+		(target === AI_EDITOR_PROXY_EDGE_TARGET && metadata.entryPoint !== 'src/launcher.js') ||
+		(target === AI_EDITOR_PROXY_GATEWAY_TARGET && metadata.entryPoint !== 'gateway/dist/server.js')
+	) {
+		throw new Error(`Invalid AI Editor Proxy release target entry point: ${releaseManifestPath}`);
+	}
+	assertSafeArtifactPath(metadata.entryPoint);
 
 	if (expectedPlatform && metadata.platform !== expectedPlatform) {
 		throw new Error(
 			`AI Editor Proxy artifact platform mismatch: expected ${expectedPlatform}, found ${metadata.platform}.`
 		);
 	}
+	if (expectedTarget && target !== expectedTarget) {
+		throw new Error(
+			`AI Editor Proxy artifact target mismatch: expected ${expectedTarget}, found ${target}.`
+		);
+	}
 
 	const expectedFiles = Object.keys(metadata.files).sort();
-	for (const requiredFile of requiredFiles) {
+	for (const requiredFile of [...requiredMetadataFiles, metadata.entryPoint]) {
 		if (!Object.hasOwn(metadata.files, requiredFile)) {
 			throw new Error(`AI Editor Proxy artifact is missing required file: ${requiredFile}`);
 		}
 	}
 	for (const relativePath of expectedFiles) {
 		assertSafeArtifactPath(relativePath);
+		assertReleaseTargetBoundary(target, relativePath);
 		if (!/^[0-9a-f]{64}$/i.test(metadata.files[relativePath])) {
 			throw new Error(`Invalid AI Editor Proxy artifact checksum: ${relativePath}`);
 		}
@@ -184,5 +231,23 @@ export function validateAiEditorProxyArtifact(
 		throw new Error('AI Editor Proxy package metadata does not match its release manifest.');
 	}
 
-	return metadata;
+	return metadata.schemaVersion === 1
+		? metadata
+		: { ...metadata, target };
+}
+
+function assertReleaseTargetBoundary(target: AiEditorProxyReleaseTargetName, relativePath: string): void {
+	const lowerPath = relativePath.toLowerCase();
+	if (/\.(?:db|sqlite|sqlite3)(?:$|[.-])/.test(lowerPath)) {
+		throw new Error(`Database resource is forbidden in an AI Editor Proxy artifact: ${relativePath}`);
+	}
+	if (
+		target === AI_EDITOR_PROXY_EDGE_TARGET &&
+		(forbiddenEdgeFiles.has(lowerPath) || forbiddenEdgePrefixes.some(prefix => lowerPath.startsWith(prefix)))
+	) {
+		throw new Error(`Gateway or standalone resource is forbidden in an Edge artifact: ${relativePath}`);
+	}
+	if (target === AI_EDITOR_PROXY_GATEWAY_TARGET && lowerPath.startsWith('src/edge/')) {
+		throw new Error(`Edge resource is forbidden in a Gateway artifact: ${relativePath}`);
+	}
 }

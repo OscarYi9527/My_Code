@@ -381,16 +381,28 @@ function Test-ProductChecksums([string]$ProductAppRoot, $ProductJson) {
 function Test-ProxyArtifact([string]$ProxyRoot) {
 	$manifestPath = Join-Path $ProxyRoot 'release-manifest.json'
 	$manifest = Read-JsonFile $manifestPath
+	$target = if ($manifest.schemaVersion -eq 1) {
+		'legacy-standalone'
+	} else {
+		[string]$manifest.target
+	}
+	$expectedEntryPoint = switch ($target) {
+		'legacy-standalone' { 'src/server.js' }
+		'edge' { 'src/launcher.js' }
+		'gateway' { 'gateway/dist/server.js' }
+		default { throw "Invalid bundled Proxy release target: $target" }
+	}
 	if (
-		$manifest.schemaVersion -ne 1 -or
+		($manifest.schemaVersion -ne 1 -and $manifest.schemaVersion -ne 2) -or
 		$manifest.name -ne 'codex_proxy' -or
 		$manifest.platform -ne 'win32-x64' -or
-		$manifest.entryPoint -ne 'src/server.js'
+		$manifest.entryPoint -ne $expectedEntryPoint -or
+		($manifest.schemaVersion -eq 2 -and $manifest.target -ne $target)
 	) {
 		throw "Invalid bundled Proxy release manifest: $manifestPath"
 	}
 
-	$required = @('LICENSE', 'ThirdPartyNotices.txt', 'package-lock.json', 'package.json', 'src/server.js')
+	$required = @('LICENSE', 'ThirdPartyNotices.txt', 'package-lock.json', 'package.json', $expectedEntryPoint)
 	foreach ($relativePath in $required) {
 		if ($manifest.files.PSObject.Properties.Name -notcontains $relativePath) {
 			throw "Bundled Proxy manifest is missing required file: $relativePath"
@@ -411,6 +423,37 @@ function Test-ProxyArtifact([string]$ProxyRoot) {
 		throw 'Bundled Proxy file set does not match release-manifest.json.'
 	}
 
+	foreach ($relativePath in $expectedFiles) {
+		$normalized = $relativePath.ToLowerInvariant()
+		if ($normalized -match '\.(db|sqlite|sqlite3)($|[.-])') {
+			throw "Bundled Proxy contains a forbidden database resource: $relativePath"
+		}
+		if (
+			$target -eq 'edge' -and (
+				$normalized.StartsWith('gateway/') -or
+				$normalized.StartsWith('src/admin/') -or
+				$normalized.StartsWith('src/admin_modules/') -or
+				$normalized.StartsWith('src/routes/') -or
+				$normalized -in @(
+					'src/admin.html',
+					'src/admin.js',
+					'src/admin_app.js',
+					'src/admin_html_head.txt',
+					'src/admin_ui_behaviors.cjs',
+					'src/chatgpt-accounts.js',
+					'src/credential-store.js',
+					'src/migrations.js',
+					'src/server.js'
+				)
+			)
+		) {
+			throw "Bundled Edge contains a forbidden Gateway or standalone resource: $relativePath"
+		}
+		if ($target -eq 'gateway' -and $normalized.StartsWith('src/edge/')) {
+			throw "Bundled Gateway contains a forbidden Edge resource: $relativePath"
+		}
+	}
+
 	foreach ($property in $manifest.files.PSObject.Properties) {
 		$filePath = Join-Path $ProxyRoot ($property.Name.Replace('/', '\'))
 		if ((Get-Sha256 $filePath) -cne ([string]$property.Value).ToLowerInvariant()) {
@@ -425,6 +468,7 @@ function Test-ProxyArtifact([string]$ProxyRoot) {
 
 	return [ordered]@{
 		manifest = $manifest
+		target = $target
 		payloadFileCount = $expectedFiles.Count
 	}
 }
@@ -715,7 +759,7 @@ function Write-MarkdownReport([string]$Path, $Report) {
 		"- Result: **$($Report.result)**",
 		"- Product: $($Report.versions.code.name) $($Report.versions.code.version)",
 		"- Product commit: ``$($Report.versions.code.commit)``",
-		"- Proxy: $($Report.versions.proxy.version) @ ``$($Report.versions.proxy.commit)``",
+		"- Proxy: $($Report.versions.proxy.version) @ ``$($Report.versions.proxy.commit)`` ($($Report.versions.proxy.target))",
 		"- Codex: $($Report.versions.codex.version)",
 		'',
 		'## Artifacts',
@@ -796,7 +840,10 @@ $appRoot = Join-Path $ProductRoot 'resources\app'
 $productJsonPath = Join-Path $appRoot 'product.json'
 $packageJsonPath = Join-Path $appRoot 'package.json'
 $proxyRoot = Join-Path $appRoot 'ai-editor-proxy'
-$proxyEntryPoint = Join-Path $proxyRoot 'src\server.js'
+$proxyValidation = Test-ProxyArtifact $proxyRoot
+$proxyManifest = $proxyValidation.manifest
+$proxyManifestPath = Join-Path $proxyRoot 'release-manifest.json'
+$proxyEntryPoint = Join-Path $proxyRoot ([string]$proxyManifest.entryPoint).Replace('/', '\')
 
 $requiredResourcePaths = [ordered]@{
 	'Code executable' = $productExe
@@ -809,7 +856,7 @@ $requiredResourcePaths = [ordered]@{
 	'Bundled Proxy entry point' = $proxyEntryPoint
 	'Bundled Proxy license' = Join-Path $proxyRoot 'LICENSE'
 	'Bundled Proxy third-party notices' = Join-Path $proxyRoot 'ThirdPartyNotices.txt'
-	'Bundled Proxy release manifest' = Join-Path $proxyRoot 'release-manifest.json'
+	'Bundled Proxy release manifest' = $proxyManifestPath
 }
 $resources = @()
 foreach ($entry in $requiredResourcePaths.GetEnumerator()) {
@@ -822,20 +869,22 @@ if ($productJson.aiEditorProxyBundled -ne $true) {
 	throw 'Product does not require the bundled AI Editor Proxy.'
 }
 $productChecksums = @(Test-ProductChecksums $appRoot $productJson)
-$proxyValidation = Test-ProxyArtifact $proxyRoot
-$proxyManifest = $proxyValidation.manifest
 $proxyReleaseSource = Read-JsonFile (Join-Path $repoRoot 'build\ai-editor-proxy\release.json')
 if (
-	$proxyReleaseSource.schemaVersion -ne 1 -or
+	$proxyReleaseSource.schemaVersion -ne 2 -or
 	$proxyReleaseSource.repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or
 	$proxyReleaseSource.commit -notmatch '^[0-9a-fA-F]{40}$' -or
-	$proxyReleaseSource.version -notmatch '^\d+\.\d+\.\d+'
+	$proxyReleaseSource.version -notmatch '^\d+\.\d+\.\d+' -or
+	$proxyReleaseSource.productTarget -notin @('legacy-standalone', 'edge', 'gateway') -or
+	$null -eq $proxyReleaseSource.targets.edge -or
+	$null -eq $proxyReleaseSource.targets.gateway
 ) {
 	throw 'Invalid pinned AI Editor Proxy release source.'
 }
 if (
 	[string]$proxyManifest.commit -cne [string]$proxyReleaseSource.commit -or
-	[string]$proxyManifest.version -cne [string]$proxyReleaseSource.version
+	[string]$proxyManifest.version -cne [string]$proxyReleaseSource.version -or
+	[string]$proxyValidation.target -cne [string]$proxyReleaseSource.productTarget
 ) {
 	throw 'Bundled Proxy does not match the pinned release source.'
 }
@@ -890,6 +939,7 @@ $report = [ordered]@{
 			version = $proxyManifest.version
 			commit = $proxyManifest.commit
 			builtAt = $proxyManifest.builtAt
+			target = $proxyValidation.target
 		}
 		codex = [ordered]@{
 			version = $codexPackage.version

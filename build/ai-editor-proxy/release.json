@@ -1,6 +1,53 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"repository": "OscarYi9527/codex_proxy",
 	"commit": "06cd8d57dc39ab30be5d193f7678ca227ef1aa30",
-	"version": "2.2.1"
+	"version": "2.2.1",
+	"productTarget": "legacy-standalone",
+	"targets": {
+		"legacy-standalone": {
+			"entryPoint": "src/server.js",
+			"npmWorkspaces": false,
+			"include": [
+				"package.json",
+				"package-lock.json",
+				"LICENSE",
+				"ThirdPartyNotices.txt",
+				"README.md",
+				"SECURITY.md",
+				"src/**"
+			]
+		},
+		"edge": {
+			"entryPoint": "src/launcher.js",
+			"npmWorkspaces": false,
+			"include": [
+				"package.json",
+				"package-lock.json",
+				"LICENSE",
+				"ThirdPartyNotices.txt",
+				"README.md",
+				"SECURITY.md",
+				"src/launcher.js",
+				"src/mode.js",
+				"src/edge/**"
+			]
+		},
+		"gateway": {
+			"entryPoint": "gateway/dist/server.js",
+			"npmWorkspaces": true,
+			"include": [
+				"package.json",
+				"package-lock.json",
+				"LICENSE",
+				"ThirdPartyNotices.txt",
+				"README.md",
+				"SECURITY.md",
+				"gateway/package.json",
+				"gateway/dist/**",
+				"gateway/admin-web/package.json",
+				"gateway/admin-web/dist/**"
+			]
+		}
+	}
 }

@@ -38,7 +38,7 @@ macOS:   Contents/Resources/app/ai-editor-proxy/
 
 ```text
 ai-editor-proxy/
-├─ src/**
+├─ <target allowlist>     # legacy-standalone、edge 或 gateway，只能选择一个
 ├─ node_modules/**        # 仅生产依赖
 ├─ package.json
 ├─ package-lock.json
@@ -51,18 +51,30 @@ ai-editor-proxy/
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "codex_proxy",
   "version": "<package version>",
   "commit": "<40-char git commit>",
   "builtAt": "<ISO-8601 UTC>",
   "platform": "win32-x64",
-  "entryPoint": "src/server.js",
+  "target": "edge",
+  "entryPoint": "src/launcher.js",
   "files": {
-    "src/server.js": "<SHA-256 hex>"
+    "src/launcher.js": "<SHA-256 hex>"
   }
 }
 ```
+
+发布源清单 `build/ai-editor-proxy/release.json` 使用独立 allowlist：
+
+| Target | 允许的程序资源 | npm workspace |
+| --- | --- | --- |
+| `legacy-standalone` | 旧版 `src/**`，仅用于迁移期间保持现有成品可运行 | 禁用 |
+| `edge` | `src/launcher.js`、`src/mode.js`、`src/edge/**` | 禁用，避免安装 Gateway 依赖 |
+| `gateway` | `gateway/dist/**`、`gateway/admin-web/dist/**` 及对应包元数据 | 启用 |
+
+正式用户安装包最终必须选择 `edge`。`legacy-standalone` 只允许在 Black 的生产 Edge
+尚未完成时保持现有可用链路，不能通过最终 Edge-only 发布验收。
 
 ### 必须排除
 
@@ -82,6 +94,10 @@ node_modules/.cache/**
 tests/**
 coverage/**
 ```
+
+Edge 制品还必须排除 `gateway/**`、管理后台、Provider route、凭据仓库、迁移脚本和
+SQLite/其他数据库文件；Gateway 制品不得包含 `src/edge/**`。发布清单、Code 产品打包、
+Windows/macOS 验收脚本会同时校验 target、入口文件、文件集合和逐文件 SHA-256。
 
 还必须排除任何 access token、refresh token、API Key、账号 ID、用户邮箱、请求正文、
 提示词、文件内容和本机绝对路径。
@@ -107,7 +123,7 @@ Code 仓库和 Proxy 仓库是两个独立版本源。发布流水线需要：
 1. checkout 固定的 Code commit；
 2. checkout 固定的 `codex_proxy` commit；
 3. 在隔离目录执行 Proxy 生产依赖安装和测试；
-4. 依据本清单生成干净 Proxy 制品；
+4. 依据明确的 target allowlist 生成干净 Proxy 制品；
 5. 将制品复制到 Code 产品资源目录；
 6. 生成 checksum 和第三方许可证；
 7. 在无预装 Proxy 的干净用户环境验证首次启动。
@@ -117,7 +133,8 @@ Code 仓库和 Proxy 仓库是两个独立版本源。发布流水线需要：
 
 ## 5. Windows 验收
 
-- `Code - OSS.exe` 能在 Proxy 未运行时后台启动安装包内 `src/server.js`。
+- 最终 Edge 成品中，`Code - OSS.exe` 能在 Edge 未运行时后台启动安装包内
+  `src/launcher.js`；迁移期旧成品继续使用 `src/server.js`。
 - Proxy 窗口隐藏，Code 退出后 Proxy 保持运行。
 - `/live`、`/ready`、`/v1/models` 和真实 `/v1/responses` 请求通过。
 - `product.json` 中全部 checksum 与产品文件匹配。
@@ -134,10 +151,13 @@ Code 仓库和 Proxy 仓库是两个独立版本源。发布流水线需要：
 - 退出所有 Code 窗口后 Proxy 仍可服务其他 Codex 客户端。
 - 签名、公证和升级后资源完整性不被破坏。
 
-## 7. 当前状态（2026-07-15）
+## 7. 当前状态（2026-07-16）
 
 - Code 发布输入已固定到 `codex_proxy 2.2.1`、commit
   `06cd8d57dc39ab30be5d193f7678ca227ef1aa30`。
+- T022 已把发布源和制品清单升级为 target-aware schema：Edge、Gateway 和迁移期
+  standalone 使用互斥 allowlist；当前 `productTarget=legacy-standalone`，待 Black
+  完成生产 Edge 与真实 `/v1/responses` 后再由 T047 切换为 `edge`。
 - Windows 成品已包含 Workbench、中文语言包和 Codex Agent Host 运行时。
 - Windows 成品已包含
   `resources/app/ai-editor-proxy/src/server.js`、生产依赖和带逐文件 SHA-256 的

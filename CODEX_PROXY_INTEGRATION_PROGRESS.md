@@ -1535,3 +1535,39 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - AI Editor Account platform Electron 测试：`33 passing`。
 - 本轮只增加回归测试和进度记录，没有修改运行时代码、成品资源或 Proxy；共享
   `http://127.0.0.1:47892/live` 未停止或重启。
+
+## 49. 2026-07-16 Oscar T022 Edge/Gateway 发布白名单分离
+
+- 完成 T022，`build/ai-editor-proxy/release.json` 升级为 target-aware schema 2：
+  - `legacy-standalone`：迁移期间维持现有 Proxy 2.2.1 成品可用；
+  - `edge`：只允许包元数据、许可证、`src/launcher.js`、`src/mode.js` 和
+    `src/edge/**`；
+  - `gateway`：只允许编译后的 `gateway/dist/**`、`gateway/admin-web/dist/**` 和对应
+    workspace 元数据。
+- 构建与发布阻断：
+  - `prepare-ai-editor-proxy --target` 只复制目标 allowlist；
+  - Edge 安装生产依赖时强制 `--workspaces=false`，不会拉入 Gateway workspace；
+  - 制品清单记录 target 和动态入口文件；
+  - Edge 中出现 Gateway、管理后台、Provider route、凭据仓库、迁移脚本或数据库文件
+    会直接失败；Gateway 中出现 `src/edge/**` 同样失败；
+  - Code 产品打包、Windows 安装器和 macOS 验收均校验发布 target。
+- 安全迁移边界：
+  - 当前固定发布输入仍为 `codex_proxy 2.2.1@06cd8d5`，它没有生产 Edge，因此
+    `productTarget` 明确保持 `legacy-standalone`；
+  - 不会为了提前显示进度而把可用 AI 链路切换到 Black 尚未完成真实
+    `/v1/responses` 的 Mock Edge；
+  - Black 完成 T038–T046 并提供稳定 commit 后，由 T047/T116 更新发布 pin、切换
+    `productTarget=edge` 并执行最终 Edge-only 验收。
+- 验证：
+  - 构建脚本定向 ESLint：通过；
+  - PowerShell 发布脚本语法检查：通过；
+  - `npm --prefix build run typecheck`：通过；
+  - AI Editor Proxy 发布源/制品测试：`15 passing`；
+  - 实际生成 Windows legacy 迁移制品：schema 2、target
+    `legacy-standalone`、248 个校验文件；
+  - `npm run compile`、`npm run core-ci`：通过；
+  - `npm run gulp vscode-win32-x64-min-ci`：通过；
+  - Windows 发布验收：`PASS`，Workbench checksum `10/10`、Proxy 文件
+    `248`、共享模型目录 `20`，隔离空数据首次启动 `cleanStart=true`，测试 Proxy 在
+    Code 退出后保持存活并由验收脚本安全清理。
+- 共享 `http://127.0.0.1:47892/live` 始终为 `ok`，未停止或重启。

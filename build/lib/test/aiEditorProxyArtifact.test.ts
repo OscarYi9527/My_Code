@@ -10,15 +10,25 @@ import * as os from 'os';
 import * as path from 'path';
 import { suite, test } from 'node:test';
 import { validateAiEditorProxyArtifact } from '../aiEditorProxyArtifact.ts';
+import type { AiEditorProxyReleaseTargetName } from '../aiEditorProxyRelease.ts';
 
-function createArtifact(platform = 'win32-x64'): string {
+function createArtifact(
+	platform = 'win32-x64',
+	target: AiEditorProxyReleaseTargetName = 'legacy-standalone',
+	schemaVersion = 2
+): string {
 	const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-editor-proxy-artifact-'));
+	const entryPoint = target === 'edge'
+		? 'src/launcher.js'
+		: target === 'gateway'
+			? 'gateway/dist/server.js'
+			: 'src/server.js';
 	const files: Record<string, string> = {
 		'LICENSE': 'MIT\n',
 		'ThirdPartyNotices.txt': 'undici 8.7.0\nMIT License\n',
 		'package-lock.json': '{}\n',
 		'package.json': '{"name":"codex-proxy","version":"2.2.0"}\n',
-		'src/server.js': 'console.log("proxy");\n'
+		[entryPoint]: 'console.log("proxy");\n'
 	};
 	const checksums: Record<string, string> = {};
 
@@ -30,13 +40,14 @@ function createArtifact(platform = 'win32-x64'): string {
 	}
 
 	fs.writeFileSync(path.join(artifactRoot, 'release-manifest.json'), JSON.stringify({
-		schemaVersion: 1,
+		schemaVersion,
 		name: 'codex_proxy',
 		version: '2.2.0',
 		commit: 'a'.repeat(40),
 		builtAt: '2026-07-15T00:00:00.000Z',
 		platform,
-		entryPoint: 'src/server.js',
+		...(schemaVersion === 2 ? { target } : {}),
+		entryPoint,
 		files: checksums
 	}));
 
@@ -52,6 +63,17 @@ suite('AI Editor Proxy release artifact', () => {
 
 		assert.strictEqual(manifest.name, 'codex_proxy');
 		assert.strictEqual(manifest.version, '2.2.0');
+		assert.strictEqual(manifest.target, 'legacy-standalone');
+	});
+
+	test('accepts the legacy schema while migration target remains selected', t => {
+		const artifactRoot = createArtifact('win32-x64', 'legacy-standalone', 1);
+		t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
+
+		const manifest = validateAiEditorProxyArtifact(artifactRoot, 'win32-x64', 'legacy-standalone');
+
+		assert.strictEqual(manifest.schemaVersion, 1);
+		assert.strictEqual(manifest.entryPoint, 'src/server.js');
 	});
 
 	test('rejects a platform mismatch', t => {
@@ -110,6 +132,43 @@ suite('AI Editor Proxy release artifact', () => {
 		assert.throws(
 			() => validateAiEditorProxyArtifact(artifactRoot, 'win32-x64'),
 			/missing required file: ThirdPartyNotices\.txt/
+		);
+	});
+
+	test('rejects Gateway, admin, provider, and database resources in an Edge artifact', t => {
+		const artifactRoot = createArtifact('win32-x64', 'edge');
+		t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
+		const forbiddenFiles = {
+			'gateway/dist/server.js': 'gateway',
+			'src/admin/accounts.js': 'admin',
+			'src/routes/openai-api.js': 'provider',
+			'data/gateway.sqlite': 'database'
+		};
+		const manifestPath = path.join(artifactRoot, 'release-manifest.json');
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+			files: Record<string, string>;
+		};
+		for (const [relativePath, contents] of Object.entries(forbiddenFiles)) {
+			const filePath = path.join(artifactRoot, ...relativePath.split('/'));
+			fs.mkdirSync(path.dirname(filePath), { recursive: true });
+			fs.writeFileSync(filePath, contents);
+			manifest.files[relativePath] = crypto.createHash('sha256').update(contents).digest('hex');
+		}
+		fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+		assert.throws(
+			() => validateAiEditorProxyArtifact(artifactRoot, 'win32-x64', 'edge'),
+			/(Gateway or standalone resource|Database resource)/
+		);
+	});
+
+	test('rejects a release target mismatch', t => {
+		const artifactRoot = createArtifact('win32-x64', 'edge');
+		t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
+
+		assert.throws(
+			() => validateAiEditorProxyArtifact(artifactRoot, 'win32-x64', 'legacy-standalone'),
+			/target mismatch/
 		);
 	});
 

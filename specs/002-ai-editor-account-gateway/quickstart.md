@@ -283,6 +283,8 @@ Expected:
 
 - Product contains Edge resources only; no Gateway database driver, admin source, SQLite database or
   Provider credential file.
+- `release-manifest.json` reports `target=edge`; `legacy-standalone` is a migration target and does
+  not satisfy final T116 acceptance.
 - Product UI and management entry are Chinese under Chinese system locale.
 - Login, status, management Webview, model refresh and real streaming response match development
   build behavior.
