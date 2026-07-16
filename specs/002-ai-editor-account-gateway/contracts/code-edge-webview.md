@@ -51,9 +51,16 @@ No unsafe diagnostic fields are part of this renderer contract.
 4. Callback listener accepts exactly one request with matching state, then closes.
 5. Main service exchanges authorization code and hands the resulting device session to Edge using
    the local one-time handoff contract.
-6. Main service clears transient tokens and emits safe status.
+6. Edge acknowledges handoff completion with `status=completed` and a positive `bindingVersion`.
+7. Main service fetches `GET /ai-editor/status`, clears transient tokens and emits safe status.
 
 Cancellation, timeout, invalid state and callback-port errors return stable safe error codes.
+
+All Electron-main HTTP calls to `/ai-editor/*` carry `X-AI-Editor-Local-Nonce`. The nonce is loaded
+from a protected runtime boundary and never crosses account IPC into the renderer.
+
+Logout accepts Edge HTTP `204 No Content`; main then refreshes safe status before notifying the
+renderer.
 
 ## 4. New-Turn Gate
 

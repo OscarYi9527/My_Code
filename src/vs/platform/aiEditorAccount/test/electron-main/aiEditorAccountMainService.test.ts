@@ -93,6 +93,25 @@ suite('AI Editor Account main service', () => {
 		assert.strictEqual(await first, await duplicate);
 	});
 
+	test('refreshes safe status after a no-content logout', async () => {
+		const calls: string[] = [];
+		const service = store.add(new AiEditorAccountMainServiceCore({
+			client: createClient({
+				logout: async () => { calls.push('logout'); },
+				getStatus: async () => {
+					calls.push('status');
+					return createAiEditorAccountUnavailableStatus(AiEditorAccountState.LoginRequired, 2);
+				}
+			}),
+			login: async () => readyStatus()
+		}));
+
+		await service.logout();
+
+		assert.deepStrictEqual(calls, ['logout', 'status']);
+		assert.strictEqual((await service.getStatus()).state, AiEditorAccountState.LoginRequired);
+	});
+
 	test('performs browser PKCE exchange before the one-time Edge handoff', async () => {
 		const calls: string[] = [];
 		let callbackDisposed = false;
@@ -116,6 +135,9 @@ suite('AI Editor Account main service', () => {
 			},
 			completeHandoff: async (state, grant, tokens) => {
 				calls.push(`handoff-complete:${state}:${grant.handoffId}:${tokens.deviceSessionId}`);
+			},
+			getStatus: async () => {
+				calls.push('status');
 				return readyStatus();
 			}
 		});
@@ -138,7 +160,8 @@ suite('AI Editor Account main service', () => {
 			'open:http://gateway.test/authorize',
 			'exchange:authorization-code:verifier',
 			'handoff-start:login-state',
-			'handoff-complete:login-state:handoff:device-session'
+			'handoff-complete:login-state:handoff:device-session',
+			'status'
 		]);
 		assert.strictEqual(callbackDisposed, true);
 	});
@@ -148,10 +171,10 @@ function createClient(overrides: Partial<IAiEditorAccountHttpClient> = {}): IAiE
 	return {
 		getStatus: async () => createAiEditorAccountUnavailableStatus(AiEditorAccountState.LoginRequired, 1),
 		retryStatus: async () => readyStatus(),
-		logout: async () => createAiEditorAccountUnavailableStatus(AiEditorAccountState.LoginRequired, 1),
+		logout: async () => { },
 		requestWebviewTicket: async () => ({ ticket: 'ticket', expiresIn: 60 }),
 		startHandoff: async () => ({ handoffId: 'handoff', nonce: 'nonce', expiresIn: 60 }),
-		completeHandoff: async () => readyStatus(),
+		completeHandoff: async () => { },
 		createAuthorizationUrl: () => 'http://gateway.test/authorize',
 		exchangeAuthorizationCode: async () => ({
 			accessToken: 'access-token',

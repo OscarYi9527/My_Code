@@ -27,6 +27,15 @@ product API key; Edge attaches the account bound by AI Editor.
 Product-local endpoints require a short-lived Edge-generated nonce or a Code IPC-mediated call.
 They must reject non-loopback sockets and invalid Host/Origin values.
 
+For the local HTTP transport, Electron main sends the nonce only in:
+
+```http
+X-AI-Editor-Local-Nonce: {opaque-local-secret}
+```
+
+The nonce is supplied to the Edge process and Electron main through a protected process/runtime
+boundary. It must not enter renderer IPC payloads, URLs, Webview storage, diagnostics or logs.
+
 ## 2. Local Account Handoff
 
 ### `POST /ai-editor/handoff/start`
@@ -62,6 +71,18 @@ Response:
   "accessTokenExpiresIn": 300
 }
 ```
+
+Successful response:
+
+```json
+{
+  "status": "completed",
+  "bindingVersion": 1
+}
+```
+
+Code must fetch `GET /ai-editor/status` after completion instead of treating this acknowledgement
+as a safe status payload.
 
 Rules:
 
@@ -103,6 +124,11 @@ Failure response:
 
 It must never include port, upstream account, route, circuit, credential, request URL or raw upstream
 error details.
+
+### `POST /ai-editor/logout`
+
+Successful response is HTTP `204 No Content`. Code fetches `GET /ai-editor/status` after logout and
+expects `login_required`. Logout does not stop Edge or revoke unrelated devices.
 
 ## 4. Edge-to-Gateway Authentication
 

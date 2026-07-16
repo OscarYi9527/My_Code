@@ -1398,3 +1398,53 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     `[aiEditorAccount]` 错误日志。
 - 验证期间只关闭本轮隔离 Code/Mock 进程；共享 Proxy 始终为 PID `18120`，
   `http://127.0.0.1:47892/live` 持续返回 `ok`，未停止或重启。
+
+## 45. 2026-07-16 Black 第一轮 Mock 合同符合性修复
+
+- 已获取并只读审计 Black 的最新交接分支：
+  - 分支 `feature/ai-editor-account-gateway`；
+  - 运行时基线 `84ab6445bb4b557dc379815776bcd784f34676c1`；
+  - 最新交接文档提交 `37e61d9bb6e705c40dc322b7319eb874508d18c2`；
+  - 该分支仍堆叠依赖 `feature/custom-api-urls@e3ed1d6`，尚未更新正式 Proxy 发布基线。
+- 首次真实联调发现并修复三处 Code/Black Mock 差异：
+  - Black 的 `/ai-editor/*` 要求 `X-AI-Editor-Local-Nonce`，原 Code Transport 未发送；
+  - Black logout 返回 HTTP 204，原 Code 期待安全状态 JSON；
+  - Black handoff complete 返回 `status=completed` 与 `bindingVersion`，原 Code 将其误当
+    安全状态解析。
+- Code 主进程现在：
+  - 仅在开发模式通过 `VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE` 读取 nonce；
+  - 每次请求重新读取并验证 32–4096 字节 nonce，支持 Edge 重启轮换；
+  - nonce 只进入 Electron-main 请求 Header，不进入 renderer、IPC、URL 或日志；
+  - logout 204 和 handoff acknowledgement 后均重新获取 `/ai-editor/status`。
+- Oscar 自带 Mock 已改为与 Black 一致的 logout/handoff 响应，继续用于独立单元测试。
+- 新增 `scripts/connect-ai-editor-black-dev.ps1`：
+  - 校验 Black checkout 必须包含运行时基线、无 tracked 修改；
+  - 数据根固定在 Black checkout 的 `.ai-editor-dev/`；
+  - 只启动/停止隔离 `47920/47921`，拒绝占用进程不属于 Black checkout 的端口；
+  - 验证 Gateway/Edge `/live`、nonce 文件和五种 Mock 状态；
+  - 只打印 nonce 文件路径和 Code 环境变量，不打印 nonce；
+  - 支持复用现有 Black 服务并切换 Mock 状态。
+- 真实联调结果：
+  - 建立独立 worktree `D:\AI_prejoct\codex_proxy-gateway-dev@37e61d9`；
+  - Black Gateway PID `23660`、Edge PID `26508` 启动成功；
+  - HTTP logout `204`、后续状态 `login_required`、handoff `completed`、
+    `bindingVersion=2`、最终状态 `ready` 均通过；
+  - Black Edge `/v1/models` 返回 `gpt-mock`；
+  - Code 开发版通过 nonce 文件连接 Black Edge，启动及 30 秒刷新均无
+    `local_authorization_required`、nonce 或账号错误日志。
+- 联调还确认 Black 原始启动脚本在服务已运行时会先因端口占用退出，与交接文档的
+  “重复启动复用”描述不一致；Oscar wrapper 已安全复用现有进程，该差异需要反馈 Black。
+- 正式产品内存态 nonce 交接仍属于 T022/T047 的 Edge 打包/启动集成，不在当前 Mock
+  联调中伪装完成；T047 继续等待 Black 的真实 `/v1/responses` T038–T046。
+- 共享 Proxy 始终为 PID `18120` 且 `/live=ok`，未停止、重启、迁移或读取其凭据。
+- 最终回归验证：
+  - Code 账号 Electron 定向测试：`23 passing`；
+  - Oscar Mock 测试：`4 passing`；
+  - Black standalone/Edge、Gateway、Admin React 测试分别为
+    `100 passing`、`16 passing`、`1 passing`，`npm run check` 通过；
+  - `npm run typecheck-client`、定向 ESLint、`npm run compile` 和
+    `npm run core-ci` 均通过；
+  - `npm run gulp vscode-win32-x64-min-ci` 通过，Windows 成品 Workbench
+    checksum `10/10`；
+  - 开发版与 Windows 成品版均使用隔离 profile 启动通过，未发现账号服务、模块加载或
+    `Unknown service` 错误。

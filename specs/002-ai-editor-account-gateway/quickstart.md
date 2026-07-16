@@ -36,8 +36,12 @@ No command may install into or modify `C:\Users\Oscar\.claude\proxy`.
 ## 3. Start Isolated Gateway and Edge
 
 ```powershell
+Set-Location D:\AI_prejoct\My_code
+
 powershell -NoProfile -ExecutionPolicy Bypass -File `
-  D:\AI_prejoct\My_code\scripts\start-ai-editor-account-dev.ps1
+  .\scripts\connect-ai-editor-black-dev.ps1 `
+  -BlackRepository D:\AI_prejoct\codex_proxy-gateway-dev `
+  -State login_required
 ```
 
 Expected:
@@ -50,9 +54,21 @@ Expected:
   - login name `admin`;
   - one-time bootstrap password exactly once.
 - Password is not present in Gateway/Edge log files.
+- The wrapper prints the nonce **file path**, never the nonce value.
+- The Black checkout contains runtime commit
+  `84ab6445bb4b557dc379815776bcd784f34676c1` or a confirmed descendant.
 
 Repeat the start command. Expected: existing healthy processes and database are reused; no new
 bootstrap password and no data reset.
+
+To stop only the isolated stack:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  D:\AI_prejoct\My_code\scripts\connect-ai-editor-black-dev.ps1 `
+  -BlackRepository D:\AI_prejoct\codex_proxy-gateway-dev `
+  -Stop
+```
 
 ## 4. Bootstrap Level 1
 
@@ -111,11 +127,15 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
+$env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN = 'http://127.0.0.1:47921'
+$env:VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN = 'http://127.0.0.1:47920'
+$env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE = `
+  'D:\AI_prejoct\codex_proxy-gateway-dev\.ai-editor-dev\oscar-code\edge-local-nonce.secret'
+
 .\scripts\code.bat `
   --user-data-dir D:\AI_prejoct\My_code\.verify-account-gateway-user-data `
   --extensions-dir D:\AI_prejoct\My_code\.verify-account-gateway-extensions `
-  --ai-editor-edge-url http://127.0.0.1:47921 `
-  --ai-editor-gateway-url http://127.0.0.1:47920 `
+  --shared-data-dir D:\AI_prejoct\My_code\.verify-account-gateway-shared `
   D:\AI_prejoct\My_code
 ```
 
@@ -124,6 +144,8 @@ Expected before login:
 - File editing, terminal and Git work.
 - AI status shows `需要登录`.
 - Sending a Turn is blocked before Codex/Provider forwarding.
+- Electron main sends the nonce only in `X-AI-Editor-Local-Nonce`; renderer storage and IPC do not
+  contain it.
 
 Complete system-browser login. Expected:
 

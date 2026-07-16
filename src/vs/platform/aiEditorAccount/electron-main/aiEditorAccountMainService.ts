@@ -29,7 +29,9 @@ import {
 import {
 	AiEditorAccountHttpClient,
 	AiEditorAccountHttpError,
+	AiEditorEdgeLocalNonceFileAuthorization,
 	IAiEditorAccountHttpClient,
+	IAiEditorEdgeLocalAuthorization,
 	IAiEditorPkce,
 	IAiEditorTokenResponse
 } from './aiEditorAccountHttpClient.js';
@@ -100,7 +102,8 @@ export class AiEditorAccountMainServiceCore extends Disposable implements IAiEdi
 
 	async logout(): Promise<void> {
 		try {
-			this.updateStatus(await this.dependencies.client.logout());
+			await this.dependencies.client.logout();
+			this.updateStatus(await this.dependencies.client.getStatus());
 		} catch (error) {
 			this.updateStatus(this.statusForError(error));
 		}
@@ -208,7 +211,8 @@ export async function performAiEditorAccountLogin(
 		});
 		try {
 			const grant = await dependencies.client.startHandoff(pkce.state);
-			return await dependencies.client.completeHandoff(pkce.state, grant, tokens);
+			await dependencies.client.completeHandoff(pkce.state, grant, tokens);
+			return await dependencies.client.getStatus();
 		} finally {
 			tokens = undefined;
 		}
@@ -234,7 +238,11 @@ function createRuntimeDependencies(
 ): IAiEditorAccountMainServiceDependencies {
 	const edgeOrigin = resolveEdgeOrigin(environmentMainService, productService);
 	const gatewayOrigin = resolveGatewayOrigin(environmentMainService, productService, logService);
-	const client = new AiEditorAccountHttpClient(edgeOrigin, gatewayOrigin);
+	const client = new AiEditorAccountHttpClient(
+		edgeOrigin,
+		gatewayOrigin,
+		resolveEdgeLocalAuthorization(environmentMainService)
+	);
 	const loginDependencies: IAiEditorAccountLoginDependencies = {
 		client,
 		createPkce,
@@ -256,6 +264,19 @@ function createRuntimeDependencies(
 		login: kind => performAiEditorAccountLogin(kind, loginDependencies),
 		logSafeError: errorId => logService.warn(`[aiEditorAccount] Account operation failed (${errorId}).`)
 	};
+}
+
+function resolveEdgeLocalAuthorization(
+	environmentMainService: IEnvironmentMainService
+): IAiEditorEdgeLocalAuthorization | undefined {
+	if (environmentMainService.isBuilt) {
+		return undefined;
+	}
+	const nonceFile = process.env['VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE']?.trim();
+	if (!nonceFile) {
+		return undefined;
+	}
+	return new AiEditorEdgeLocalNonceFileAuthorization(nonceFile);
 }
 
 function resolveEdgeOrigin(environmentMainService: IEnvironmentMainService, productService: IProductService): string {

@@ -113,6 +113,15 @@ Code-OSS Workbench
 - 已建立完整功能规格、技术计划、数据模型、接口合同、验收指南和 120 项实施任务，见
   `specs/002-ai-editor-account-gateway/`；实现按登录门禁、中央模型链路、组织与积分、
   Provider 管理、安全审计四个垂直切片推进。
+- Oscar 已完成 Code 账号 IPC、系统浏览器 PKCE 壳层、30 秒状态刷新和新 Turn
+  fail-closed 门禁，并完成 Black `feature/ai-editor-account-gateway@84ab644` 第一轮
+  Mock 合同适配。开发态账号请求使用 Electron-main 独占的
+  `X-AI-Editor-Local-Nonce`，logout 204 和 handoff acknowledgement 后重新刷新安全
+  状态。
+- 下一 Oscar 顺序调整为：先完成账户菜单/状态操作/管理 Webview 的
+  T051、T056–T059、T099；Black 完成真实认证 T023–T033 后做登录端到端；Black 完成
+  `/v1/responses` T038–T046 后再执行 T047、T048 和 T090，避免提前切换 Edge 导致 AI
+  对话不可用。
 - Code 原生账号管理界面延期到 MVP 后评估，见
   `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。
 - 上游凭据的信封加密延期到 MVP 验证后实施，具体边界、迁移和发布阻断条件见

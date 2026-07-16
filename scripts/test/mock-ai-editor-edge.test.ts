@@ -57,7 +57,7 @@ test('completes a one-time handoff before exposing models and a Webview ticket',
 		accessToken: 'test-access-token'
 	});
 	assert.equal(completed.status, 200);
-	assert.equal(completed.body.state, 'ready');
+	assert.deepEqual(completed.body, { status: 'completed', bindingVersion: 1 });
 
 	const models = await getJson('/v1/models');
 	assert.equal(models.status, 200);
@@ -82,8 +82,8 @@ test('completes a one-time handoff before exposing models and a Webview ticket',
 test('logout removes access to account-scoped endpoints', async () => {
 	await postJson('/__mock/state', { state: 'ready' });
 	const logout = await postJson('/ai-editor/logout', {});
-	assert.equal(logout.status, 200);
-	assert.equal(logout.body.state, 'login_required');
+	assert.equal(logout.status, 204);
+	assert.equal(logout.body, undefined);
 
 	const models = await getJson('/v1/models');
 	assert.equal(models.status, 401);
@@ -107,5 +107,8 @@ async function postJson(path, body) {
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
 	});
-	return { status: response.status, body: await response.json() };
+	return {
+		status: response.status,
+		body: response.status === 204 ? undefined : await response.json()
+	};
 }

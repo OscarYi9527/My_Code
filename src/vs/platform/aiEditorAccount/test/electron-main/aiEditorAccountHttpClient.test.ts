@@ -9,7 +9,8 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/c
 import { AiEditorAccountState } from '../../common/aiEditorAccount.js';
 import {
 	AiEditorAccountHttpClient,
-	AiEditorAccountHttpError
+	AiEditorAccountHttpError,
+	AiEditorEdgeLocalNonceFileAuthorization
 } from '../../electron-main/aiEditorAccountHttpClient.js';
 
 suite('AI Editor Account HTTP client', () => {
@@ -17,16 +18,28 @@ suite('AI Editor Account HTTP client', () => {
 
 	let origin: string;
 	let server: http.Server;
-	let requests: Array<{ readonly path: string; readonly body: Record<string, unknown> }>;
+	let requests: Array<{
+		readonly path: string;
+		readonly body: Record<string, unknown>;
+		readonly localNonce: string | undefined;
+	}>;
 	let statusFailure = false;
+	let accountState: 'ready' | 'login_required';
 
 	setup(async () => {
 		requests = [];
 		statusFailure = false;
+		accountState = 'login_required';
 		const httpModule = await import('http');
 		server = httpModule.createServer(async (request, response) => {
 			const body = await readBody(request);
-			requests.push({ path: request.url ?? '/', body });
+			requests.push({
+				path: request.url ?? '/',
+				body,
+				localNonce: typeof request.headers['x-ai-editor-local-nonce'] === 'string'
+					? request.headers['x-ai-editor-local-nonce']
+					: undefined
+			});
 
 			if (request.url === '/ai-editor/status') {
 				if (statusFailure) {
@@ -37,7 +50,7 @@ suite('AI Editor Account HTTP client', () => {
 						}
 					});
 				}
-				return sendJson(response, 200, safeStatus('login_required'));
+				return sendJson(response, 200, safeStatus(accountState));
 			}
 			if (request.url === '/ai-editor/status/retry') {
 				return sendJson(response, 200, safeStatus('ready'));
@@ -46,13 +59,15 @@ suite('AI Editor Account HTTP client', () => {
 				return sendJson(response, 200, { handoffId: 'lh_test', nonce: 'nonce_test', expiresIn: 60 });
 			}
 			if (request.url === '/ai-editor/handoff/complete') {
-				return sendJson(response, 200, safeStatus('ready'));
+				accountState = 'ready';
+				return sendJson(response, 200, { status: 'completed', bindingVersion: 1 });
 			}
 			if (request.url === '/ai-editor/webview-ticket') {
 				return sendJson(response, 200, { ticket: 'wvt_test', expiresIn: 60 });
 			}
 			if (request.url === '/ai-editor/logout') {
-				return sendJson(response, 200, safeStatus('login_required'));
+				accountState = 'login_required';
+				return sendNoContent(response);
 			}
 			if (request.url === '/api/v1/oauth/token') {
 				return sendJson(response, 200, {
@@ -78,7 +93,10 @@ suite('AI Editor Account HTTP client', () => {
 	});
 
 	test('implements status, PKCE exchange, handoff, ticket and logout contracts', async () => {
-		const client = new AiEditorAccountHttpClient(origin, origin);
+		const localNonce = 'test-local-nonce-with-at-least-32-bytes';
+		const client = new AiEditorAccountHttpClient(origin, origin, {
+			getLocalNonce: async () => localNonce
+		});
 
 		assert.strictEqual((await client.getStatus()).state, AiEditorAccountState.LoginRequired);
 		assert.strictEqual((await client.retryStatus()).state, AiEditorAccountState.Ready);
@@ -101,9 +119,11 @@ suite('AI Editor Account HTTP client', () => {
 			platform: 'windows'
 		});
 		const grant = await client.startHandoff('login-state');
-		assert.strictEqual((await client.completeHandoff('login-state', grant, tokens)).state, AiEditorAccountState.Ready);
+		await client.completeHandoff('login-state', grant, tokens);
+		assert.strictEqual((await client.getStatus()).state, AiEditorAccountState.Ready);
 		assert.deepStrictEqual(await client.requestWebviewTicket(), { ticket: 'wvt_test', expiresIn: 60 });
-		assert.strictEqual((await client.logout()).state, AiEditorAccountState.LoginRequired);
+		await client.logout();
+		assert.strictEqual((await client.getStatus()).state, AiEditorAccountState.LoginRequired);
 
 		const exchange = requests.find(request => request.path === '/api/v1/oauth/token');
 		assert.deepStrictEqual(exchange?.body, {
@@ -117,6 +137,7 @@ suite('AI Editor Account HTTP client', () => {
 				platform: 'windows'
 			}
 		});
+		assert.strictEqual(exchange?.localNonce, undefined);
 		const completion = requests.find(request => request.path === '/ai-editor/handoff/complete');
 		assert.deepStrictEqual(completion?.body, {
 			handoffId: 'lh_test',
@@ -127,6 +148,12 @@ suite('AI Editor Account HTTP client', () => {
 			accessToken: 'access-token',
 			accessTokenExpiresIn: 300
 		});
+		assert.strictEqual(
+			requests
+				.filter(request => request.path.startsWith('/ai-editor/'))
+				.every(request => request.localNonce === localNonce),
+			true
+		);
 	});
 
 	test('exposes only a stable server error code', async () => {
@@ -137,6 +164,63 @@ suite('AI Editor Account HTTP client', () => {
 			error.errorId === 'provider_unavailable' &&
 			!error.message.includes('secret upstream')
 		);
+	});
+
+	test('rejects an invalid local nonce before sending an Edge request', async () => {
+		const client = new AiEditorAccountHttpClient(origin, origin, {
+			getLocalNonce: async () => 'short'
+		});
+		await assert.rejects(
+			client.getStatus(),
+			error => error instanceof AiEditorAccountHttpError && error.errorId === 'account_edge_local_nonce_invalid'
+		);
+		assert.strictEqual(requests.length, 0);
+	});
+
+	test('reloads a rotated local nonce from an absolute Unicode path', async () => {
+		const fs = await import('fs/promises');
+		const os = await import('os');
+		const path = await import('path');
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-editor-本机 nonce '));
+		try {
+			const nonceFile = path.join(directory, 'edge local nonce.secret');
+			const authorization = new AiEditorEdgeLocalNonceFileAuthorization(nonceFile);
+			await fs.writeFile(nonceFile, 'first-local-nonce-with-at-least-32-bytes', 'utf8');
+			assert.strictEqual(await authorization.getLocalNonce(), 'first-local-nonce-with-at-least-32-bytes');
+
+			await fs.writeFile(nonceFile, 'rotated-local-nonce-with-at-least-32-bytes', 'utf8');
+			assert.strictEqual(await authorization.getLocalNonce(), 'rotated-local-nonce-with-at-least-32-bytes');
+		} finally {
+			await fs.rm(directory, { recursive: true, force: true });
+		}
+	});
+
+	test('rejects relative, missing, and malformed local nonce files with stable errors', async () => {
+		await assert.rejects(
+			new AiEditorEdgeLocalNonceFileAuthorization('relative-nonce.secret').getLocalNonce(),
+			error => error instanceof AiEditorAccountHttpError && error.errorId === 'account_edge_local_nonce_path_invalid'
+		);
+
+		const fs = await import('fs/promises');
+		const os = await import('os');
+		const path = await import('path');
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-editor-nonce-'));
+		try {
+			const missingFile = path.join(directory, 'missing.secret');
+			await assert.rejects(
+				new AiEditorEdgeLocalNonceFileAuthorization(missingFile).getLocalNonce(),
+				error => error instanceof AiEditorAccountHttpError && error.errorId === 'account_edge_local_nonce_unavailable'
+			);
+
+			const malformedFile = path.join(directory, 'malformed.secret');
+			await fs.writeFile(malformedFile, 'short', 'utf8');
+			await assert.rejects(
+				new AiEditorEdgeLocalNonceFileAuthorization(malformedFile).getLocalNonce(),
+				error => error instanceof AiEditorAccountHttpError && error.errorId === 'account_edge_local_nonce_invalid'
+			);
+		} finally {
+			await fs.rm(directory, { recursive: true, force: true });
+		}
 	});
 });
 
@@ -159,4 +243,9 @@ async function readBody(request: http.IncomingMessage): Promise<Record<string, u
 function sendJson(response: http.ServerResponse, statusCode: number, body: object): void {
 	response.writeHead(statusCode, { 'Content-Type': 'application/json' });
 	response.end(JSON.stringify(body));
+}
+
+function sendNoContent(response: http.ServerResponse): void {
+	response.writeHead(204);
+	response.end();
 }

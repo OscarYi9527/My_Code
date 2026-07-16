@@ -58,6 +58,10 @@ dist
 .tmp-codeoss-user-data/
 .tmp-codeoss-extensions/
 .tmp-codeoss-*/
+/.tmp-*
+/.verify-*/
+/screenshots/
+/rebuild-sqlite3.log
 vscode-temp/
 extensions/copilot/test/simulation/cache/
 

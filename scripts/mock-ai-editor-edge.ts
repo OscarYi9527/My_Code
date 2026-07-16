@@ -32,6 +32,7 @@ function createMockAiEditorEdgeServer(options: IMockAiEditorEdgeServerOptions = 
 	let state = parseState(options.initialState ?? 'login_required');
 	const handoffs = new Map();
 	const tickets = new Set();
+	let bindingVersion = 0;
 
 	return http.createServer(async (request, response) => {
 		const requestId = `mock_${randomUUID()}`;
@@ -85,7 +86,8 @@ function createMockAiEditorEdgeServer(options: IMockAiEditorEdgeServerOptions = 
 					return sendError(response, 409, 'handoff_invalid', 'The local account handoff is invalid or expired.', requestId);
 				}
 				state = 'ready';
-				return sendJson(response, 200, buildSafeStatus(state, now()));
+				bindingVersion++;
+				return sendJson(response, 200, { status: 'completed', bindingVersion });
 			}
 			if (request.method === 'POST' && url.pathname === '/ai-editor/webview-ticket') {
 				await readJson(request);
@@ -101,7 +103,8 @@ function createMockAiEditorEdgeServer(options: IMockAiEditorEdgeServerOptions = 
 				handoffs.clear();
 				tickets.clear();
 				state = 'login_required';
-				return sendJson(response, 200, buildSafeStatus(state, now()));
+				bindingVersion++;
+				return sendNoContent(response);
 			}
 			if (request.method === 'GET' && url.pathname === '/v1/models') {
 				if (state !== 'ready') {
@@ -202,6 +205,11 @@ function setCommonHeaders(response, requestId) {
 function sendJson(response, statusCode, body) {
 	response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
 	response.end(JSON.stringify(body));
+}
+
+function sendNoContent(response) {
+	response.writeHead(204);
+	response.end();
 }
 
 function sendError(response, statusCode, code, message, requestId) {

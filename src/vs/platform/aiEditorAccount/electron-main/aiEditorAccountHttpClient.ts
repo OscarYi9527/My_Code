@@ -41,13 +41,48 @@ export interface IAiEditorHandoffGrant {
 	readonly expiresIn: number;
 }
 
+export interface IAiEditorEdgeLocalAuthorization {
+	getLocalNonce(): Promise<string | undefined>;
+}
+
+/**
+ * Reloads the Edge-local authorization nonce for every request so an isolated
+ * Edge restart can rotate the nonce without exposing it to the renderer.
+ */
+export class AiEditorEdgeLocalNonceFileAuthorization implements IAiEditorEdgeLocalAuthorization {
+	constructor(private readonly nonceFile: string) { }
+
+	async getLocalNonce(): Promise<string> {
+		const path = await import('path');
+		if (!path.isAbsolute(this.nonceFile)) {
+			throw new AiEditorAccountHttpError('account_edge_local_nonce_path_invalid');
+		}
+
+		const fs = await import('fs/promises');
+		let contents: Buffer | undefined;
+		try {
+			contents = await fs.readFile(this.nonceFile);
+			const localNonce = contents.toString('utf8').trim();
+			validateLocalNonce(localNonce);
+			return localNonce;
+		} catch (error) {
+			if (error instanceof AiEditorAccountHttpError) {
+				throw error;
+			}
+			throw new AiEditorAccountHttpError('account_edge_local_nonce_unavailable');
+		} finally {
+			contents?.fill(0);
+		}
+	}
+}
+
 export interface IAiEditorAccountHttpClient {
 	getStatus(): Promise<IAiEditorSafeStatus>;
 	retryStatus(): Promise<IAiEditorSafeStatus>;
-	logout(): Promise<IAiEditorSafeStatus>;
+	logout(): Promise<void>;
 	requestWebviewTicket(): Promise<IAiEditorWebviewTicket>;
 	startHandoff(state: string): Promise<IAiEditorHandoffGrant>;
-	completeHandoff(state: string, grant: IAiEditorHandoffGrant, tokens: IAiEditorTokenResponse): Promise<IAiEditorSafeStatus>;
+	completeHandoff(state: string, grant: IAiEditorHandoffGrant, tokens: IAiEditorTokenResponse): Promise<void>;
 	createAuthorizationUrl(pkce: IAiEditorPkce, redirectUri: string): string;
 	exchangeAuthorizationCode(exchange: IAiEditorAuthorizationCodeExchange): Promise<IAiEditorTokenResponse>;
 }
@@ -65,42 +100,39 @@ export class AiEditorAccountHttpError extends Error {
 export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 	constructor(
 		private readonly edgeOrigin: string,
-		private readonly gatewayOrigin: string | undefined
+		private readonly gatewayOrigin: string | undefined,
+		private readonly edgeLocalAuthorization?: IAiEditorEdgeLocalAuthorization
 	) { }
 
 	async getStatus(): Promise<IAiEditorSafeStatus> {
-		return parseAiEditorSafeStatus(await requestJson(
-			new URL(AI_EDITOR_ACCOUNT_ENDPOINTS.status, this.edgeOrigin),
+		return parseAiEditorSafeStatus(await this.requestEdgeJson(
+			AI_EDITOR_ACCOUNT_ENDPOINTS.status,
 			'GET',
-			undefined,
-			'account_edge_unreachable'
+			undefined
 		));
 	}
 
 	async retryStatus(): Promise<IAiEditorSafeStatus> {
-		return parseAiEditorSafeStatus(await requestJson(
-			new URL(AI_EDITOR_ACCOUNT_ENDPOINTS.retryStatus, this.edgeOrigin),
+		return parseAiEditorSafeStatus(await this.requestEdgeJson(
+			AI_EDITOR_ACCOUNT_ENDPOINTS.retryStatus,
 			'POST',
-			{},
-			'account_edge_unreachable'
+			{}
 		));
 	}
 
-	async logout(): Promise<IAiEditorSafeStatus> {
-		return parseAiEditorSafeStatus(await requestJson(
-			new URL(AI_EDITOR_ACCOUNT_ENDPOINTS.logout, this.edgeOrigin),
+	async logout(): Promise<void> {
+		await this.requestEdgeJson(
+			AI_EDITOR_ACCOUNT_ENDPOINTS.logout,
 			'POST',
-			{},
-			'account_edge_unreachable'
-		));
+			{}
+		);
 	}
 
 	async requestWebviewTicket(): Promise<IAiEditorWebviewTicket> {
-		const response = asRecord(await requestJson(
-			new URL(AI_EDITOR_ACCOUNT_ENDPOINTS.webviewTicket, this.edgeOrigin),
+		const response = asRecord(await this.requestEdgeJson(
+			AI_EDITOR_ACCOUNT_ENDPOINTS.webviewTicket,
 			'POST',
-			{},
-			'account_edge_unreachable'
+			{}
 		));
 		return {
 			ticket: readRequiredString(response, 'ticket'),
@@ -109,11 +141,10 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 	}
 
 	async startHandoff(state: string): Promise<IAiEditorHandoffGrant> {
-		const response = asRecord(await requestJson(
-			new URL(AI_EDITOR_ACCOUNT_ENDPOINTS.handoffStart, this.edgeOrigin),
+		const response = asRecord(await this.requestEdgeJson(
+			AI_EDITOR_ACCOUNT_ENDPOINTS.handoffStart,
 			'POST',
-			{ state },
-			'account_edge_unreachable'
+			{ state }
 		));
 		return {
 			handoffId: readRequiredString(response, 'handoffId'),
@@ -122,9 +153,9 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 		};
 	}
 
-	async completeHandoff(state: string, grant: IAiEditorHandoffGrant, tokens: IAiEditorTokenResponse): Promise<IAiEditorSafeStatus> {
-		return parseAiEditorSafeStatus(await requestJson(
-			new URL(AI_EDITOR_ACCOUNT_ENDPOINTS.handoffComplete, this.edgeOrigin),
+	async completeHandoff(state: string, grant: IAiEditorHandoffGrant, tokens: IAiEditorTokenResponse): Promise<void> {
+		const response = asRecord(await this.requestEdgeJson(
+			AI_EDITOR_ACCOUNT_ENDPOINTS.handoffComplete,
 			'POST',
 			{
 				handoffId: grant.handoffId,
@@ -134,9 +165,11 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 				refreshToken: tokens.refreshToken,
 				accessToken: tokens.accessToken,
 				accessTokenExpiresIn: tokens.accessTokenExpiresIn
-			},
-			'account_edge_unreachable'
+			}
 		));
+		if (response['status'] !== 'completed' || !isPositiveInteger(response['bindingVersion'])) {
+			throw new AiEditorAccountHttpError('account_handoff_response_invalid');
+		}
 	}
 
 	createAuthorizationUrl(pkce: IAiEditorPkce, redirectUri: string): string {
@@ -177,6 +210,34 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 		};
 	}
 
+	private async requestEdgeJson(path: string, method: 'GET' | 'POST', body: object | undefined): Promise<unknown> {
+		const localNonce = await this.getValidatedLocalNonce();
+		return requestJson(
+			new URL(path, this.edgeOrigin),
+			method,
+			body,
+			'account_edge_unreachable',
+			localNonce ? { 'X-AI-Editor-Local-Nonce': localNonce } : undefined
+		);
+	}
+
+	private async getValidatedLocalNonce(): Promise<string | undefined> {
+		let localNonce: string | undefined;
+		try {
+			localNonce = await this.edgeLocalAuthorization?.getLocalNonce();
+		} catch (error) {
+			if (error instanceof AiEditorAccountHttpError) {
+				throw error;
+			}
+			throw new AiEditorAccountHttpError('account_edge_local_nonce_unavailable');
+		}
+		if (localNonce === undefined) {
+			return undefined;
+		}
+		validateLocalNonce(localNonce);
+		return localNonce;
+	}
+
 	private requireGatewayOrigin(): string {
 		if (!this.gatewayOrigin) {
 			throw new AiEditorAccountHttpError('account_gateway_not_configured');
@@ -185,7 +246,13 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 	}
 }
 
-async function requestJson(url: URL, method: 'GET' | 'POST', body: object | undefined, unavailableErrorId: string): Promise<unknown> {
+async function requestJson(
+	url: URL,
+	method: 'GET' | 'POST',
+	body: object | undefined,
+	unavailableErrorId: string,
+	additionalHeaders?: Readonly<Record<string, string>>
+): Promise<unknown> {
 	let requestBody: Buffer | undefined;
 	try {
 		requestBody = body === undefined ? undefined : Buffer.from(JSON.stringify(body), 'utf8');
@@ -196,9 +263,11 @@ async function requestJson(url: URL, method: 'GET' | 'POST', body: object | unde
 				headers: requestBody ? {
 					'Accept': 'application/json',
 					'Content-Type': 'application/json',
-					'Content-Length': String(requestBody.byteLength)
+					'Content-Length': String(requestBody.byteLength),
+					...additionalHeaders
 				} : {
-					'Accept': 'application/json'
+					'Accept': 'application/json',
+					...additionalHeaders
 				}
 			}, response => readJsonResponse(response, resolve, reject));
 
@@ -297,4 +366,18 @@ function readPositiveNumber(value: Record<string, unknown>, key: string): number
 		throw new AiEditorAccountHttpError('account_http_response_invalid');
 	}
 	return candidate;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+	return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+function validateLocalNonce(localNonce: string): void {
+	if (
+		Buffer.byteLength(localNonce, 'utf8') < 32 ||
+		Buffer.byteLength(localNonce, 'utf8') > 4096 ||
+		/[\r\n]/.test(localNonce)
+	) {
+		throw new AiEditorAccountHttpError('account_edge_local_nonce_invalid');
+	}
 }
