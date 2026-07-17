@@ -85,6 +85,15 @@ export function normalizeAiEditorProxyBaseUrl(value: string | undefined): string
 	return url.origin;
 }
 
+/**
+ * During account/Gateway development the Agent Host must use the same isolated
+ * Edge as the account service. Production deliberately omits this override:
+ * its proxy address remains controlled by the product release configuration.
+ */
+export function resolveAiEditorAgentHostProxyBaseUrl(configuredBaseUrl: string | undefined, developmentEdgeOrigin: string | undefined): string {
+	return normalizeAiEditorProxyBaseUrl(developmentEdgeOrigin?.trim() || configuredBaseUrl);
+}
+
 export function isLoopbackHostname(hostname: string): boolean {
 	const normalized = hostname.toLowerCase();
 	return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]';

@@ -234,3 +234,5 @@ Write-Host "`$env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN = 'http://127.0.0.1:47921
 Write-Host "`$env:VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN = 'http://127.0.0.1:47920'"
 $escapedNonceFile = $nonceFile.Replace("'", "''")
 Write-Host "`$env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE = '$escapedNonceFile'"
+Write-Host "`$env:VSCODE_AGENT_HOST_CODEX_PROXY_MODE = 'external-local-proxy'"
+Write-Host "`$env:VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL = 'http://127.0.0.1:47921'"

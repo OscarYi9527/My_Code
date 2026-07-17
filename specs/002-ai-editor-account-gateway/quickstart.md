@@ -131,6 +131,8 @@ $env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN = 'http://127.0.0.1:47921'
 $env:VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN = 'http://127.0.0.1:47920'
 $env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE = `
   'D:\AI_prejoct\codex_proxy-gateway-dev\.ai-editor-dev\oscar-code\edge-local-nonce.secret'
+$env:VSCODE_AGENT_HOST_CODEX_PROXY_MODE = 'external-local-proxy'
+$env:VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL = 'http://127.0.0.1:47921'
 
 .\scripts\code.bat `
   --user-data-dir D:\AI_prejoct\My_code\.verify-account-gateway-user-data `
@@ -148,6 +150,8 @@ Expected before login:
 - Sending a Turn is blocked before Codex/Provider forwarding.
 - Electron main sends the nonce only in `X-AI-Editor-Local-Nonce`; renderer storage and IPC do not
   contain it.
+- Codex Agent Host routes only to isolated Edge `47921`; it does not send a Turn to shared Proxy
+  `47892`.
 
 Complete system-browser login. Expected:
 

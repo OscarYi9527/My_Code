@@ -139,9 +139,11 @@ Code-OSS Workbench
 - Black 已在 `feature/ai-editor-account-gateway@ebd18c6` 交付并由 Oscar 本机复核
   T023–T046 的真实认证和 Responses 基线。Oscar 已完成真实隔离预检：未绑定状态为
   `login_required`，未带 nonce 的状态请求、`/v1/models` 和 `/v1/responses` 均被安全
-  拒绝，Mock 控制路由为 404，且共享 `47892` 未改变。下一步是 T047 开发态 Agent Host
-  Edge override 审计、真实 PKCE 登录和配置隔离 Provider；随后使用已完成的 T048/T090
-  框架执行真实目录和流式联合验证。正式 `productTarget=edge` 继续禁止提前切换。
+  拒绝，Mock 控制路由为 404，且共享 `47892` 未改变。Oscar 已完成 T047 的开发态 Agent
+  Host Edge override：仅未打包的 Code 在显式设置
+  `VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN` 时把 Agent Host 指向隔离 Edge `47921`，成品
+  仍使用发布配置。下一步是用户真实 PKCE 登录和配置隔离 Provider；随后使用已完成的
+  T048/T090 框架执行真实目录和流式联合验证。正式 `productTarget=edge` 继续禁止提前切换。
 - 当前 Windows 中间成品尚未配置正式 HTTPS `aiEditorAccountGatewayOrigin`，因此继续
   显示原生“账户”入口且不实例化账号服务、不轮询共享 Proxy；待中央 Gateway 地址冻结
   后再启用成品账户 UI，禁止为本地演示静默写入不安全 HTTP 地址。

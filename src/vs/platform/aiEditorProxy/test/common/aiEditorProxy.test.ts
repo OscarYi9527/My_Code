@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
-import { hasAvailableAiEditorProxyProvider, normalizeAiEditorProxyBaseUrl, parseAiEditorProxyProviderStatus } from '../../common/aiEditorProxy.js';
+import { hasAvailableAiEditorProxyProvider, normalizeAiEditorProxyBaseUrl, parseAiEditorProxyProviderStatus, resolveAiEditorAgentHostProxyBaseUrl } from '../../common/aiEditorProxy.js';
 import { type AiEditorProxyCatalogFetch, parseAiEditorProxyModelCatalog, refreshAiEditorProxyModelCatalog } from '../../common/aiEditorProxyModelCatalog.js';
 
 suite('AI Editor Proxy', () => {
@@ -27,6 +27,22 @@ suite('AI Editor Proxy', () => {
 		for (const value of ['https://127.0.0.1:47892', 'http://192.168.1.2:47892', 'http://localhost:47892/v1', 'http://user:pass@localhost:47892']) {
 			assert.throws(() => normalizeAiEditorProxyBaseUrl(value));
 		}
+	});
+
+	test('uses the isolated development Edge for Agent Host routing', () => {
+		assert.strictEqual(
+			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'http://127.0.0.1:47921/'),
+			'http://127.0.0.1:47921'
+		);
+		assert.strictEqual(
+			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', undefined),
+			'http://127.0.0.1:47892'
+		);
+		assert.strictEqual(
+			resolveAiEditorAgentHostProxyBaseUrl('http://localhost:47892', '  '),
+			'http://localhost:47892'
+		);
+		assert.throws(() => resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'https://gateway.example.test'));
 	});
 
 	test('parses provider availability', () => {

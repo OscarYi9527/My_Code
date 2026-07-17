@@ -1733,3 +1733,20 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 合同跟踪：Black 交接文档仍引用旧的 My_Code 合同基线 `0da3497`，且尚未消费
   `contracts/fixtures/edge-code-contract.json`。最终联合验收前，Black 需要更新基线并在
   服务端合同测试中消费或明确验证该 fixture。
+
+## 55. 2026-07-17 T047 开发态 Agent Host 隔离 Edge 路由
+
+- `ElectronAgentHostStarter` 现在仅在未打包的 Code 中读取显式
+  `VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN`，并通过同一套 loopback URL 校验将 Codex
+  Agent Host 路由到隔离 Edge；未设置时继续使用 `aiEditor.proxy.baseUrl`。
+- 已覆盖：Edge `47921` 覆盖、无覆盖时保留 `47892` 配置、空白覆盖不吞掉原配置、以及
+  非 loopback HTTPS 地址被拒绝。connector 和 quickstart 同时输出 Agent Host 的显式
+  `external-local-proxy`/`47921` 环境变量，避免继承环境覆盖开发配置。
+- 正式成品路径不读取上述开发环境变量，继续走现有发布配置；在 `productTarget=edge`、
+  固定中央 HTTPS Gateway 与完整真实链路验收完成前，T047 不勾选为最终完成。
+- 本轮验证：`npm run typecheck-client`、聚焦 AI Editor Proxy 单元测试（8 passing）、
+  `npm run compile`、`npm run core-ci`、`npm run gulp vscode-win32-x64-min-ci` 均通过。
+  Windows 产物验证报告为 `PASS`（checksum 10/10、cleanStart=true、共享 Proxy `/live=ok`）。
+- 共享 `47892` 未停止或重启；最终仍为 PID `18120`、`/live=ok`。此前 Mock UI 回归脚本
+  使用运行中的 Agent Host 时暴露出旧的跨状态刷新不稳定性，未将该测试脚本的实验性改动
+  纳入提交；真实模型/SSE 验收仍以 Black Edge 与真实登录为前置条件。
