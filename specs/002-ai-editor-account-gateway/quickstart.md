@@ -119,6 +119,16 @@ Expected:
 
 ## 7. Launch Code Against Isolated Edge
 
+Recommended one-command launcher (it starts only isolated `47920`/`47921`, injects the protected
+nonce into Electron main, and launches a dedicated Code profile):
+
+```powershell
+Set-Location D:\AI_prejoct\My_code
+.\scripts\launch-ai-editor-black-dev.ps1 -AuthenticationMode real
+```
+
+For diagnosis or custom profile paths, the equivalent manual launch is:
+
 ```powershell
 Set-Location D:\AI_prejoct\My_code
 npm run compile *> .tmp-account-gateway-compile.log

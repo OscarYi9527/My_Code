@@ -1767,3 +1767,11 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 本轮验证：`npm run typecheck-client`、账号状态单元测试（4 passing）、`npm run compile`、
   `npm run core-ci`、`npm run gulp vscode-win32-x64-min-ci` 通过；Windows 成品验证为
   `PASS`（checksum 10/10、cleanStart=true、共享 Proxy `/live=ok`）。
+
+## 57. 2026-07-17 隔离真实 Edge 一键开发启动
+
+- 新增 `scripts\launch-ai-editor-black-dev.ps1`：在启动 Code 前先只读验证 Black checkout，
+  启动隔离 Gateway `47920` 与 Edge `47921`，将 connector 生成的 nonce 文件仅注入当前
+  PowerShell/Electron main 环境，再使用独立 Code 用户、扩展和 shared-data 目录启动。
+- 脚本拒绝复用仍被 `code.lock` 占用的隔离 profile，避免第二次启动把新环境变量发送给
+  已经用错误环境启动的旧窗口；不停止、重启或修改共享 `47892`。
