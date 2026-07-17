@@ -83,6 +83,7 @@
     "verify-ai-editor-windows-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-ai-editor-windows-release.ps1",
     "test-ai-editor-account-contracts": "node --experimental-strip-types --test scripts/test/ai-editor-account-contract-fixtures.test.ts scripts/test/mock-ai-editor-edge.test.ts",
     "test-ai-editor-account-gateway-cleanup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-verify-ai-editor-account-gateway-cleanup.ps1",
+    "verify-ai-editor-account-mock-ui": "node --experimental-strip-types scripts/verify-ai-editor-account-mock-ui.ts",
     "test-ai-editor-windows-final-edge-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-verify-ai-editor-windows-final-edge.ps1",
     "compile-extensions-build": "npm run gulp compile-extensions-build",
     "minify-vscode": "npm run gulp minify-vscode",

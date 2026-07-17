@@ -110,7 +110,7 @@ function createMockAiEditorEdgeServer(options: IMockAiEditorEdgeServerOptions = 
 				}
 				return sendJson(response, 200, contractFixtures.models.example);
 			}
-			if (request.method === 'GET' && url.pathname === '/management') {
+			if (request.method === 'GET' && (url.pathname === '/management' || url.pathname === '/admin')) {
 				response.writeHead(200, {
 					'Content-Type': 'text/html; charset=utf-8',
 					// eslint-disable-next-line local/code-no-unexternalized-strings -- This mock-only CSP is not product UI.

@@ -156,6 +156,32 @@ Complete system-browser login. Expected:
 - Edge secure store contains the device Refresh Token; Code/Webview storage does not.
 - The selected model can answer a real streaming request.
 
+### Automated Mock UI smoke (does not require real Gateway)
+
+For a repeatable Code-side UI regression before Black completes the real authentication and
+Responses chain, first ensure that `47921` is unused, then run:
+
+```powershell
+Set-Location D:\AI_prejoct\My_code
+npm run verify-ai-editor-account-mock-ui
+```
+
+The verifier starts its own in-memory Mock Edge only on `47921`, opens `scripts\code.bat` with an
+isolated profile and CDP port `49231`, then verifies:
+
+- all five safe account states and their Chat-input actions;
+- the ready-state account/model/credits summary;
+- fixed-origin opening of the `AI Editor 管理` BrowserView;
+- the `service_unavailable` retry action;
+- cleanup of its own Mock/Code processes and unchanged shared `47892` PID and `/live`.
+
+It writes sanitized reports under `.build\ai-editor-account-gateway\`. During this mock-only test,
+the Gateway origin deliberately points to the in-memory Mock Edge so the BrowserView route can be
+verified. It does not change product configuration, `productTarget`, Agent Host routing, or the
+shared Proxy, and it must not run while the real Black Edge occupies `47921`.
+If either required port is occupied, the verifier fails safely and does not stop or modify the
+existing process.
+
 ## 8. Validate Account Menu and Management Editor
 
 1. Click the lower-left `AI Editor 账户`.

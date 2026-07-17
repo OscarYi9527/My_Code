@@ -462,6 +462,9 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
   `47920`/`47921`，生成脱敏 JSON/Markdown 报告，并比较共享 `47892` 的 PID、
   `/live`、程序哈希和选定数据哈希。任务仍保持未勾选，直到完整真实链路 quickstart
   由 Black 与 Oscar 共同验收。
+- Code Mock UI smoke 已提前完成：实际启动隔离 `scripts\code.bat`，检查五种账号状态、
+  Chat 输入区操作、ready 摘要和管理 BrowserView 固定路由；它只覆盖 Code 端 Mock
+  回归，不替代真实认证、`/v1/responses` 或最终联合验收。
 - T047 和正式 `productTarget=edge` 没有提前切换；它们继续等待 Black 完成真实
   `/v1/responses`，避免破坏当前可用 AI 对话。
 

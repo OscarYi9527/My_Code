@@ -1696,3 +1696,20 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   模型目录 `20`、`cleanStart=true`。
 - 最终共享 Proxy 仍为 PID `18120` 且 `/live=ok`；未停止、重启或迁移共享
   `47892`。T112/T113 仍等待 Black/Oscar 的完整真实链路联合验收后再勾选。
+
+## 53. 2026-07-17 Oscar Code Mock UI 前置回归
+
+- 新增 `scripts/verify-ai-editor-account-mock-ui.ts` 和
+  `npm run verify-ai-editor-account-mock-ui`：
+  - 仅当 `47921`、`49231` 空闲时，启动自身的内存 Mock Edge 和隔离
+    `scripts\code.bat` profile；
+  - 通过 CDP 实际打开 Chat，验证五种安全账号状态及相应的中文安全操作文本；
+  - ready 状态验证账号、模型和积分摘要，并验证 `AI Editor 管理` BrowserView 仅打开
+    Mock 固定 `/admin#account` 路由；
+  - service-unavailable 状态实际触发一次重试；
+  - 结束时只清理本轮 Mock 和 Code 进程，记录共享 `47892` PID、`/live` 不变性并输出
+    脱敏 JSON/Markdown 报告。
+- Mock 同时支持 `/admin`，使 BrowserView 路由可在不依赖 Black Gateway 的情况下进行
+  Code 侧回归；它不是生产管理页、不会模拟真实认证或 `/v1/responses`。
+- 本机实测结果：`PASS`，9 项检查通过，Mock `47921` 与 CDP `49231` 已释放，共享 Proxy
+  保持 PID `18120` 且 `/live=ok`。

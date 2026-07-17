@@ -133,6 +133,9 @@ Code-OSS Workbench
 - Oscar 已提前完成 T112/T113 的统一隔离验收基础设施和共享机器可读合同 fixture：
   脚本只启动/停止 `47920`、`47921`，生成脱敏 JSON/Markdown 报告，并比较共享
   `47892` 的 PID、`/live`、程序哈希和选定数据哈希。
+- Oscar 新增可重复执行的 Mock UI smoke：隔离启动 `scripts\code.bat` 和内存 Mock
+  Edge，实际检查五种账号状态、Chat 输入区安全操作、ready 摘要、管理 BrowserView
+  固定路由和服务不可用重试；该测试只用于 Code 端前置回归，不切换 Agent Host 到 Edge。
 - 下一 Oscar 顺序调整为：等待 Black 完成真实认证 T023–T033 后执行登录端到端；等待
   Black 完成 `/v1/responses` T038–T046 后执行 T047，并用已完成的 T048/T090
   框架做真实联合验证，避免提前切换 Edge 导致 AI 对话不可用。双方下一次同步点是

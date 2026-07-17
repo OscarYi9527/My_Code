@@ -90,6 +90,12 @@ test('logout removes access to account-scoped endpoints', async () => {
 	assert.equal(models.body.error.code, 'login_required');
 });
 
+test('serves the fixed management route used by the isolated Mock UI verifier', async () => {
+	const response = await fetch(`${baseUrl}/admin#account`);
+	assert.equal(response.status, 200);
+	assert.equal(await response.text(), '<!doctype html><meta charset="utf-8"><title>AI Editor 管理 Mock</title><h1>AI Editor 管理 Mock</h1>');
+});
+
 test('rejects unsupported account states', async () => {
 	const response = await postJson('/__mock/state', { state: 'unknown' });
 	assert.equal(response.status, 400);
