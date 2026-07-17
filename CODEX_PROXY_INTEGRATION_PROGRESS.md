@@ -1814,3 +1814,10 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 验证器不会执行登录、不会配置 Provider、不会读取或记录 nonce/Token；若本机已有 Black 隔离服务则只复用且绝不停止它，否则只清理由自身启动的 `47920/47921` 与独立 Code 进程。
 - 本轮实测：`PASS`，4 项检查通过；共享 Proxy PID `18120` 和 `/live=ok` 不变，独立 Code 调试端口已释放。
 - 该回归将“真实 Edge 未登录时不能留下空白 Chat 组”固定为自动化检查；它是 T117 前的安全预检，不替代真实 PKCE、Provider 或 SSE 联合验收。
+
+## 61. 2026-07-17 Black T049–T055 管理页面联调预备
+
+- 已只读同步到 Black 远程新提交 `feature/ai-editor-account-gateway@a066744`：包含一次性 Webview ticket、HttpOnly 管理会话、固定 `/admin` 管理外壳、角色导航及普通用户账号/积分/设备/使用页。
+- 扩展 `verify-ai-editor-account-real-ui`：未登录时继续验证 Chat 和“需要登录”；已登录时改为验证“AI 服务正常”入口打开固定 `http://127.0.0.1:47920/admin#account` BrowserView。验证器不把 ticket、Cookie 或 Token 写入报告。
+- 当前本机隔离服务仍是上一已验证提交 `ebd18c6`，因此本轮实际完成未登录分支回归（`PASS`）；已登录管理页面分支等待 Black checkout 更新至 `a066744` 或更高稳定提交并完成真实 PKCE 登录后执行。
+- 共享 Proxy `47892` 本轮保持 PID `18120`、`/live=ok`；未停止、重启或修改。

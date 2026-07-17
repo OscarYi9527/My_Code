@@ -5,10 +5,11 @@
 
 
 /**
- * Verifies the real, isolated Black Gateway/Edge pre-login surface. It never
- * logs in, configures a Provider, or touches the shared Proxy. Its purpose is
- * to ensure an Edge 401 model catalog does not leave the Codex Chat group
- * blank before the user signs in.
+ * Verifies the real, isolated Black Gateway/Edge Chat surface. It never logs
+ * in, configures a Provider, or touches the shared Proxy. Before login it
+ * ensures an Edge 401 model catalog does not leave the Codex Chat group blank.
+ * After a user has already logged in, it additionally verifies that the
+ * account status opens the fixed-origin management BrowserView.
  */
 
 const { spawn, spawnSync } = require('node:child_process') as typeof import('node:child_process');
@@ -110,10 +111,20 @@ async function main(): Promise<void> {
 			value => value.includes('AI 服务'),
 			'AI Editor Chat input status'
 		);
-		if (!statusText.includes('需要登录')) {
-			throw new Error('The real pre-login Edge did not expose the safe login-required Chat status.');
+		if (statusText.includes('需要登录')) {
+			checks.push(pass('prelogin-chat-visible', 'The real pre-login Edge opened Codex Chat and exposed the login-required status.'));
+		} else if (statusText.includes('AI 服务正常')) {
+			const statusAction = page.getByRole('button', { name: /AI Editor.*账号|AI 服务正常/ }).first();
+			await statusAction.click();
+			await waitFor(
+				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
+				value => Array.isArray(value) && value.some((target: { url?: unknown }) => target.url === `${gatewayOrigin}/admin#account`),
+				'AI Editor management BrowserView'
+			);
+			checks.push(pass('ready-management-route', 'The ready account status opened the fixed-origin management BrowserView.'));
+		} else {
+			throw new Error('The real Edge did not expose a supported safe Chat account status.');
 		}
-		checks.push(pass('prelogin-chat-visible', 'The real pre-login Edge opened Codex Chat and exposed the login-required status.'));
 	} catch (error) {
 		failure = error;
 	} finally {
