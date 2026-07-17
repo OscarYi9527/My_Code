@@ -1117,7 +1117,17 @@ function rewriteLinkTokenRaw(token: Tokens.Link | Tokens.Image, connectionAuthor
 	if (!scheme || EXTERNAL_LINK_SCHEMES.has(scheme)) {
 		return undefined;
 	}
-	let agentHostUri = toAgentHostUri(parsed, connectionAuthority);
+	let agentHostUri: URI;
+	try {
+		agentHostUri = toAgentHostUri(parsed, connectionAuthority);
+	} catch {
+		// A Markdown link can contain a Windows path such as
+		// `D:\workspace\HANDOFF.md`. URI.parse treats its drive letter as
+		// a scheme, but it is not a valid hierarchical URI to wrap through
+		// the agent host. Leave that one link untouched rather than failing
+		// hydration of the entire historical conversation.
+		return undefined;
+	}
 	const isSkill = isSkillFileUri(parsed);
 	// VS-Code-specific: links pointing at a `SKILL.md` file are rendered as a
 	// rich skill pill rather than a plain markdown link. The chat renderer's

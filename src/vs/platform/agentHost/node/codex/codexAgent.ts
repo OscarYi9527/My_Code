@@ -77,6 +77,7 @@ import type { Thread } from './protocol/generated/v2/Thread.js';
 import type { ThreadListResponse } from './protocol/generated/v2/ThreadListResponse.js';
 import type { ThreadSourceKind } from './protocol/generated/v2/ThreadSourceKind.js';
 import type { ThreadReadResponse } from './protocol/generated/v2/ThreadReadResponse.js';
+import type { ThreadResumeResponse } from './protocol/generated/v2/ThreadResumeResponse.js';
 import type { TurnCompletedNotification } from './protocol/generated/v2/TurnCompletedNotification.js';
 import type { TurnStartedNotification } from './protocol/generated/v2/TurnStartedNotification.js';
 import type { ItemStartedNotification } from './protocol/generated/v2/ItemStartedNotification.js';
@@ -2498,7 +2499,11 @@ export class CodexAgent extends Disposable implements IAgent {
 				currentAppTurnId: undefined,
 				hostTurnIdByAppTurnId: new Map<string, string>(),
 				codexTurnIdByHostTurnId: new Map<string, string>(),
-				needsResume: true,
+				// `_readSession` resumes an unloaded historical thread before
+				// returning its turns, so the first follow-up message can go
+				// straight to `turn/start`. Resuming it again would be
+				// redundant and risks replacing the hydrated conversation.
+				needsResume: false,
 				lastPromptText: '',
 				disposed: false,
 				materializePromise: undefined,
@@ -2541,11 +2546,22 @@ export class CodexAgent extends Disposable implements IAgent {
 			return response;
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
-			// `thread not loaded` is app-server's expected response for any
-			// thread we have not yet resumed in this process; sendMessage's
-			// `thread/resume` path will handle it. Log at info level.
+			// Historical threads are not loaded after an Agent Host restart.
+			// Their UI must still show the completed conversation before the
+			// user sends a new message, so resume and use its hydrated thread
+			// payload instead of returning an empty history.
 			if (/thread not loaded/i.test(message)) {
-				this._logService.info(`[Codex:${threadId}] thread/read: not loaded yet (will resume on first send)`);
+				this._logService.info(`[Codex:${threadId}] thread/read: resuming unloaded historical thread`);
+				try {
+					const conn = await this._ensureConnection();
+					const resumed = await conn.client.request<'thread/resume', ThreadResumeResponse>('thread/resume', {
+						threadId,
+					}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
+					return { thread: resumed.thread };
+				} catch (resumeError) {
+					const resumeMessage = resumeError instanceof Error ? resumeError.message : String(resumeError);
+					this._logService.warn(`[Codex:${threadId}] thread/resume while loading historical session failed: ${resumeMessage}`);
+				}
 			} else {
 				this._logService.warn(`[Codex:${threadId}] thread/read failed: ${message}`);
 			}

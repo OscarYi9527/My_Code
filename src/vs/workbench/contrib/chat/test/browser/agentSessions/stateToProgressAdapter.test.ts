@@ -521,6 +521,25 @@ suite('stateToProgressAdapter', () => {
 			);
 		});
 
+		test('preserves Windows-path Markdown links so history hydration does not fail', () => {
+			const turn = createTurn({
+				responseParts: [{
+					kind: ResponsePartKind.Markdown,
+					id: 'md-windows-path',
+					content: 'Read [the handoff](D:\\AI_prejoct\\My_code\\HANDOFF_FROM_CODEX_SESSION.md) before continuing.',
+				}],
+			});
+
+			const history = rawTurnsToHistory(URI.file('/'), [turn], 'p', 'my-host');
+			const response = history[1];
+			assert.strictEqual(response.type, 'response');
+			if (response.type !== 'response') { return; }
+			assert.strictEqual(
+				(response.parts[0] as IChatMarkdownContent).content.value,
+				'Read [the handoff](D:\\AI_prejoct\\My_code\\HANDOFF_FROM_CODEX_SESSION.md) before continuing.',
+			);
+		});
+
 		test('markdown link syntax inside fenced code blocks is preserved verbatim', () => {
 			const input = [
 				'Use [real](file:///a.ts) directly.',

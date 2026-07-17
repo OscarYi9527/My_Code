@@ -1878,3 +1878,40 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   My_Code 中重复实现网页认证界面，避免产生双重登录页和合同漂移。
 - 已将“简约、智能感”的可实施视觉规范与安全/无障碍验收标准写入
   `OSCAR_TO_BLACK_SYNC.md` 第 11 节，等待 Black 在 Gateway 侧实现并回传稳定 SHA。
+
+## 68. 2026-07-18 Codex 历史对话上下文恢复修复
+
+### 根因
+
+- 历史会话列表和 Chat 状态订阅都已成功返回；实际“读取 HANDOFF 继续处理”线程包含
+  320 个 Turn。
+- 其中一条旧回复使用 Markdown 链接引用 Windows 路径
+  `D:\AI_prejoct\My_code\CODEX_PROXY_INTEGRATION_PROGRESS.md`。
+- 历史渲染的链接重写器把 `D:` 误当 URI scheme，再尝试包装为带 authority 的远程 URI，
+  触发 `UriError`。上层为保护 UI 吞掉异常，最终把整个历史会话渲染为空白。
+
+### 修复
+
+- `CodexAgent` 现在在读取历史线程遇到 `thread not loaded` 时立即调用
+  `thread/resume`，直接使用其包含 turns 的线程数据恢复 Chat 历史。
+- 已恢复的线程标记为无需在首条后续消息前再次 resume，避免重复恢复覆盖已水合的上下文。
+- Markdown 链接重写器现在会跳过无法安全包装的链接；Windows 路径链接保留原文，
+  不再阻断整个历史会话的恢复。
+
+### 已完成验证
+
+- `npm run compile`：通过，开发版 `out` 已同步。
+- 使用真实 Agent Host JSON-RPC 记录重放“读取 HANDOFF 继续处理”：
+  `320` 个 Turn 成功转换为 `640` 条 Chat 历史项，首条与末条用户消息正确。
+- 定向 Electron 测试
+  `stateToProgressAdapter.test.ts --grep "preserves Windows-path Markdown links"`：`1 passing`。
+- `npm run core-ci`：通过，产品输出 `out-vscode-min` 已同步。
+- Windows 成品已重新打包；最终签名步骤仅因 `signtool.exe` 未在 PATH 中而停止，
+  不影响本机功能验证。
+- `scripts\verify-ai-editor-windows-release.ps1 -SkipCleanStart`：通过；
+  产品完整性校验 `10/10`，共享 Proxy `/live=ok`。
+- 已在全新隔离的开发版 Code UI 中实际打开正确的“读取 HANDOFF 继续处理”
+  （列表中 `Codex • 1 wk` 的原线程）并看到历史消息内容，确认不再为空白；
+  历史滚动区域高度为 `129472px`，对应完整历史已水合。
+- 该 UI 验证日志中未出现 `UriError` 或 `Failed to subscribe to existing session`。
+- 开发版与 Windows 产品版均已完成本轮构建/校验；共享 Proxy 未停止、重启或修改。
