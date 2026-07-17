@@ -5,19 +5,17 @@
 
 const { randomBytes, randomUUID } = require('node:crypto') as typeof import('node:crypto');
 const http = require('node:http') as typeof import('node:http');
+const {
+	loadAiEditorAccountContractFixtures
+} = require('./ai-editor-account-contract-fixtures.ts') as typeof import('./ai-editor-account-contract-fixtures');
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 47921;
 const MAX_BODY_BYTES = 64 * 1024;
 const HANDOFF_TTL_MS = 60_000;
+const contractFixtures = loadAiEditorAccountContractFixtures();
 
-const mockAiEditorAccountStates = Object.freeze([
-	'ready',
-	'login_required',
-	'account_unavailable',
-	'service_unavailable',
-	'password_change_required'
-]);
+const mockAiEditorAccountStates = Object.freeze(contractFixtures.statuses.map(fixture => fixture.state));
 
 interface IMockAiEditorEdgeServerOptions {
 	readonly initialState?: string;
@@ -110,13 +108,7 @@ function createMockAiEditorEdgeServer(options: IMockAiEditorEdgeServerOptions = 
 				if (state !== 'ready') {
 					return sendError(response, 401, 'login_required', 'Sign in before requesting models.', requestId);
 				}
-				return sendJson(response, 200, {
-					object: 'list',
-					data: [
-						{ id: 'mock-gpt', object: 'model', owned_by: 'ai-editor-mock' },
-						{ id: 'mock-deepseek', object: 'model', owned_by: 'ai-editor-mock' }
-					]
-				});
+				return sendJson(response, 200, contractFixtures.models.example);
 			}
 			if (request.method === 'GET' && url.pathname === '/management') {
 				response.writeHead(200, {
@@ -145,31 +137,13 @@ function createMockAiEditorEdgeServer(options: IMockAiEditorEdgeServerOptions = 
 }
 
 function buildSafeStatus(state, checkedAt) {
-	const status = {
-		state,
-		checkedAt: new Date(checkedAt).toISOString(),
-		actions: actionsForState(state)
-	};
-	if (state === 'ready') {
-		status.account = { display: 'oscar.mock@example.test', role: 'user' };
-		status.currentModel = 'mock-gpt';
-		status.availableCredits = '1000.000000';
+	const fixture = contractFixtures.statuses.find(candidate => candidate.state === state);
+	if (!fixture) {
+		throw new Error(`Missing mock account fixture: ${state}`);
 	}
-	if (state === 'service_unavailable') {
-		status.errorId = 'mock_service_unavailable';
-	}
+	const status = JSON.parse(JSON.stringify(fixture.example));
+	status.checkedAt = new Date(checkedAt).toISOString();
 	return status;
-}
-
-function actionsForState(state) {
-	switch (state) {
-		case 'ready': return [];
-		case 'login_required': return ['login'];
-		case 'account_unavailable': return ['openAccount'];
-		case 'service_unavailable': return ['retry'];
-		case 'password_change_required': return ['openAccount'];
-		default: return [];
-	}
 }
 
 function parseState(value) {

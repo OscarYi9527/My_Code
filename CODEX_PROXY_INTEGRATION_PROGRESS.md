@@ -1649,3 +1649,50 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - Black 下一步 T023–T033、T038–T046、T049/T050/T054/T055 的交付顺序；
   - Oscar 后续真实登录、真实 Responses、管理页面和最终 Edge 发布验收动作。
 - T112/T113 继续保持未完成；第一轮 Mock 兼容不能替代完整真实链路联合验收。
+
+## 52. 2026-07-17 Oscar 合同、隔离验收与模型刷新前置框架
+
+### 机器可读合同
+
+- 新增 `contracts/fixtures/edge-code-contract.json`，冻结五种安全账号状态、local
+  nonce、状态重试、一次性交接、Webview ticket、logout、模型目录和安全错误字段。
+- Oscar Mock Edge、合同测试和真实 Black 隔离验收共同消费该 fixture，避免 Markdown
+  合同与可执行行为分别漂移；Black 后续服务合同测试应复用同一文件。
+- Node 合同/Mock 测试共 `6 passing`。
+
+### 统一隔离验收与清理
+
+- 新增 `scripts/verify-ai-editor-account-gateway.ps1`：
+  - 通过现有安全 connector 启动 Black Gateway `47920` 和 Edge `47921`；
+  - 验证服务模式、缺失 nonce 的 401、安全状态、重试、handoff 一次性、Webview
+    ticket、logout 和 `/v1/models`；
+  - 扫描隔离日志，拒绝把 nonce、ticket、Token、密码或 fixture secret 写入报告；
+  - 始终只停止隔离 `47920`/`47921`，并输出 `.build/ai-editor-account-gateway/`
+    下的脱敏 JSON/Markdown 报告；
+  - 比较共享 `47892` 的 PID、`/live`、程序哈希和选定数据哈希。
+- 新增注入失败清理测试，证明失败路径仍释放 `47920`/`47921`、生成 `FAIL` 脱敏报告，
+  且不改变共享 Proxy。
+- Black `feature/ai-editor-account-gateway@37e61d9` 实际验收结果：
+  `PASS`、15 项检查、隔离端口全部释放；注入失败清理测试 `1 passing`。
+
+### T048/T090 模型目录刷新框架
+
+- 新增共享模型目录解析/原子刷新 helper，并接入 Codex Agent Host：
+  - 支持启动加载和手动刷新；
+  - 支持运行中发现新增模型；
+  - 解析富模型元数据并去重；
+  - 401 或请求失败时立即清空旧可选模型，防止登出后继续显示无权限目录；
+  - 登录或服务恢复后可重新加载模型。
+- AI Editor Proxy 与 Workbench provider 定向 Electron 测试共 `11 passing`。
+- T048/T090 仍保持未勾选：框架已完成，但最终真实 Gateway-backed Edge 验证需等待
+  Black 的真实模型/Responses 链路。
+
+### 双构建与安全边界验证
+
+- `npm run typecheck-client`、定向 ESLint、PowerShell 语法和 `git diff --check`：通过。
+- `npm run compile`、`npm run core-ci`、`npm run gulp vscode-win32-x64-min-ci`：通过。
+- 开发版通过 `scripts/code.bat` 使用隔离 profile 启动到 Workbench renderer。
+- Windows 成品验收：`PASS`，Workbench checksum `10/10`、Proxy payload `248`、
+  模型目录 `20`、`cleanStart=true`。
+- 最终共享 Proxy 仍为 PID `18120` 且 `/live=ok`；未停止、重启或迁移共享
+  `47892`。T112/T113 仍等待 Black/Oscar 的完整真实链路联合验收后再勾选。

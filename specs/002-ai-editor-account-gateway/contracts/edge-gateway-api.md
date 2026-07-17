@@ -4,6 +4,11 @@
 
 Default debug origin: `http://127.0.0.1:47921`
 
+Machine-readable status, handoff, Webview-ticket, logout, model and safe-error
+examples are versioned in
+`fixtures/edge-code-contract.json`. Server and Code contract tests must update
+that fixture together with this document.
+
 The Edge accepts requests only from loopback. Other local applications do not provide a separate
 product API key; Edge attaches the account bound by AI Editor.
 

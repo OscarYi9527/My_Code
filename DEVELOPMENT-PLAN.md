@@ -127,10 +127,16 @@ Code-OSS Workbench
   password-required 入口（T051、T056–T059、T099）。管理票据只在 Electron main
   获取并注入，Workbench renderer 不接收票据；管理页关闭时按 `/api/v1/webview/session`
   最佳努力撤销会话、清理临时存储并销毁私有 BrowserView。
+- Oscar 已提前完成 T048/T090 的模型目录刷新测试框架：启动加载、手动刷新、动态新增、
+  富元数据、去重、失败时清空旧目录及登录恢复后重新加载均有回归覆盖；真实
+  Gateway-backed Edge 联合验证前，这两个任务仍保持未勾选。
+- Oscar 已提前完成 T112/T113 的统一隔离验收基础设施和共享机器可读合同 fixture：
+  脚本只启动/停止 `47920`、`47921`，生成脱敏 JSON/Markdown 报告，并比较共享
+  `47892` 的 PID、`/live`、程序哈希和选定数据哈希。
 - 下一 Oscar 顺序调整为：等待 Black 完成真实认证 T023–T033 后执行登录端到端；等待
-  Black 完成 `/v1/responses` T038–T046 后再执行 T047、T048 和 T090，避免提前切换
-  Edge 导致 AI 对话不可用。双方下一次同步点是本轮 Webview bootstrap envelope 与
-  `/api/v1/webview/session` 合同确认。
+  Black 完成 `/v1/responses` T038–T046 后执行 T047，并用已完成的 T048/T090
+  框架做真实联合验证，避免提前切换 Edge 导致 AI 对话不可用。双方下一次同步点是
+  Webview bootstrap envelope、`/api/v1/webview/session` 和共享 fixture 的合同确认。
 - 当前 Windows 中间成品尚未配置正式 HTTPS `aiEditorAccountGatewayOrigin`，因此继续
   显示原生“账户”入口且不实例化账号服务、不轮询共享 Proxy；待中央 Gateway 地址冻结
   后再启用成品账户 UI，禁止为本地演示静默写入不安全 HTTP 地址。

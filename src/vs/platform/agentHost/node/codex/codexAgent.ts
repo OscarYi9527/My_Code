@@ -14,6 +14,7 @@ import { URI } from '../../../../base/common/uri.js';
 import { generateUuid } from '../../../../base/common/uuid.js';
 import { IInstantiationService } from '../../../instantiation/common/instantiation.js';
 import { localize } from '../../../../nls.js';
+import { refreshAiEditorProxyModelCatalog } from '../../../aiEditorProxy/common/aiEditorProxyModelCatalog.js';
 import { ILogService } from '../../../log/common/log.js';
 import { IProductService } from '../../../product/common/productService.js';
 import { createSchema, platformSessionSchema, schemaProperty, type SessionMode } from '../../common/agentHostSchema.js';
@@ -871,42 +872,22 @@ export class CodexAgent extends Disposable implements IAgent {
 
 	private async _refreshExternalModels(): Promise<void> {
 		const baseUrl = this._externalProxyBaseUrl();
-		const response = await fetch(`${baseUrl}/v1/models`, { headers: { 'User-Agent': `${USER_AGENT_PREFIX}/${this._productService.version}` } });
-		if (!response.ok) {
-			throw new Error(`Proxy model catalog request failed with HTTP ${response.status}`);
-		}
-		const catalog = await response.json() as {
-			readonly models?: readonly {
-				readonly slug?: string;
-				readonly display_name?: string;
-				readonly context_window?: number;
-				readonly input_modalities?: readonly string[];
-			}[];
-			readonly data?: readonly { readonly id?: string }[];
-		};
 		const configSchema = this._createReasoningEffortConfigSchema();
-		const richModels = Array.isArray(catalog.models) ? catalog.models : [];
-		const models: IAgentModelInfo[] = richModels.length > 0
-			? richModels
-				.filter(model => typeof model.slug === 'string' && model.slug.length > 0)
-				.map((model): IAgentModelInfo => ({
+		await refreshAiEditorProxyModelCatalog(
+			baseUrl,
+			`${USER_AGENT_PREFIX}/${this._productService.version}`,
+			catalog => {
+				const models: IAgentModelInfo[] = catalog.map((model): IAgentModelInfo => ({
 					provider: this.id,
-					id: model.slug!,
-					name: model.display_name ?? model.slug!,
-					maxContextWindow: model.context_window,
-					supportsVision: model.input_modalities?.includes('image') === true,
-					configSchema,
-				}))
-			: (Array.isArray(catalog.data) ? catalog.data : [])
-				.filter(model => typeof model.id === 'string' && model.id.length > 0)
-				.map((model): IAgentModelInfo => ({
-					provider: this.id,
-					id: model.id!,
-					name: model.id!,
-					supportsVision: false,
+					id: model.id,
+					name: model.name,
+					maxContextWindow: model.contextWindow,
+					supportsVision: model.supportsVision,
 					configSchema,
 				}));
-		this._models.set(models, undefined);
+				this._models.set(models, undefined);
+			}
+		);
 	}
 
 	// #endregion

@@ -36,6 +36,50 @@ suite('AgentHostLanguageModelProvider', () => {
 		assert.strictEqual(concrete?.metadata.tooltip, undefined);
 	});
 
+	test('publishes startup models and dynamically added models after refresh', async () => {
+		const provider = createProvider();
+		let changeCount = 0;
+		store.add(provider.onDidChange(() => changeCount++));
+
+		provider.updateModels([makeModel('mock-gpt'), makeModel('mock-deepseek')]);
+		assert.deepStrictEqual(
+			(await provider.provideLanguageModelChatInfo(undefined, CancellationToken.None)).map(model => model.metadata.id),
+			['mock-gpt', 'mock-deepseek']
+		);
+
+		provider.updateModels([
+			makeModel('mock-gpt'),
+			makeModel('mock-deepseek'),
+			makeModel('mock-new-model')
+		]);
+		assert.deepStrictEqual(
+			(await provider.provideLanguageModelChatInfo(undefined, CancellationToken.None)).map(model => model.metadata.id),
+			['mock-gpt', 'mock-deepseek', 'mock-new-model']
+		);
+		assert.strictEqual(changeCount, 2);
+	});
+
+	test('clears stale models after an Edge failure and restores models after login', async () => {
+		const provider = createProvider();
+		provider.updateModels([makeModel('stale-model')]);
+		assert.strictEqual(
+			(await provider.provideLanguageModelChatInfo(undefined, CancellationToken.None)).length,
+			1
+		);
+
+		provider.updateModels([]);
+		assert.deepStrictEqual(
+			await provider.provideLanguageModelChatInfo(undefined, CancellationToken.None),
+			[]
+		);
+
+		provider.updateModels([makeModel('ready-model')]);
+		assert.deepStrictEqual(
+			(await provider.provideLanguageModelChatInfo(undefined, CancellationToken.None)).map(model => model.metadata.id),
+			['ready-model']
+		);
+	});
+
 	test('shows the Auto tooltip but no detail when there is no positive discount', async () => {
 		const provider = createProvider();
 
