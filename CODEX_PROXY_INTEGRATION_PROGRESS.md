@@ -1828,3 +1828,12 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 当前真实仓库报告为 `BLOCKED`，且阻断符合预期：迁移成品仍为 `legacy-standalone`、尚未冻结生产 HTTPS Gateway 地址、尚未提供生产 Edge 源码和 macOS Keychain 实现。
 - Edge/Gateway 发布白名单隔离与已打包产品不读取开发 Gateway override 均为 `PASS`。不会为了勾选 T118 而伪造 `edge` target 或写入本机 HTTP Gateway。
 - T118 保持未勾选，待生产 Edge、固定 HTTPS Gateway 和 Keychain 交付后以 `--require-final-edge` 重新执行并要求 `PASS`。
+
+## 63. 2026-07-17 真实 PKCE 登录验收环境自动就绪
+
+- 在不触碰共享 Proxy 的前提下，安全停止旧 Black 隔离服务，将只读集成 checkout 从 `ebd18c6` 切换到稳定提交 `a066744`，并执行 `npm ci`；未修改或提交 Black 源码。
+- `connect-ai-editor-black-dev.ps1` 的最低 Black 提交已升级为 `a066744`，防止后续联调意外回退到不含真实管理页面的旧 Gateway。
+- 真实 Gateway `47920`、Edge `47921` 已启动并验证：安全状态为 `login_required`、未登录模型目录为 HTTP 401、`/admin` 为 HTTP 200 且具备严格 CSP/no-store。
+- 已启动全新隔离 Code 开发 profile `D:\AI_prejoct\My_code\.verify-edge-a066-user-data`，主进程使用新的 local nonce，AI Chat 登录入口已可供实际 PKCE 登录验证。
+- `npm run verify-ai-editor-account-real-ui` 在 `a066744` 上通过；共享 Proxy 仍为 PID `18120`、`/live=ok`。
+- 当前隔离数据根已有 1 个 bootstrap 管理员账号；不会为获取密码而读取密码哈希、日志或重置数据。真实登录需要该账号的首次 bootstrap 密码；若密码遗失，应由用户明确允许后另建全新隔离数据根（保留当前数据）并在可见终端一次性显示新密码。

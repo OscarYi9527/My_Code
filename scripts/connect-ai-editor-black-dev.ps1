@@ -16,7 +16,7 @@ $codeRepository = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoo
 $projectsRoot = Split-Path -Parent $codeRepository
 $defaultGatewayCheckout = Join-Path $projectsRoot 'codex_proxy-gateway-dev'
 $fallbackGatewayCheckout = Join-Path $projectsRoot 'codex_proxy-dev'
-$requiredBlackCommit = 'ebd18c6c0a2e781c46405c1e15e81a0aebb2f782'
+$requiredBlackCommit = 'a06674424253ebf426ea6d6b8ae45a3443b5af3a'
 
 if ([string]::IsNullOrWhiteSpace($BlackRepository)) {
 	$BlackRepository = if (Test-Path -LiteralPath $defaultGatewayCheckout) {
