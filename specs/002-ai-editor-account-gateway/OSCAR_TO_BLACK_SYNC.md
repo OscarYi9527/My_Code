@@ -235,3 +235,23 @@ Code 已按既定产品行为打开固定来源的 `AI Editor 管理` Webview。
   `contracts/` 并双方确认。
 - 验收标准：bootstrap `admin` 登录后在管理 Webview 修改密码和邮箱成功；Code 状态由
   `password_change_required` 变为 `ready`；模型目录可刷新；新 Turn 才允许发送。
+
+## 11. 2026-07-17 登录页视觉优化请求（Black 实施）
+
+登录页位于 Black 仓库 `gateway/src/api/auth-routes.ts` 的 `authorizationPage()`，属于 Gateway
+产品页面，不应由 My_Code 静默复制或重写。请在不改变 OAuth/PKCE、表单字段、POST 路径、
+错误语义、CSP 或不存储凭据原则的前提下实施以下视觉优化：
+
+- **视觉方向**：简约、专业、智能感；深墨蓝/石墨背景配低对比网格或柔和蓝紫径向光，不使用
+  大面积渐变、营销插画或夸张动效。
+- **布局**：单一 420–460px 登录卡片；顶部仅保留小型 `AI EDITOR` 标识、标题“登录 AI Editor”
+  和一句简短说明。登录表单为默认主操作；邀请码注册折叠为次级区域，避免首屏两个等权表单。
+- **输入与按钮**：统一 44px 高度、清晰标签、细边框和键盘 focus ring；主按钮全宽并有 loading/
+  disabled 状态；密码字段可提供本地显示/隐藏，不保存密码。
+- **反馈与无障碍**：为登录失败、邀请码无效和密码规则错误保留可读错误区域；对比度、焦点顺序、
+  `autocomplete`、移动端单列和 `prefers-reduced-motion` 均需保持可用。
+- **安全不变项**：不增加第三方字体/分析脚本/远程图片；不使用 localStorage；授权事务 ID 继续仅
+  使用现有隐藏字段；不在 URL、页面日志或客户端状态中暴露密码、code、Token 或 ticket。
+
+验收：Windows/macOS 系统浏览器中 360px–1440px 宽度无横向滚动；键盘 Tab 可完成登录；视觉
+风格与 AI Editor 管理页一致；认证合同与现有 PKCE 自动化测试保持通过。

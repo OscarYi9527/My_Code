@@ -1871,3 +1871,10 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   SSE 请求；这同时证明 Ready 前的真实模型/回复验收不会绕过强制改密门禁。
 - Black 完成改密闭环、用户状态达到 `ready` 并配置隔离 Provider 后，直接运行该命令即可
   进行 T048/T090/T112/T113 的模型与真实 SSE 前置验收。
+
+## 67. 2026-07-17 登录页视觉优化归属
+
+- 登录页由 Black Gateway 的 `authorizationPage()` 生成，属于 `codex_proxy` 仓库；Oscar 不在
+  My_Code 中重复实现网页认证界面，避免产生双重登录页和合同漂移。
+- 已将“简约、智能感”的可实施视觉规范与安全/无障碍验收标准写入
+  `OSCAR_TO_BLACK_SYNC.md` 第 11 节，等待 Black 在 Gateway 侧实现并回传稳定 SHA。
