@@ -1859,3 +1859,15 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   共享 Proxy。
 - 在 Black 交付改密 UI/API 验收版本前，`password_change_required` 下禁止新 Turn 是预期
   的 fail-closed 安全行为。
+
+## 66. 2026-07-17 真实模型目录与 SSE 联合验收脚本前置
+
+- 新增 `npm run verify-ai-editor-account-real-model-sse`：仅连接已运行的指定隔离 Edge，验证
+  Ready 账号状态、授权模型目录、排除 `gpt-mock`、`/v1/responses` SSE 的
+  `response.completed`，并确认共享 Proxy PID/`/live` 不变。
+- 脚本不启动或停止服务，不读取 Access/Refresh Token，不把 nonce、ticket、测试 prompt 或
+  AI 回复写入验收报告；报告只包含安全状态、检查结果和共享 Proxy 不变量。
+- 当前实际执行结果为预期 `BLOCKED`：`password_change_required`，因此没有发送模型目录或
+  SSE 请求；这同时证明 Ready 前的真实模型/回复验收不会绕过强制改密门禁。
+- Black 完成改密闭环、用户状态达到 `ready` 并配置隔离 Provider 后，直接运行该命令即可
+  进行 T048/T090/T112/T113 的模型与真实 SSE 前置验收。
