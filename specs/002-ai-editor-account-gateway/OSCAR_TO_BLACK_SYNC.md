@@ -206,3 +206,32 @@ Black 最新交接文档仍引用旧 My_Code 合同基线 `0da3497`。当前 Cod
 1. 更新交接文档至当前合同基线；
 2. 在 Gateway/Edge 服务端合同测试中消费该 fixture，或明确给出等价验证的测试和 SHA；
 3. 回传相应 commit SHA，不要修改既有 endpoint、状态码或安全语义而未先确认合同。
+
+## 10. 2026-07-17 真实登录后强制改密缺口（需 Black 处理）
+
+### Oscar 实际联调结果
+
+```text
+codex_proxy: feature/ai-editor-account-gateway@a066744
+mode: real
+result: PKCE 登录、授权码回调、Token 交换和 Edge handoff 成功
+Edge safe status: password_change_required
+Edge safe action: openAccount
+```
+
+Code 已按既定产品行为打开固定来源的 `AI Editor 管理` Webview。管理页中的
+`AccountPage` 仅显示“请先修改临时密码并完善邮箱”，没有旧密码、新密码和邮箱输入控件，
+也没有调用现有 `POST /api/v1/account/password/change`。因此用户无法从
+`password_change_required` 进入 `ready`，新 Turn 会一直被正确地 fail-closed 阻止。
+
+### 结论与请求
+
+- 这不是 Code 登录、状态栏或管理 Webview 注入问题；Code 端 `T099` 的
+  password-required 入口按预期工作。
+- 这是 Black 侧管理页面/密码生命周期缺口：请优先完成 T091、T094、T096、T097 的
+  最小闭环，至少交付普通用户本人改密与必填邮箱表单，并在成功后刷新账户状态。
+- 不需要修改现有 Edge/Code 合同；可复用已有的
+  `POST /api/v1/account/password/change`。如需新增字段、状态码或安全语义，必须先更新
+  `contracts/` 并双方确认。
+- 验收标准：bootstrap `admin` 登录后在管理 Webview 修改密码和邮箱成功；Code 状态由
+  `password_change_required` 变为 `ready`；模型目录可刷新；新 Turn 才允许发送。

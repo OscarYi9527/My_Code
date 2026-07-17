@@ -1845,3 +1845,17 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 以可见 PowerShell 控制台执行真实 bootstrap，控制台一次性显示新 `admin` 的临时密码；密码未写入 My_Code、报告、日志摘要或 Git。
 - 已启动新隔离 Code profile `D:\AI_prejoct\My_code\.verify-edge-login-user-data`，并用新 local nonce 验证 Edge 安全状态为 `login_required`。用户现在可在该 Code 窗口点击“AI 服务：需要登录”，在浏览器以 `admin` 和可见控制台中的一次性密码完成真实 PKCE 登录。
 - 完成登录后的预期安全状态为 `password_change_required`；这证明 PKCE、授权码回调、Token 交换与 Edge handoff。改密 UI、Ready 模型目录和真实 SSE 仍属于下一轮联合验收。
+
+## 65. 2026-07-17 真实登录后改密缺口确认
+
+- 用户已使用新建独立 bootstrap 管理员完成真实 PKCE 登录。Edge 安全状态实际为
+  `password_change_required`，安全动作是 `openAccount`，证明 Code 登录/回调/Edge handoff
+  链路工作正常。
+- Code 已正确打开 `AI Editor 管理` Webview；Black `a066744` 的普通用户账号页只显示
+  改密提醒，未提供表单或调用改密 API。因此“修改密码没有效果”是 Black 管理页面缺少
+  T091/T094/T096/T097 最小闭环，不是 Code 端遗漏。
+- 已把可直接执行的复现、责任边界和验收标准写入
+  `specs/002-ai-editor-account-gateway/OSCAR_TO_BLACK_SYNC.md`；不修改 Black 源码、合同或
+  共享 Proxy。
+- 在 Black 交付改密 UI/API 验收版本前，`password_change_required` 下禁止新 Turn 是预期
+  的 fail-closed 安全行为。
