@@ -374,8 +374,8 @@ Turn 可结算为负积分。
 - [ ] T111 Run existing standalone `npm test` and Gateway/admin coverage suites in `D:\AI_prejoct\codex_proxy-dev\`
 - [ ] T112 Run the full isolated quickstart and save a sanitized report under `D:\AI_prejoct\My_code\.build\ai-editor-account-gateway\`
 - [ ] T113 Verify shared `47892` PID, `/live` and selected data hashes remained unchanged using `D:\AI_prejoct\My_code\scripts\start-ai-editor-account-dev.ps1`
-- [ ] T114 Run Code `npm run typecheck-client`, focused tests and `npm run compile`, then validate `D:\AI_prejoct\My_code\scripts\code.bat`
-- [ ] T115 Run Code `npm run core-ci` and rebuild `out-vscode-min` plus `D:\AI_prejoct\VSCode-win32-x64`
+- [x] T114 Run Code `npm run typecheck-client`, focused tests and `npm run compile`, then validate `D:\AI_prejoct\My_code\scripts\code.bat`
+- [x] T115 Run Code `npm run core-ci` and rebuild `out-vscode-min` plus `D:\AI_prejoct\VSCode-win32-x64`
 - [ ] T116 Verify Windows product Workbench checksums and confirm the installer contains Edge but excludes Gateway/admin/database resources in `D:\AI_prejoct\My_code\scripts\verify-ai-editor-windows-release.ps1`
 - [ ] T117 Validate login, status, management Webview, model refresh and real responses in `D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe`
 - [ ] T118 [P] Run macOS source/type/package static checks for Keychain, fixed Gateway origin and Edge-only release rules in `D:\AI_prejoct\My_code\build\darwin\`

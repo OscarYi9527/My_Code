@@ -1799,3 +1799,18 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `npm run gulp vscode-win32-x64-min-ci`：打包阶段完成并更新 `D:\AI_prejoct\VSCode-win32-x64`；最终本机签名步骤因 `signtool.exe` 不在 PATH 返回 `ENOENT`，属于既有本机签名环境限制。
 - `scripts\verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、`cleanStart=true`、共享 Proxy `/live=ok`。
 - 本轮未停止、重启、修改或迁移共享 Proxy `127.0.0.1:47892`。
+
+## 59. 2026-07-17 Oscar T114/T115 双构建验证补全
+
+- 空白 AI 窗口修复的定向 Electron 测试已实际执行：
+  `scripts\test.bat --run src\vs\workbench\contrib\aiEditorMode\test\browser\aiEditorMode.contribution.test.ts --grep "AiEditorModeLayoutContribution"`，结果 `5 passing`；这替代了无法启动的 Playwright 浏览器运行器，不再将该回归测试记为未通过。
+- 用户已通过 `scripts\launch-ai-editor-black-dev.ps1 -AuthenticationMode real` 实际验证：真实 Edge 未登录时右侧会立即显示 Codex Chat，而不是空白编辑器组。
+- 因此 Oscar 负责的 T114（typecheck、定向测试、开发版 compile/Code 验证）和 T115（`core-ci`、`out-vscode-min`、Windows 工作台更新）已勾选完成。
+- T116 仍等待最终 `productTarget=edge` 制品；T117 及 T048/T090/T112/T113 仍等待真实 PKCE 登录、隔离 Provider 配置与真实 SSE 联合验收。
+
+## 60. 2026-07-17 真实 Edge 未登录 Chat 自动化回归
+
+- 新增 `npm run verify-ai-editor-account-real-ui`：使用 Black 真实认证模式下的隔离 Gateway `47920` 和 Edge `47921` 启动独立开发版 Code，并通过 CDP 验证 Chat 输入区实际出现“AI 服务：需要登录”。
+- 验证器不会执行登录、不会配置 Provider、不会读取或记录 nonce/Token；若本机已有 Black 隔离服务则只复用且绝不停止它，否则只清理由自身启动的 `47920/47921` 与独立 Code 进程。
+- 本轮实测：`PASS`，4 项检查通过；共享 Proxy PID `18120` 和 `/live=ok` 不变，独立 Code 调试端口已释放。
+- 该回归将“真实 Edge 未登录时不能留下空白 Chat 组”固定为自动化检查；它是 T117 前的安全预检，不替代真实 PKCE、Provider 或 SSE 联合验收。
