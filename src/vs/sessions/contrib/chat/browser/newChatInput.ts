@@ -397,7 +397,7 @@ export class NewChatInputWidget extends Disposable implements IHistoryNavigation
 		this._register(installMobileChipLaneScroll(newChatBottomContainer, this.layoutService));
 
 		// Generic extension point for status indicators in the new-session view.
-		const statusContainer = dom.append(repoConfigContainer, dom.$('.new-chat-status-toolbar'));
+		const statusContainer = dom.append(newChatBottomContainer, dom.$('.new-chat-status-toolbar'));
 		this._register(this.instantiationService.createInstance(MenuWorkbenchToolBar, statusContainer, MenuId.ChatInputStatus, {
 			hiddenItemStrategy: HiddenItemStrategy.NoHide,
 			toolbarOptions: { primaryGroup: () => true },

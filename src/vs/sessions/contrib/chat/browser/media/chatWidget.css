@@ -212,20 +212,31 @@
 	padding-left: 4px;
 }
 
-/* Icon-only action items in the bottom row (e.g. OpenTelemetry status pill)
- * lack the chevron that visually balances the 7px left padding, so use
- * symmetric horizontal padding and drop the picker min-width that would
- * otherwise leave the icon left-aligned inside a 30px box. */
+/* Status is its own full-width row. It must not compete with the repository
+ * controls: long safe account errors previously overflowed into that row in a
+ * newly-created chat. */
+.new-chat-widget-container .new-chat-bottom-container .new-chat-status-toolbar {
+	flex: 1 1 100%;
+	min-width: 0;
+	overflow: hidden;
+	order: 3;
+	margin-top: 2px;
+}
+
 .new-chat-widget-container .new-chat-bottom-container .new-chat-status-toolbar .monaco-action-bar .action-item,
 .new-chat-widget-container .new-chat-bottom-container .new-chat-status-toolbar .monaco-action-bar .action-item .action-label {
 	min-width: 0;
+	max-width: 100%;
 }
 
 .new-chat-widget-container .new-chat-bottom-container .new-chat-status-toolbar .action-label {
 	padding: 3px 4px;
 	display: flex;
 	align-items: center;
-	justify-content: center;
+	justify-content: flex-start;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* Pickers row - two equal halves */

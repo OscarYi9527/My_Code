@@ -50,13 +50,13 @@ export function getAiEditorAccountStatusPresentation(status: IAiEditorSafeStatus
 			};
 		case AiEditorAccountState.AccountUnavailable:
 			return {
-				label: withSafeErrorId(localize('aiEditor.account.status.accountUnavailable', "AI 服务：账号不可用"), status.errorId),
-				tooltip: localize('aiEditor.account.status.accountUnavailableTooltip', "点击查看账号状态。")
+				label: localize('aiEditor.account.status.accountUnavailable', "AI 服务：账号不可用"),
+				tooltip: withSafeErrorId(localize('aiEditor.account.status.accountUnavailableTooltip', "点击查看账号状态。"), status.errorId)
 			};
 		case AiEditorAccountState.ServiceUnavailable:
 			return {
-				label: withSafeErrorId(localize('aiEditor.account.status.serviceUnavailable', "AI 服务：暂不可用"), status.errorId),
-				tooltip: localize('aiEditor.account.status.serviceUnavailableTooltip', "账号服务暂不可用。点击重试；本地编辑不受影响。")
+				label: localize('aiEditor.account.status.serviceUnavailable', "AI 服务：暂不可用"),
+				tooltip: withSafeErrorId(localize('aiEditor.account.status.serviceUnavailableTooltip', "账号服务暂不可用。点击重试；本地编辑不受影响。"), status.errorId)
 			};
 		case AiEditorAccountState.PasswordChangeRequired:
 			return {

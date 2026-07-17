@@ -31,15 +31,16 @@ suite('AI Editor account status contribution', () => {
 		assert.ok(!presentation.label.includes('47921'));
 	});
 
-	test('service unavailable status exposes only a safe error identifier and retry guidance', () => {
+	test('service unavailable status keeps its label compact and exposes a safe error identifier in the tooltip', () => {
 		const presentation = getAiEditorAccountStatusPresentation({
 			...status(AiEditorAccountState.ServiceUnavailable),
 			errorId: 'account_edge_unavailable'
 		});
 
-		assert.ok(presentation.label.includes('account_edge_unavailable'));
+		assert.ok(!presentation.label.includes('account_edge_unavailable'));
+		assert.ok(presentation.tooltip.includes('account_edge_unavailable'));
 		assert.ok(presentation.tooltip.includes('重试'));
-		assert.ok(!presentation.label.includes('http://'));
+		assert.ok(!presentation.tooltip.includes('http://'));
 	});
 
 	test('login, account and password states have distinct safe labels', () => {

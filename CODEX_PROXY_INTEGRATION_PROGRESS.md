@@ -1750,3 +1750,20 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 共享 `47892` 未停止或重启；最终仍为 PID `18120`、`/live=ok`。此前 Mock UI 回归脚本
   使用运行中的 Agent Host 时暴露出旧的跨状态刷新不稳定性，未将该测试脚本的实验性改动
   纳入提交；真实模型/SSE 验收仍以 Black Edge 与真实登录为前置条件。
+
+## 56. 2026-07-17 新建 AI 对话状态布局与本机 nonce 诊断
+
+- 用户真实 Edge 联调截图中的 `local_authorization_required` 已确认不是 Gateway 或共享
+  Proxy 故障：启动 PowerShell 缺少
+  `VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE`，Electron main 因此不能向真实 Edge 的
+  `/ai-editor/*` 产品本机接口发送 nonce。
+- connector 与 quickstart 已输出该变量；修复步骤是关闭当前开发 Code，在同一 PowerShell
+  设置 connector 输出的 nonce 文件路径后重新启动。该 nonce 不得写入设置、URL、日志或
+  renderer。
+- 新建 AI 对话的 `ChatInputStatus` 不再嵌入仓库配置 toolbar：状态现在单独占用可伸缩的
+  完整底行；长状态文本省略显示，避免覆盖 `Codey`/仓库控制项。
+- 账号不可用或服务不可用时，正文只显示简短安全状态；脱敏错误编号移至 hover tooltip，
+  保留诊断能力但不挤压 Chat 输入区。
+- 本轮验证：`npm run typecheck-client`、账号状态单元测试（4 passing）、`npm run compile`、
+  `npm run core-ci`、`npm run gulp vscode-win32-x64-min-ci` 通过；Windows 成品验证为
+  `PASS`（checksum 10/10、cleanStart=true、共享 Proxy `/live=ok`）。
