@@ -1713,3 +1713,23 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   Code 侧回归；它不是生产管理页、不会模拟真实认证或 `/v1/responses`。
 - 本机实测结果：`PASS`，9 项检查通过，Mock `47921` 与 CDP `49231` 已释放，共享 Proxy
   保持 PID `18120` 且 `/live=ok`。
+
+## 54. 2026-07-17 Black 真实认证与 Responses 交付预检
+
+- 只读同步并复核 Black 的 `feature/ai-editor-account-gateway@ebd18c6c0a2e781c46405c1e15e81a0aebb2f782`；
+  功能实现提交为 `5a0b75ffed8893767a4cf466db6c64ca3734d28e`。未修改 Black 源码、分支或提交。
+- 本机隔离 checkout 已安装缺失的运行时依赖后，通过：
+  `npm test`（106/106）、`npm run gateway:test`（45/45）、`npm run admin:test`（1/1）、
+  `npm run check`、`npm run release:check` 和 `npm audit --audit-level=moderate`（0 漏洞）。
+- 新增 connector 的 `-AuthenticationMode real`，默认 Mock 行为保持不变。真实模式不再写入
+  Mock 状态，也不调用 Mock 控制接口；启动后只接受五种安全账号状态。
+- 真实隔离预检结果：`/ai-editor/status` 缺失 nonce 返回 401；带本机 nonce 的安全状态为
+  `login_required`；`/ai-editor/mock/state` 返回 404；未登录状态下 `/v1/models` 和
+  `/v1/responses` 均返回 401。未调用 Provider。
+- 本轮开始和结束均记录共享 `47892` 为 PID `18120`、`/live=ok`；只启动和停止
+  `47920`/`47921`，未触碰共享 Proxy。
+- 联合验收尚未完成：尚未执行真实 PKCE 登录、隔离 Provider 配置或真实 SSE 回复。T047、
+  T048、T090、T112、T113 继续未勾选，正式 `productTarget=edge` 保持禁止切换。
+- 合同跟踪：Black 交接文档仍引用旧的 My_Code 合同基线 `0da3497`，且尚未消费
+  `contracts/fixtures/edge-code-contract.json`。最终联合验收前，Black 需要更新基线并在
+  服务端合同测试中消费或明确验证该 fixture。

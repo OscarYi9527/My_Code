@@ -2,6 +2,8 @@
 param(
 	[ValidateSet('ready', 'login_required', 'account_unavailable', 'service_unavailable', 'password_change_required')]
 	[string]$State = 'login_required',
+	[ValidateSet('mock', 'real')]
+	[string]$AuthenticationMode = 'mock',
 	[string]$BlackRepository,
 	[string]$DataRoot,
 	[switch]$Stop,
@@ -14,7 +16,7 @@ $codeRepository = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoo
 $projectsRoot = Split-Path -Parent $codeRepository
 $defaultGatewayCheckout = Join-Path $projectsRoot 'codex_proxy-gateway-dev'
 $fallbackGatewayCheckout = Join-Path $projectsRoot 'codex_proxy-dev'
-$requiredBlackCommit = '84ab6445bb4b557dc379815776bcd784f34676c1'
+$requiredBlackCommit = 'ebd18c6c0a2e781c46405c1e15e81a0aebb2f782'
 
 if ([string]::IsNullOrWhiteSpace($BlackRepository)) {
 	$BlackRepository = if (Test-Path -LiteralPath $defaultGatewayCheckout) {
@@ -113,6 +115,7 @@ if ($ValidateOnly) {
 		gatewayOrigin = 'http://127.0.0.1:47920'
 		edgeOrigin = 'http://127.0.0.1:47921'
 		nonceFile = $nonceFile
+		authenticationMode = $AuthenticationMode
 	}
 	exit 0
 }
@@ -151,7 +154,15 @@ if ($existingBlackPorts.Count -eq 1) {
 	throw 'Only one Black development service is running; stop the isolated stack before retrying.'
 }
 if ($existingBlackPorts.Count -eq 0) {
-	& powershell -NoProfile -ExecutionPolicy Bypass -File $startScript -Mode all -DataRoot $resolvedDataRoot -MockState $State
+	$startArguments = @(
+		'-Mode', 'all',
+		'-DataRoot', $resolvedDataRoot,
+		'-AuthenticationMode', $AuthenticationMode
+	)
+	if ($AuthenticationMode -eq 'mock') {
+		$startArguments += @('-MockState', $State)
+	}
+	& powershell -NoProfile -ExecutionPolicy Bypass -File $startScript @startArguments
 	if ($LASTEXITCODE -ne 0) {
 		throw "Black isolated start script failed with exit code $LASTEXITCODE."
 	}
@@ -182,23 +193,32 @@ if (
 }
 
 $headers = @{ 'X-AI-Editor-Local-Nonce' = $nonce }
-$stateBody = @{ state = $State } | ConvertTo-Json -Compress
-Invoke-RestMethod `
-	-Uri 'http://127.0.0.1:47921/ai-editor/mock/state' `
-	-Method Post `
-	-Headers $headers `
-	-ContentType 'application/json' `
-	-Body $stateBody `
-	-TimeoutSec 5 | Out-Null
 $status = Invoke-RestMethod `
 	-Uri 'http://127.0.0.1:47921/ai-editor/status' `
 	-Headers $headers `
 	-TimeoutSec 5
+if ($AuthenticationMode -eq 'mock') {
+	$stateBody = @{ state = $State } | ConvertTo-Json -Compress
+	Invoke-RestMethod `
+		-Uri 'http://127.0.0.1:47921/ai-editor/mock/state' `
+		-Method Post `
+		-Headers $headers `
+		-ContentType 'application/json' `
+		-Body $stateBody `
+		-TimeoutSec 5 | Out-Null
+	$status = Invoke-RestMethod `
+		-Uri 'http://127.0.0.1:47921/ai-editor/status' `
+		-Headers $headers `
+		-TimeoutSec 5
+}
 $nonce = $null
 $headers = $null
 
-if ($status.state -ne $State) {
+if ($AuthenticationMode -eq 'mock' -and $status.state -ne $State) {
 	throw "Black Edge state mismatch: expected $State, got $($status.state)."
+}
+if ($AuthenticationMode -eq 'real' -and $status.state -notin @('ready', 'login_required', 'account_unavailable', 'service_unavailable', 'password_change_required')) {
+	throw "Black real Edge returned an unsupported safe account state: $($status.state)."
 }
 
 $sharedAfter = Test-SharedProxy
@@ -207,7 +227,7 @@ if ($sharedBefore.processId -ne $sharedAfter.processId -or -not $sharedAfter.liv
 }
 
 Write-Host "[ai-editor-black-dev] Gateway ready: http://127.0.0.1:47920"
-Write-Host "[ai-editor-black-dev] Edge ready: http://127.0.0.1:47921 state=$State"
+Write-Host "[ai-editor-black-dev] Edge ready: http://127.0.0.1:47921 mode=$AuthenticationMode state=$($status.state)"
 Write-Host "[ai-editor-black-dev] Code main-process nonce file: $nonceFile"
 Write-Host '[ai-editor-black-dev] Before launching scripts\code.bat in this PowerShell, set:'
 Write-Host "`$env:VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN = 'http://127.0.0.1:47921'"

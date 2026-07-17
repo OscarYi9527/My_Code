@@ -171,3 +171,38 @@ Code 测试和构建结果：
 任何 endpoint、字段、状态码或安全语义变化必须先更新
 `specs/002-ai-editor-account-gateway/contracts/` 并由双方确认，禁止分别静默兼容两套
 合同。
+
+## 9. 2026-07-17 真实认证和 Responses 交付复核
+
+Black 本次已交付并由 Oscar 本机只读复核：
+
+```text
+codex_proxy 分支：feature/ai-editor-account-gateway
+远程 HEAD：ebd18c6c0a2e781c46405c1e15e81a0aebb2f782
+功能提交：5a0b75ffed8893767a4cf466db6c64ca3734d28e（T023–T046）
+```
+
+Oscar 在隔离 checkout 对该版本完成根测试 106/106、Gateway 测试 45/45、Admin 测试
+1/1、`npm run check`、`npm run release:check` 和 `npm audit`（0 vulnerabilities）。
+
+真实模式无凭据预检结果：
+
+- 缺失本机 nonce 的 `/ai-editor/status`：HTTP 401；
+- 带 nonce 的安全状态：`login_required`；
+- Mock 控制路由 `/ai-editor/mock/state`：HTTP 404；
+- 未登录 `/v1/models` 和 `/v1/responses`：HTTP 401；
+- 未触发 Provider，隔离 Gateway/Edge 停止后端口已释放；
+- 共享 `47892` 保持 PID `18120`、`/live=ok`。
+
+这证明真实模式的隔离和 fail-closed 前置门禁符合预期，但不代表真实登录、Provider
+转发或 SSE 联合验收已经完成。Oscar 将继续 T047 的开发态 Agent Host Edge override
+审计；真实 PKCE 登录、隔离 Provider 配置和 T048/T090/T112/T113 的联合验收保持未完成。
+
+### 待 Black 回传的合同动作
+
+Black 最新交接文档仍引用旧 My_Code 合同基线 `0da3497`。当前 Code 合同基线已包含
+`contracts/fixtures/edge-code-contract.json`。最终联合验收前请：
+
+1. 更新交接文档至当前合同基线；
+2. 在 Gateway/Edge 服务端合同测试中消费该 fixture，或明确给出等价验证的测试和 SHA；
+3. 回传相应 commit SHA，不要修改既有 endpoint、状态码或安全语义而未先确认合同。
