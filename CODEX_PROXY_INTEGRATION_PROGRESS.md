@@ -1837,3 +1837,11 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 已启动全新隔离 Code 开发 profile `D:\AI_prejoct\My_code\.verify-edge-a066-user-data`，主进程使用新的 local nonce，AI Chat 登录入口已可供实际 PKCE 登录验证。
 - `npm run verify-ai-editor-account-real-ui` 在 `a066744` 上通过；共享 Proxy 仍为 PID `18120`、`/live=ok`。
 - 当前隔离数据根已有 1 个 bootstrap 管理员账号；不会为获取密码而读取密码哈希、日志或重置数据。真实登录需要该账号的首次 bootstrap 密码；若密码遗失，应由用户明确允许后另建全新隔离数据根（保留当前数据）并在可见终端一次性显示新密码。
+
+## 64. 2026-07-17 独立真实登录测试账号准备
+
+- 经用户明确允许，保留原 `oscar-code` 隔离数据后，新建独立数据根 `codex_proxy-gateway-dev\.ai-editor-dev\oscar-login-verify`；未删除、重置或读取原账号数据、密码哈希、Token 或日志。
+- 旧的本轮 Code 登录验证 profile 已安全关闭；仅停止并重启 Black 隔离 Gateway/Edge `47920/47921`。共享 Proxy 始终为 PID `18120`、`/live=ok`。
+- 以可见 PowerShell 控制台执行真实 bootstrap，控制台一次性显示新 `admin` 的临时密码；密码未写入 My_Code、报告、日志摘要或 Git。
+- 已启动新隔离 Code profile `D:\AI_prejoct\My_code\.verify-edge-login-user-data`，并用新 local nonce 验证 Edge 安全状态为 `login_required`。用户现在可在该 Code 窗口点击“AI 服务：需要登录”，在浏览器以 `admin` 和可见控制台中的一次性密码完成真实 PKCE 登录。
+- 完成登录后的预期安全状态为 `password_change_required`；这证明 PKCE、授权码回调、Token 交换与 Edge handoff。改密 UI、Ready 模型目录和真实 SSE 仍属于下一轮联合验收。
