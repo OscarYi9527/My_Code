@@ -1821,3 +1821,10 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 扩展 `verify-ai-editor-account-real-ui`：未登录时继续验证 Chat 和“需要登录”；已登录时改为验证“AI 服务正常”入口打开固定 `http://127.0.0.1:47920/admin#account` BrowserView。验证器不把 ticket、Cookie 或 Token 写入报告。
 - 当前本机隔离服务仍是上一已验证提交 `ebd18c6`，因此本轮实际完成未登录分支回归（`PASS`）；已登录管理页面分支等待 Black checkout 更新至 `a066744` 或更高稳定提交并完成真实 PKCE 登录后执行。
 - 共享 Proxy `47892` 本轮保持 PID `18120`、`/live=ok`；未停止、重启或修改。
+
+## 62. 2026-07-17 T118 macOS 静态发布门禁复核
+
+- 已执行 `node --experimental-strip-types build/darwin/verify-ai-editor-account-release.ts`、`npm --prefix build run typecheck` 和 `node --test build/lib/test/aiEditorAccountRelease.test.ts`；类型检查通过，发布门禁单测 `4/4 passing`。
+- 当前真实仓库报告为 `BLOCKED`，且阻断符合预期：迁移成品仍为 `legacy-standalone`、尚未冻结生产 HTTPS Gateway 地址、尚未提供生产 Edge 源码和 macOS Keychain 实现。
+- Edge/Gateway 发布白名单隔离与已打包产品不读取开发 Gateway override 均为 `PASS`。不会为了勾选 T118 而伪造 `edge` target 或写入本机 HTTP Gateway。
+- T118 保持未勾选，待生产 Edge、固定 HTTPS Gateway 和 Keychain 交付后以 `--require-final-edge` 重新执行并要求 `PASS`。
