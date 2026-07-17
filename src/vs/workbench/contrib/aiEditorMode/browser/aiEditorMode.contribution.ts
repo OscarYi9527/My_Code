@@ -353,8 +353,8 @@ export class AiEditorModeLayoutContribution extends Disposable implements IWorkb
 
 	private async openCodexSession(resource: URI, group: IEditorGroup): Promise<void> {
 		await this.agentHostService.refreshModels('codex').catch(() => {
-			// The readiness wait below remains authoritative on first launch;
-			// transient failures retain the last successful catalog.
+			// Opening the chat must not depend on a model catalog. For example,
+			// the account Edge intentionally rejects /v1/models before login.
 		});
 		await this.waitForCodexSessionContribution();
 		if (isUntitledChatSession(resource)) {
@@ -377,22 +377,10 @@ export class AiEditorModeLayoutContribution extends Disposable implements IWorkb
 				this.chatSessionsService.onDidChangeAvailability,
 				() => !!this.chatSessionsService.getChatSessionContribution(SessionType.AgentHostCodex)
 			)));
-		const modelsReady = this.hasCodexModels()
-			? Promise.resolve()
-			: Event.toPromise(Event.once(Event.filter(
-				this.agentHostService.rootState.onDidChange,
-				state => !(state instanceof Error) && state.agents.some(agent => agent.provider === 'codex' && agent.models.length > 0)
-			)));
 
-		await Promise.all([contributionReady, modelsReady]);
-	}
-
-	private hasCodexModels(): boolean {
-		const state = this.agentHostService.rootState.value;
-		if (!state || state instanceof Error) {
-			return false;
-		}
-		return state.agents.some(agent => agent.provider === 'codex' && agent.models.length > 0);
+		// The session contribution creates the Chat UI. Models are optional
+		// runtime data and can be unavailable until the user signs in.
+		await contributionReady;
 	}
 
 	private storeCodexSession(resource: URI): void {

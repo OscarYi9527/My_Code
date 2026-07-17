@@ -128,4 +128,18 @@ suite('AiEditorModeLayoutContribution', () => {
 			'finish:simple',
 		]);
 	});
+
+	test('allows the Codex chat session to open before the model catalog is available', async () => {
+		const contribution = Object.create(AiEditorModeLayoutContribution.prototype) as {
+			chatSessionsService: {
+				getChatSessionContribution(sessionType: string): object | undefined;
+			};
+			waitForCodexSessionContribution(): Promise<void>;
+		};
+		contribution.chatSessionsService = {
+			getChatSessionContribution: () => ({}),
+		};
+
+		await contribution.waitForCodexSessionContribution();
+	});
 });

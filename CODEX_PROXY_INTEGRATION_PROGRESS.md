@@ -1775,3 +1775,27 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   PowerShell/Electron main 环境，再使用独立 Code 用户、扩展和 shared-data 目录启动。
 - 脚本拒绝复用仍被 `code.lock` 占用的隔离 profile，避免第二次启动把新环境变量发送给
   已经用错误环境启动的旧窗口；不停止、重启或修改共享 `47892`。
+
+## 58. 2026-07-17 真实 Edge 未登录时的空白 AI 窗口修复
+
+### 根因
+
+- 真实隔离 Edge 在用户尚未登录时会正确拒绝 `/v1/models`（HTTP 401），因此 Codex 模型目录为空。
+- AI Editor 的布局恢复此前同时等待 Codex Chat session contribution 和非空模型目录；后一个条件在未登录时不会满足，导致右侧编辑器组已创建但从未打开 `agent-host-codex` Chat Editor，表现为空白窗口。
+
+### 修复
+
+- 布局恢复现在只等待 Codex Chat session contribution 注册后立即打开 Chat Editor。
+- `refreshModels('codex')` 继续作为尽力而为的后台刷新；模型目录不可用不再阻塞 Chat UI。
+- 未登录状态下用户会直接看到 Chat 内的“需要登录”账号状态；登录成功后模型目录按既有启动/手动刷新机制加载。
+- 新增回归测试，覆盖“模型目录尚不可用时仍可完成 Chat session 打开前置条件”。
+
+### 验证
+
+- `npm run typecheck-client`：通过。
+- `npm run compile`：通过，开发版 `out` 已同步。
+- 定向浏览器单测因本机 Playwright Chromium 缓存损坏/缺失而未能启动；安装器下载后未完成解压，未将该结果计为通过。
+- `npm run core-ci`：通过，`out-vscode-min` 已同步。
+- `npm run gulp vscode-win32-x64-min-ci`：打包阶段完成并更新 `D:\AI_prejoct\VSCode-win32-x64`；最终本机签名步骤因 `signtool.exe` 不在 PATH 返回 `ENOENT`，属于既有本机签名环境限制。
+- `scripts\verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、`cleanStart=true`、共享 Proxy `/live=ok`。
+- 本轮未停止、重启、修改或迁移共享 Proxy `127.0.0.1:47892`。
