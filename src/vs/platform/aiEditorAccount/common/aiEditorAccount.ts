@@ -59,6 +59,7 @@ export interface IAiEditorSafeStatus {
 	readonly role?: AiEditorAccountRole;
 	readonly currentModel?: string;
 	readonly availableCredits?: string;
+	readonly usedCreditsPercent?: string;
 	readonly errorId?: string;
 	readonly actions: readonly AiEditorAccountAction[];
 }

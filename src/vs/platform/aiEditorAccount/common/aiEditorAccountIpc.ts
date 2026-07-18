@@ -71,6 +71,7 @@ export function parseAiEditorSafeStatus(value: unknown): IAiEditorSafeStatus {
 		role,
 		currentModel: readOptionalSafeString(record, 'currentModel', 160),
 		availableCredits: readOptionalSafeString(record, 'availableCredits', 64),
+		usedCreditsPercent: readOptionalSafeString(record, 'usedCreditsPercent', 16),
 		errorId: readOptionalErrorId(record, 'errorId'),
 		actions: safeActions
 	};

@@ -112,6 +112,7 @@ Ordinary response:
   },
   "currentModel": "gpt-example",
   "availableCredits": "876.550000",
+  "usedCreditsPercent": "12.5",
   "actions": []
 }
 ```

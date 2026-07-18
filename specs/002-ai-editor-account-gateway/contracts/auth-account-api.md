@@ -169,7 +169,8 @@ Used before each new Turn and for 30-second refresh.
   "safeSummary": {
     "accountDisplay": "user@example.com",
     "currentModel": "gpt-example",
-    "availableCredits": "876.550000"
+    "availableCredits": "876.550000",
+    "usedCreditsPercent": "12.5"
   },
   "actions": []
 }

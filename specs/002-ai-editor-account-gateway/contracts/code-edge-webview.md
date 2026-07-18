@@ -36,6 +36,7 @@ interface IAiEditorSafeStatus {
   role?: 'level1' | 'level2' | 'user';
   currentModel?: string;
   availableCredits?: string;
+  usedCreditsPercent?: string;
   errorId?: string;
   actions: readonly ('login' | 'openAccount' | 'retry' | 'openDiagnostics')[];
 }

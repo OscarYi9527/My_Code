@@ -30,6 +30,7 @@ suite('AI Editor Account', () => {
 			},
 			currentModel: 'mock-gpt',
 			availableCredits: '1000.000000',
+			usedCreditsPercent: '12.5',
 			actions: ['openAccount', 'unsafeAction'],
 			providers: { secret: true }
 		}), {
@@ -39,6 +40,7 @@ suite('AI Editor Account', () => {
 			role: AiEditorAccountRole.User,
 			currentModel: 'mock-gpt',
 			availableCredits: '1000.000000',
+			usedCreditsPercent: '12.5',
 			errorId: undefined,
 			actions: [AiEditorAccountAction.OpenAccount]
 		});
@@ -125,6 +127,7 @@ suite('AI Editor Account', () => {
 			account: { display: `Oscar\u0000${'x'.repeat(200)}` },
 			currentModel: 'model\nsecret',
 			availableCredits: 'x'.repeat(100),
+			usedCreditsPercent: 'x'.repeat(100),
 			errorId: 'http://127.0.0.1/token=secret',
 			actions: []
 		});
@@ -132,6 +135,7 @@ suite('AI Editor Account', () => {
 		assert.strictEqual(status.accountDisplay, undefined);
 		assert.strictEqual(status.currentModel, undefined);
 		assert.strictEqual(status.availableCredits, undefined);
+		assert.strictEqual(status.usedCreditsPercent, undefined);
 		assert.strictEqual(status.errorId, undefined);
 	});
 });

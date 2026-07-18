@@ -29,17 +29,22 @@ export interface IAiEditorAccountStatusPresentation {
 export function getAiEditorAccountStatusPresentation(status: IAiEditorSafeStatus): IAiEditorAccountStatusPresentation {
 	switch (status.state) {
 		case AiEditorAccountState.Ready: {
-			const account = status.accountDisplay
-				? localize('aiEditor.account.status.account', " · {0}", status.accountDisplay)
-				: '';
-			const model = status.currentModel
-				? localize('aiEditor.account.status.model', " · {0}", status.currentModel)
-				: '';
-			const credits = status.availableCredits
-				? localize('aiEditor.account.status.credits', " · {0} 积分", status.availableCredits)
-				: '';
+			const credits = localize(
+				'aiEditor.account.status.credits',
+				" · 剩余额度 {0}",
+				status.availableCredits
+					? localize('aiEditor.account.status.creditsValue', "{0} 积分", status.availableCredits)
+					: localize('aiEditor.account.status.creditsUnknown', "—")
+			);
+			const usage = localize(
+				'aiEditor.account.status.usage',
+				" · 已使用 {0}",
+				status.usedCreditsPercent
+					? localize('aiEditor.account.status.usageValue', "{0}%", status.usedCreditsPercent)
+					: localize('aiEditor.account.status.usageUnknown', "—")
+			);
 			return {
-				label: localize('aiEditor.account.status.ready', "AI 服务正常{0}{1}{2}", account, model, credits),
+				label: localize('aiEditor.account.status.ready', "AI 服务正常{0}{1}", credits, usage),
 				tooltip: localize('aiEditor.account.status.readyTooltip', "AI Editor 账号可用。点击查看我的账号。")
 			};
 		}

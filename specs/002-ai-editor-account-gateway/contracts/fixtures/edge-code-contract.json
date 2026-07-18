@@ -12,7 +12,8 @@
 			"requiredFields": [
 				"account",
 				"currentModel",
-				"availableCredits"
+				"availableCredits",
+				"usedCreditsPercent"
 			],
 			"forbiddenFields": [
 				"errorId"
@@ -26,6 +27,7 @@
 				},
 				"currentModel": "mock-gpt",
 				"availableCredits": "1000.000000",
+				"usedCreditsPercent": "12.5",
 				"actions": []
 			}
 		},
@@ -38,7 +40,8 @@
 			"forbiddenFields": [
 				"account",
 				"currentModel",
-				"availableCredits"
+				"availableCredits",
+				"usedCreditsPercent"
 			],
 			"example": {
 				"state": "login_required",
@@ -57,7 +60,8 @@
 			"forbiddenFields": [
 				"account",
 				"currentModel",
-				"availableCredits"
+				"availableCredits",
+				"usedCreditsPercent"
 			],
 			"example": {
 				"state": "account_unavailable",
@@ -78,7 +82,8 @@
 			"forbiddenFields": [
 				"account",
 				"currentModel",
-				"availableCredits"
+				"availableCredits",
+				"usedCreditsPercent"
 			],
 			"example": {
 				"state": "service_unavailable",
@@ -98,7 +103,8 @@
 			"forbiddenFields": [
 				"account",
 				"currentModel",
-				"availableCredits"
+				"availableCredits",
+				"usedCreditsPercent"
 			],
 			"example": {
 				"state": "password_change_required",

@@ -15,18 +15,21 @@ import { getAiEditorAccountStatusPresentation } from '../../browser/aiEditorStat
 suite('AI Editor account status contribution', () => {
 	ensureNoDisposablesAreLeakedInTestSuite();
 
-	test('ready status includes only the safe account, model and credit summary', () => {
+	test('ready status includes only service state and safe credit usage summary', () => {
 		const presentation = getAiEditorAccountStatusPresentation({
 			...status(AiEditorAccountState.Ready),
 			accountDisplay: 'Oscar',
 			role: AiEditorAccountRole.User,
 			currentModel: 'gpt-mock',
-			availableCredits: '100'
+			availableCredits: '100',
+			usedCreditsPercent: '25'
 		});
 
-		assert.ok(presentation.label.includes('Oscar'));
-		assert.ok(presentation.label.includes('gpt-mock'));
+		assert.ok(presentation.label.includes('AI 服务正常'));
 		assert.ok(presentation.label.includes('100'));
+		assert.ok(presentation.label.includes('25%'));
+		assert.ok(!presentation.label.includes('Oscar'));
+		assert.ok(!presentation.label.includes('gpt-mock'));
 		assert.ok(!presentation.label.toLowerCase().includes('provider'));
 		assert.ok(!presentation.label.includes('47921'));
 	});
