@@ -158,6 +158,33 @@ Code-OSS Workbench
 - 上游凭据的信封加密延期到 MVP 验证后实施，具体边界、迁移和发布阻断条件见
   `AI_EDITOR_POST_MVP_ENCRYPTION_TODO.md`。
 
+## 2026-07-18 Black Provider 交付后的下一开发顺序
+
+Black 已推送
+`codex_proxy/feature/ai-editor-account-gateway@34a2a9ca193fdac19b630e521c373a73fb8927c1`：
+一级管理员 Provider/模型/路由管理、凭据掩码、脱敏诊断和隔离真实 Relay 链路已在
+Gateway 分支交付。该提交没有改变双方冻结的 Code/Edge 合同；它仍需通过真实 Code
+端联调，不能只凭服务端测试当作产品完成。
+
+1. **Oscar：先做联合 Gate A**
+   用隔离 Gateway `47920`、Edge `47921` 完成真实登录和强制改密后的重新 handoff，
+   然后执行 T047/T048/T090：Code 启动/手动模型刷新、Provider 动态模型变更、
+   `gpt-mock` 排除，以及订阅/非订阅模型各一条真实 SSE。此阶段不改共享 `47892`。
+2. **Black：优先补齐账户可用性**
+   完成 T091–T098（改密、临时重置、设备会话撤销、Edge 本机安全退出）。此前已经验证
+   首次登录会落入 `password_change_required`，而改密 UI/API 尚缺闭环；不解决它就不能
+   让普通用户稳定进入 `ready`。
+3. **双方：Gate B 与正式联调报告**
+   执行 T112/T113/T117，记录 PKCE、Webview、状态、模型、真实回复和共享 Proxy
+   不变量。报告必须脱敏，且不能包含 Token、nonce、ticket、Provider 凭据或用户原文。
+4. **Black：产品多租户主线**
+   先 T060–T068（组织/角色/邀请码/最后一级管理员保护），再 T069–T080
+   （月度积分、风险预留、并发幂等结算），最后 T100–T109（受限审计、留存、泄密扫描）。
+5. **Oscar：发布收口只在前置满足后开始**
+   仅当正式 HTTPS Gateway、生产 Edge、安全存储和 Black 的真实链路全部稳定时，切换
+   `productTarget=edge` 并执行 T116/T118 的 final-edge Windows/macOS 门禁；当前
+   `legacy-standalone` 迁移成品继续保持为非最终发布候选。
+
 ## 已完成的发布资源闭环
 
 ### G01 Proxy 运行时制品（Windows + macOS arm64 已完成）

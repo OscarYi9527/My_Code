@@ -1915,3 +1915,37 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   历史滚动区域高度为 `129472px`，对应完整历史已水合。
 - 该 UI 验证日志中未出现 `UriError` 或 `Failed to subscribe to existing session`。
 - 开发版与 Windows 产品版均已完成本轮构建/校验；共享 Proxy 未停止、重启或修改。
+
+## 69. 2026-07-18 Black Gateway Provider 交付后的联合开发顺序
+
+### 已核对的交付
+
+- 只读拉取 `OscarYi9527/codex_proxy` 后，Black 的最新远程提交为
+  `feature/ai-editor-account-gateway@34a2a9ca193fdac19b630e521c373a73fb8927c1`
+  （`feat(gateway): add Level-1 Provider management (T081-T089)`）。
+- 该提交新增一级管理员专用的 Provider/模型/路由配置、凭据掩码、脱敏诊断、隔离
+  ChatGPT 登录与对应 Gateway/Admin 测试；Black 的交接文档声明真实 `/v1/models` 与
+  `/v1/responses` Relay 链路已通过隔离测试。
+- 与双方已冻结的 `dca68160b25cee78b2c231c4fbd8398624ab93ff` 合同基线相比，
+  当前 My_Code 的 `contracts/` 没有新增差异；本轮不需要改动跨仓库接口。
+- 上述内容是 Black 分支和交接文档的交付证据，不替代 Oscar 的真实 Code 联调。
+  `tasks.md` 中 Black 所有权的复选框仍由 Black 在其交付记录中维护，Oscar 不代勾。
+
+### 后续顺序
+
+1. **联合验收 Gate A（Oscar 主责，立即执行）**：将隔离开发环境连接到
+   `47920/47921`，完成真实 PKCE 登录、强制改密后重新 handoff，并由 Code 执行
+   T047/T048/T090：启动和手动模型刷新、动态 Provider 模型增删、排除 `gpt-mock`，
+   以及订阅/非订阅模型各一次真实 SSE。
+2. **账户可用性闭环（Black 主责，优先于更大功能）**：完成 T091–T098 的改密、
+   一级管理员临时重置、设备撤销与本机安全退出。此前用户已实际发现
+   `password_change_required` 无法改密，这会阻塞正常用户从首次登录走到 `ready`。
+3. **联合验收 Gate B（双方）**：在真实 Provider 准备好后执行 T112/T113/T117，
+   输出脱敏报告，并确认共享 `47892` 的 PID、`/live` 与数据哈希完全不变。
+4. **多租户与计费（Black 主责，可与 Gate B 后半段并行）**：按依赖顺序完成
+   T060–T068（组织、角色、邀请码）后再完成 T069–T080（月度积分、风险预留、
+   并发幂等结算）。不得在组织权限未落地前开放积分分配。
+5. **审计与发布收口（Black/Oscar）**：Black 完成 T100–T109、T111、T120；
+   Oscar 仅在正式 HTTPS Gateway、生产 Edge 与 macOS Keychain 前置齐备后再推进
+   T116/T118 的 final-edge 门禁和 Windows/macOS 成品验收。当前不能把
+   `legacy-standalone` 成品伪装为 Edge 正式发布。
