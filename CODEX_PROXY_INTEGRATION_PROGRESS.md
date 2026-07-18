@@ -2199,6 +2199,8 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     `signtool.exe` 返回 `ENOENT`；
   - `verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、
     `cleanStart=true`、共享 Proxy `/live=ok`。
-- 当前隔离 `47920/47921` 仍为用户在本轮开始前启动的旧进程，未强制停止或替换；
-  因此新页面的应用内人工验收将在用户关闭测试窗口后进行。共享 `47892` 始终保持
+- 自动确认没有 AI Editor Code 进程后，已通过隔离开发脚本停止旧
+  `manual-visual-us5` Gateway/Edge，并使用相同独立数据目录载入新提交：
+  Gateway PID `35816`、Edge PID `43768`，`/live` 均为 `ok`。重启后 Edge 安全降级为
+  `login_required`，下一步由用户重新登录后完成应用内人工验收。共享 `47892` 始终保持
   PID `18120`、`/live=ok`，未停止、重启、修改或迁移。
