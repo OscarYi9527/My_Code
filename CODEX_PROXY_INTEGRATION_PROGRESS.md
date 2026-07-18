@@ -1964,3 +1964,11 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `max_completion_tokens`，旧模型仍使用 `max_tokens`；新增 3 个转换回归测试。
 - 下一步：仅重启隔离 Gateway/Edge `47920/47921` 以载入已提交修复，然后重新运行真实 SSE 验收。
   不停止、不重启或修改共享 `47892`。
+
+### 重启恢复结果
+
+- 隔离 Edge 重启时发现已有的 Windows DPAPI 绑定无法解封，旧实现会使 Edge 进程退出。
+  已修复为安全降级：无法读取的本机 Refresh Token 不会被使用，Edge 清除该失效本地绑定并以
+  `login_required` 启动，用户可通过新的 PKCE 登录重新建立安全 handoff。
+- 隔离 Gateway `47920` 和 Edge `47921` 已恢复健康；共享 Proxy `47892` 仍为原 PID 且
+  `/live=ok`。真实 SSE 验收须在用户重新登录后继续执行。
