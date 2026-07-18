@@ -2244,3 +2244,41 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 最新实现已加载到隔离 Gateway `47920`（PID `40584`）和 Edge `47921`
   （PID `38528`），`/live` 均为 `ok`，供用户继续人工验收。共享 Proxy `47892`
   保持 PID `18120`、`/live=ok`，未停止、重启、修改或迁移。
+
+## 80. 2026-07-18 US8 调用审计、正文保留与泄密回归
+
+- Gateway 分支 `codex/oscar-t091-account-security` 已完成 T100–T108 的实现和测试：
+  - 只从结构化 `user` 文本和最终 `assistant` 文本提取审计正文；
+  - 排除 system/developer、文件、图片、推理、工具调用和工具输出；
+  - 持久化前遮蔽 Bearer、OpenAI/GitHub/AWS Key、JWT、密码和 Token 赋值，并限制单段
+    正文最大 16 KB；
+  - AI Turn 完成后记录组织、账号、公共模型、时间和输入/输出 Token；
+  - 审计列表不返回正文，只有单条详情接口返回脱敏正文，查看成功、拒绝和不存在均写入
+    独立管理员审计；
+  - 二级管理员由服务端强制限制在本组织，一级管理员可以查询全部或指定组织；
+  - 一级管理员可设置组织正文保留期为 7–180 天；清理只删除正文并保留 Token、模型、
+    时间及组织聚合。
+- 管理 Web UI 新增“调用审计”导航和页面，包含组织筛选、调用列表、受审计的正文详情、
+  已清理正文的明确状态、管理员事件，以及一级管理员专属保留期设置。
+- 数据库新增版本化迁移，为管理员事件保存操作时角色和安全错误码；旧事件按兼容默认值
+  迁移，不读取或导出任何秘密正文。
+- T109 泄密回归已覆盖数据库、管理 API、日志和导出形状，测试秘密均未出现在扫描面。
+- 合同已同步到 `contracts/admin-api.md` 和 `contracts/code-edge-webview.md`。
+- 当前自动化结果：
+  - standalone/edge 根测试 `110/110`；
+  - Gateway 类型检查通过，完整测试 `101/101`；
+  - Admin Web 类型检查通过，完整测试 `27/27`；
+  - Gateway 覆盖率 `87.98% statements / 71.36% branches / 90.81% lines`；
+  - Admin 审计页面行覆盖率 `80.95%`，新增代码不低于 80% 的门禁通过；
+  - Gateway/Admin 生产构建和完整 `npm run release:check`：通过。
+- Code 双构建与 Windows 成品复核：
+  - `npm run compile`：通过；
+  - `npm run core-ci`：通过；
+  - Windows release verify：`PASS`，Workbench checksum `10/10`、
+    `cleanStart=true`、共享 Proxy `/live=ok`。
+- 完整发布门禁期间只通过指定隔离脚本停止和恢复 `47920/47921`；最新审计实现现运行于
+  Gateway PID `44444`、Edge PID `43808`，数据库迁移和管理前端资源均已实际加载。
+  Edge 重启后安全状态为 `login_required`，需用户重新完成产品登录后进行应用内审计页面
+  人工验收。共享 Proxy 始终保持 PID `18120`、`/live=ok`。
+- 按 Black/Oscar 任务所有权规则，`tasks.md` 中服务器复选框仍由服务器负责人统一更新；
+  Oscar 在本节记录实现、测试和联调证据，不代改对方任务状态。

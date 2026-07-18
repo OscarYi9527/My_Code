@@ -114,7 +114,9 @@ UI actions:
 | Service unavailable | 服务暂不可用 | Retry and show safe error ID |
 | Password change required | 需要修改密码 | Open account security route |
 
-Level 1 may additionally open diagnostics; that action is absent for other roles.
+Level 1 and Level 2 receive the organization-scoped `调用审计` route. Only Level 1 may select another
+organization or change the 7–180 day body retention policy. Level 1 may additionally open
+diagnostics; that action is absent for other roles.
 
 ## 6. Account Menu
 

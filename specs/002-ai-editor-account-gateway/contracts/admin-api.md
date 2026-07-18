@@ -101,17 +101,47 @@ Level 2 responses exclude:
 
 ## 6. Conversation and Admin Audit
 
-- `GET /audit/conversations`
-- `GET /audit/conversations/{auditId}`
-- `GET /audit/admin-events`
-- `PUT /organizations/{organizationId}/audit-retention`
+- `GET /api/v1/admin/audit/conversations`
+- `GET /api/v1/admin/audit/conversations/{auditId}`
+- `GET /api/v1/admin/audit/admin-events`
+- `PUT /api/v1/admin/organizations/{organizationId}/audit-retention`
 
 Rules:
 
 - Conversation query is organization-scoped for Level 2.
+- Conversation list responses contain metadata only and never contain user or assistant bodies.
 - Body access creates a separate `audit.conversation.view` admin event, including denied attempts.
 - System/developer/file/tool/reasoning payloads are never returned because they are never persisted.
 - Body deleted by retention returns metadata with `bodyDeletedAt`, not an empty ambiguous record.
+- Level 1 may query all organizations or select one organization; Level 2 is always forced to the
+  organization in the authenticated identity even if another query value is supplied.
+- Retention accepts an integer `days` value from 7 through 180. Updating the policy recomputes the
+  expiry of retained bodies; cleanup nulls only sanitized bodies and preserves model, time, account,
+  organization and Token aggregates.
+
+Conversation list shape:
+
+```json
+{
+  "conversations": [{
+    "id": "audit_opaque",
+    "turnId": "turn_opaque",
+    "accountId": "acct_opaque",
+    "organizationId": "org_opaque",
+    "modelId": "public-model",
+    "inputTokens": 120,
+    "outputTokens": 80,
+    "createdAt": "2026-07-18T10:00:00.000Z",
+    "bodyExpiresAt": "2026-08-17T10:00:00.000Z",
+    "bodyDeletedAt": null,
+    "redactionVersion": 1
+  }]
+}
+```
+
+The detail response adds only `userText` and `assistantText`. Both are nullable after retention
+cleanup. Admin events include actor role at action time, organization scope, stable action, target,
+outcome, safe error code and small sanitized metadata; they never contain conversation bodies.
 
 ## 7. Providers, Models and Diagnostics (Level 1 only)
 
