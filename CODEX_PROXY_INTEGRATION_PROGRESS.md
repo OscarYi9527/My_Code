@@ -2003,3 +2003,12 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   有效一级管理员保护。
 - 该授权策略是后续组织、账号、邀请码 API 和管理页面的唯一服务端权限基础；不依赖前端隐藏。
 - 下一步实现组织/账号/邀请码 repository 与 API，再接入管理 Web 页面。
+
+### 服务端管理 API 基线
+
+- 已增加隔离 Gateway 的组织、账号状态和邀请码管理 API 基线：
+  `GET/POST /api/v1/admin/organizations`、`GET /api/v1/admin/accounts`、
+  `POST /api/v1/admin/accounts/{id}/enable|disable`、`GET/POST /api/v1/admin/invitations`。
+- 所有端点均复用统一的 Level 1/Level 2 组织范围授权策略；邀请码只在创建响应中返回明文，
+  数据库存储带服务器密钥的摘要。
+- 管理 Web UI 与邀请码注册原子消费仍在后续实现中，当前 API 还不对普通用户开放。
