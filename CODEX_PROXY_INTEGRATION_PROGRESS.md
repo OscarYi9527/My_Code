@@ -2204,3 +2204,43 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   Gateway PID `35816`、Edge PID `43768`，`/live` 均为 `ok`。重启后 Edge 安全降级为
   `login_required`，下一步由用户重新登录后完成应用内人工验收。共享 `47892` 始终保持
   PID `18120`、`/live=ok`，未停止、重启、修改或迁移。
+
+## 79. 2026-07-18 ChatGPT 订阅账号快捷导入与 Code 原生安全桥接
+
+- 根据用户对 `47892/admin#accounts` 原有便捷流程的反馈，一级管理员的
+  “Provider 与模型”页面已在顶部直接增加“添加订阅账号”，无需先创建 Provider。
+- 统一添加弹窗支持 OpenAI 官方登录、选择或拖入 `auth.json`、手动粘贴
+  `auth.json`、设置账号名称和选择是否立即参与路由；新账号默认只保存、不参与路由。
+- Gateway 会自动创建或复用“ChatGPT 订阅池”，并按 `tokens.account_id` 去重；
+  重复导入会安全更新原凭据，不会生成重复上游账号。
+- Gateway 新增以下一级管理员接口：
+  - `POST /api/v1/admin/chatgpt-accounts/import`
+  - `POST /api/v1/admin/chatgpt-accounts/login/start`
+  - `GET /api/v1/admin/chatgpt-accounts/login/status`
+- Gateway 分支 `codex/oscar-t091-account-security` 的实现提交
+  `762be7a`（`feat(admin): streamline ChatGPT account import (T083/T088)`）已推送。
+- Code 增加受限原生桥接动作
+  `ai-editor-code://import-current-codex-account`：
+  - 仅当当前管理页属于固定 Gateway `/admin` 管理源时允许触发；
+  - 先显示 Code 原生确认框，再读取 `$CODEX_HOME/auth.json`，未设置时读取
+    `~/.codex/auth.json`；
+  - 文件必须是小于 256 KB 的普通非空文件，并包含
+    `tokens.access_token`、`tokens.refresh_token` 和 `tokens.account_id`；
+  - Token 不进入 URL、Workbench renderer IPC、`localStorage`、日志或诊断；
+    取消和失败只返回安全错误 ID；
+  - 只接受同源 Code 桥接消息。
+- `spec.md`、`data-model.md`、`contracts/admin-api.md` 和
+  `contracts/code-edge-webview.md` 已同步快捷导入、去重和安全边界。
+- 自动化验证：
+  - standalone/edge：`110/110`；
+  - Gateway：`95/95`，覆盖率 `88.5% statements / 71.97% branches`，门禁通过；
+  - Admin Web：`21/21`；
+  - Gateway/Admin 类型检查、生产构建和 `git diff --check`：通过；
+  - Code 定向测试：`16/16`；
+  - `npm run compile` 与 `npm run core-ci`：通过；
+  - Windows 产品内容已更新，打包仅在签名阶段因本机缺少 `signtool.exe` 返回
+    `ENOENT`；
+  - Windows release verify：`PASS`，checksum `10/10`、`cleanStart=true`。
+- 最新实现已加载到隔离 Gateway `47920`（PID `40584`）和 Edge `47921`
+  （PID `38528`），`/live` 均为 `ok`，供用户继续人工验收。共享 Proxy `47892`
+  保持 PID `18120`、`/live=ok`，未停止、重启、修改或迁移。

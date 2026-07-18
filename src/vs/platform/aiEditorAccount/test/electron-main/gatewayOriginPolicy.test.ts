@@ -7,6 +7,7 @@ import * as assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import {
 	AiEditorGatewayNavigationDecision,
+	AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL,
 	createAiEditorManagementUrl,
 	decideAiEditorGatewayNavigation
 } from '../../electron-main/gatewayOriginPolicy.js';
@@ -42,6 +43,21 @@ suite('AI Editor Gateway origin policy', () => {
 		);
 		assert.strictEqual(
 			decideAiEditorGatewayNavigation('https://evil.example/download', gatewayOrigin),
+			AiEditorGatewayNavigationDecision.Block
+		);
+	});
+
+	test('reserves one exact native action URL for importing the current Codex account', () => {
+		assert.strictEqual(
+			decideAiEditorGatewayNavigation(AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL, gatewayOrigin),
+			AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount
+		);
+		assert.strictEqual(
+			decideAiEditorGatewayNavigation(`${AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL}/other`, gatewayOrigin),
+			AiEditorGatewayNavigationDecision.Block
+		);
+		assert.strictEqual(
+			decideAiEditorGatewayNavigation(`${AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL}?auth=secret`, gatewayOrigin),
 			AiEditorGatewayNavigationDecision.Block
 		);
 	});

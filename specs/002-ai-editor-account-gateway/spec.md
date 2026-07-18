@@ -179,6 +179,10 @@ Provider、端口、熔断或凭据细节。
 7. **Given** API 或 Relay Provider 不提供上游余额查询接口，**When** 一级管理员查看该
    Provider，**Then** 页面显示 Gateway 统计的请求、Token 和结算积分，可选显示内部预算
    及剩余额度，并明确标识该预算不是上游官方余额。
+8. **Given** 一级管理员需要添加 ChatGPT 订阅账号，**When** 使用统一“添加订阅账号”
+   弹窗完成官方登录、选择/拖入/粘贴 `auth.json` 或确认一键导入当前 Codex 账号，
+   **Then** Gateway 自动创建或复用默认订阅池，按 `account_id` 更新重复账号且不回显
+   Token；用户无需先理解或创建 Provider。
 
 ---
 
@@ -361,6 +365,11 @@ Provider、端口、熔断或凭据细节。
   凭据及其他已识别秘密。
 - **FR-050**: MVP 本机 Gateway 可以按已记录的临时边界保存明文上游凭据，但在完成
   `AI_EDITOR_POST_MVP_ENCRYPTION_TODO.md` 前不得公开部署或接入真实生产凭据。
+- **FR-051**: 一级管理员添加 ChatGPT 订阅账号 MUST 使用统一快捷入口；Gateway MUST
+  自动创建或复用默认订阅池、按 `account_id` 去重更新，新账号默认不参与路由。
+- **FR-052**: “一键导入当前 Codex 账号” MUST 仅由固定 Gateway 管理源触发，必须经过
+  Code 原生确认，限制 `auth.json` 为 256 KB，并禁止完整凭据进入 URL、Workbench
+  renderer IPC、localStorage、诊断或日志。
 
 ### Key Entities
 

@@ -8,8 +8,11 @@ import { Disposable } from '../../../base/common/lifecycle.js';
 export const enum AiEditorGatewayNavigationDecision {
 	AllowInView = 'allowInView',
 	OpenExternal = 'openExternal',
+	ImportCurrentCodexAccount = 'importCurrentCodexAccount',
 	Block = 'block'
 }
+
+export const AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL = 'ai-editor-code://import-current-codex-account';
 
 export function decideAiEditorGatewayNavigation(
 	rawUrl: string,
@@ -23,6 +26,19 @@ export function decideAiEditorGatewayNavigation(
 		origin = new URL(gatewayOrigin);
 	} catch {
 		return AiEditorGatewayNavigationDecision.Block;
+	}
+
+	if (
+		url.protocol === 'ai-editor-code:' &&
+		url.hostname === 'import-current-codex-account' &&
+		(url.pathname === '' || url.pathname === '/') &&
+		!url.username &&
+		!url.password &&
+		!url.port &&
+		!url.search &&
+		!url.hash
+	) {
+		return AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount;
 	}
 
 	if (url.origin === origin.origin) {
@@ -59,6 +75,7 @@ export interface IAiEditorGatewayWebContents {
 		on(event: 'will-download', listener: (event: { preventDefault(): void }, item: unknown, webContents: IAiEditorGatewayWebContents) => void): void;
 		removeListener(event: 'will-download', listener: (event: { preventDefault(): void }, item: unknown, webContents: IAiEditorGatewayWebContents) => void): void;
 	};
+	getURL(): string;
 	on(event: 'will-navigate' | 'will-redirect', listener: (event: { preventDefault(): void }, url: string) => void): void;
 	removeListener(event: 'will-navigate' | 'will-redirect', listener: (event: { preventDefault(): void }, url: string) => void): void;
 	once(event: 'destroyed', listener: () => void): void;
@@ -71,7 +88,8 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 	constructor(
 		webContents: IAiEditorGatewayWebContents,
 		gatewayOrigin: string,
-		openExternal: (url: string) => Promise<void>
+		openExternal: (url: string) => Promise<void>,
+		importCurrentCodexAccount?: () => Promise<void>
 	) {
 		super();
 
@@ -88,6 +106,11 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 			event.preventDefault();
 			if (decision === AiEditorGatewayNavigationDecision.OpenExternal) {
 				void openExternal(url);
+			} else if (
+				decision === AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount &&
+				isTrustedManagementDocument(webContents.getURL(), gatewayOrigin)
+			) {
+				void importCurrentCodexAccount?.();
 			}
 		};
 		webContents.on('will-navigate', handleNavigation);
@@ -100,8 +123,14 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 		});
 
 		webContents.setWindowOpenHandler(details => {
-			if (decideAiEditorGatewayNavigation(details.url, gatewayOrigin, { isNewWindow: true }) === AiEditorGatewayNavigationDecision.OpenExternal) {
+			const decision = decideAiEditorGatewayNavigation(details.url, gatewayOrigin, { isNewWindow: true });
+			if (decision === AiEditorGatewayNavigationDecision.OpenExternal) {
 				void openExternal(details.url);
+			} else if (
+				decision === AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount &&
+				isTrustedManagementDocument(webContents.getURL(), gatewayOrigin)
+			) {
+				void importCurrentCodexAccount?.();
 			}
 			return { action: 'deny' };
 		});
@@ -119,4 +148,8 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 		webContents.once('destroyed', handleDestroyed);
 		this._register({ dispose: () => webContents.removeListener('destroyed', handleDestroyed) });
 	}
+}
+
+function isTrustedManagementDocument(rawUrl: string, gatewayOrigin: string): boolean {
+	return decideAiEditorGatewayNavigation(rawUrl, gatewayOrigin) === AiEditorGatewayNavigationDecision.AllowInView;
 }

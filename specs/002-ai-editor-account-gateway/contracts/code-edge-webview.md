@@ -175,6 +175,35 @@ Navigation policy:
 - Generic integrated-browser context menus, sharing, inspection and browser actions are unavailable.
 - CSP disallows inline/eval script and restricts connect/frame/form targets to the Gateway origin.
 
+Current Codex account import is the only native management action:
+
+1. The Level-1 Provider page navigates to the exact fixed action URL
+   `ai-editor-code://import-current-codex-account`; it never puts a credential or file path in the URL.
+2. Electron main handles the action only when the current BrowserView document is the configured
+   same-origin `/admin` management page. Variants with path, query, fragment, port or credentials are
+   blocked. Untrusted documents and all other custom schemes are blocked.
+3. Code displays a native confirmation before reading a file. Cancellation performs no read and
+   returns only `current_codex_account_import_cancelled`.
+4. After confirmation, Code reads `CODEX_HOME/auth.json`, or `~/.codex/auth.json` when `CODEX_HOME`
+   is unset. The file MUST be a non-empty regular file no larger than 256 KB and contain non-empty
+   `tokens.access_token`, `tokens.refresh_token` and `tokens.account_id`.
+5. Electron main injects one transient isolated-world message:
+
+   ```json
+   {
+     "type": "ai-editor-current-codex-auth",
+     "version": 1,
+     "authJson": "{...}"
+   }
+   ```
+
+   On cancellation/failure it sends `errorId` instead of `authJson`; both fields together or neither
+   are invalid. The page accepts the message only from `window` and its exact Gateway origin, submits
+   it immediately to the Level-1 Gateway import API, and clears textarea/file/local references when
+   the request finishes.
+6. The full credential MUST NOT enter Workbench renderer IPC, URL/query/fragment, localStorage,
+   diagnostics or logs. Gateway authorization remains the final security boundary.
+
 ## 8. Configuration
 
 Development:

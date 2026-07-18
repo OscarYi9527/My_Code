@@ -21,8 +21,10 @@ import {
 	AiEditorAccountMainServiceCore,
 	disposeAiEditorManagementView,
 	performAiEditorAccountLogin,
-	prepareAiEditorManagementView
+	prepareAiEditorManagementView,
+	validateAiEditorCurrentCodexAuthJson
 } from '../../electron-main/aiEditorAccountMainService.js';
+import { AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL } from '../../electron-main/gatewayOriginPolicy.js';
 
 suite('AI Editor Account main service', () => {
 	const store = ensureNoDisposablesAreLeakedInTestSuite();
@@ -268,6 +270,108 @@ suite('AI Editor Account main service', () => {
 		assert.match(injectedCode, /method: 'DELETE'/);
 		assert.ok(injectedCode.includes('/api/v1/webview/session'));
 		destroyedListener?.();
+	});
+
+	test('validates the minimum Codex auth.json shape before native import', () => {
+		const valid = validateAiEditorCurrentCodexAuthJson(JSON.stringify({
+			tokens: {
+				access_token: 'access-secret',
+				refresh_token: 'refresh-secret',
+				account_id: 'account-id'
+			}
+		}));
+		assert.deepStrictEqual(JSON.parse(valid), {
+			tokens: {
+				access_token: 'access-secret',
+				refresh_token: 'refresh-secret',
+				account_id: 'account-id'
+			}
+		});
+		assert.throws(
+			() => validateAiEditorCurrentCodexAuthJson(JSON.stringify({
+				tokens: { access_token: 'access-only' }
+			})),
+			(error: unknown) => error instanceof AiEditorAccountHttpError &&
+				error.errorId === 'current_codex_auth_invalid'
+		);
+	});
+
+	test('handles the exact native import action only from the trusted management document', async () => {
+		let currentUrl = 'about:blank';
+		let navigate: ((event: { preventDefault(): void }, url: string) => void) | undefined;
+		const injectedCode: string[] = [];
+		let importCalls = 0;
+		const webContents = {
+			isDestroyed: () => false,
+			getURL: () => currentUrl,
+			executeJavaScriptInIsolatedWorld: async (_worldId: number, scripts: readonly { readonly code: string }[]) => {
+				injectedCode.push(scripts[0].code);
+			},
+			on: (event: string, listener: (event: { preventDefault(): void }, url: string) => void) => {
+				if (event === 'will-navigate') {
+					navigate = listener;
+				}
+			},
+			once: () => undefined,
+			removeListener: () => undefined,
+			removeAllListeners: () => undefined,
+			setWindowOpenHandler: () => undefined,
+			session: {
+				on: () => undefined,
+				removeListener: () => undefined
+			}
+		} as unknown as Electron.WebContents;
+		const view = {
+			webContents,
+			loadURL: async (url: string) => { currentUrl = url; }
+		};
+		await prepareAiEditorManagementView({
+			viewId: AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			route: AiEditorManagementRoute.Providers,
+			gatewayOrigin: 'http://127.0.0.1:47920',
+			client: {
+				requestWebviewTicket: async () => ({
+					ticket: 'one-time-management-ticket',
+					expiresIn: 60
+				})
+			},
+			browserViewMainService: {
+				tryGetBrowserView: () => view
+			},
+			openExternal: async () => undefined,
+			importCurrentCodexAccount: async () => {
+				importCalls++;
+				return {
+					authJson: JSON.stringify({
+						tokens: {
+							access_token: 'native-access-secret',
+							refresh_token: 'native-refresh-secret',
+							account_id: 'native-account-id'
+						}
+					})
+				};
+			}
+		});
+
+		let prevented = false;
+		navigate?.({ preventDefault: () => { prevented = true; } }, AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		assert.strictEqual(prevented, true);
+		assert.strictEqual(importCalls, 1);
+		assert.ok(injectedCode.at(-1)?.includes('ai-editor-current-codex-auth'));
+		assert.ok(injectedCode.at(-1)?.includes('native-access-secret'));
+		assert.ok(!currentUrl.includes('native-access-secret'));
+
+		currentUrl = 'about:blank';
+		navigate?.({ preventDefault: () => undefined }, AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		assert.strictEqual(importCalls, 1);
+
+		await disposeAiEditorManagementView(
+			AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			'http://127.0.0.1:47920',
+			{ tryGetBrowserView: () => view }
+		);
 	});
 });
 

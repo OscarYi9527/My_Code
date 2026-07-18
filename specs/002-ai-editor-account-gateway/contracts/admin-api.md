@@ -127,12 +127,33 @@ Rules:
 - `PUT /providers/{providerId}/internal-budget`
 - `POST /providers/{providerId}/chatgpt-login/start`
 - `GET /providers/{providerId}/chatgpt-login/status`
+- `POST /chatgpt-accounts/import`
+- `POST /chatgpt-accounts/login/start`
+- `GET /chatgpt-accounts/login/status`
 - `GET /models`
 - `PUT /models/{modelId}`
 - `GET /diagnostics`
 - `GET /diagnostics/providers`
 - `GET /diagnostics/circuits`
 - `GET /diagnostics/recent-route-errors`
+
+The three `/chatgpt-accounts/*` routes are the product shortcut used by the dedicated management
+page. They remain Level-1-only:
+
+- `POST /chatgpt-accounts/import` accepts `{ "authJson", "label", "routingEnabled" }`.
+- `authJson` MUST be valid JSON with non-empty `tokens.access_token`,
+  `tokens.refresh_token` and `tokens.account_id`, and MUST be rejected above 256 KB.
+- Gateway automatically reuses an existing ChatGPT Provider or creates the default
+  `ChatGPT 订阅池`; the administrator does not create a Provider first.
+- Import is an upsert keyed by the upstream `account_id`. Re-import rotates the stored credential
+  while preserving the Gateway credential ID; it MUST NOT create duplicate account cards.
+- New accounts default to `routingEnabled=false` unless explicitly enabled.
+- Responses return only Provider/credential IDs, a masked account-ID preview, created/updated state,
+  routing state and the MVP plaintext warning. Access Token, Refresh Token, ID Token and full
+  `authJson` are never returned.
+- Shortcut official login accepts the same `label` and `routingEnabled` settings, automatically
+  creates/reuses the pool, and imports the completed login through the same upsert operation.
+- All allowed and denied shortcut operations create redacted admin audit events.
 
 Credential responses contain only:
 

@@ -301,6 +301,12 @@ reserved/streaming → abandoned (reconciler only)
 | `createdAt`, `updatedAt`, `lastUsedAt` | Lifecycle | UTC |
 | `revokedAt` | Revocation | Nullable |
 
+ChatGPT shortcut imports derive a logical upstream identity from `tokens.account_id`. Within all
+ChatGPT Providers this value is the upsert key: importing the same upstream account updates
+`secretPayload` and `updatedAt` on the existing `ProviderCredential`, preserving its `id`, account
+policy and runtime history. A new shortcut import automatically creates/reuses the default ChatGPT
+Provider and defaults `routingEnabled` to `false`.
+
 ### ModelRoute
 
 | Field | Meaning | Rules |

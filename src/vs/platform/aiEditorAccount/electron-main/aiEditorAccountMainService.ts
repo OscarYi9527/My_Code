@@ -72,6 +72,11 @@ export interface IAiEditorAccountMainServiceDependencies {
 	readonly logSafeError?: (errorId: string) => void;
 }
 
+export interface IAiEditorCurrentCodexAccountImportResult {
+	readonly authJson?: string;
+	readonly errorId?: string;
+}
+
 export class AiEditorAccountMainServiceCore extends Disposable implements IAiEditorAccountMainService {
 	declare readonly _serviceBrand: undefined;
 
@@ -254,6 +259,78 @@ async function createPkce(): Promise<IAiEditorPkce> {
 	};
 }
 
+export function validateAiEditorCurrentCodexAuthJson(raw: string): string {
+	if (!raw || raw.length > 256 * 1024) {
+		throw new AiEditorAccountHttpError('current_codex_auth_invalid');
+	}
+	let parsed: Record<string, unknown>;
+	try {
+		const value = JSON.parse(raw) as unknown;
+		if (!value || typeof value !== 'object' || Array.isArray(value)) {
+			throw new Error('invalid root');
+		}
+		parsed = value as Record<string, unknown>;
+	} catch {
+		throw new AiEditorAccountHttpError('current_codex_auth_invalid');
+	}
+	const tokens = parsed['tokens'];
+	if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) {
+		throw new AiEditorAccountHttpError('current_codex_auth_invalid');
+	}
+	const tokenRecord = tokens as Record<string, unknown>;
+	for (const name of ['access_token', 'refresh_token', 'account_id']) {
+		const value = tokenRecord[name];
+		if (typeof value !== 'string' || !value.trim() || value.length > 64 * 1024) {
+			throw new AiEditorAccountHttpError('current_codex_auth_invalid');
+		}
+	}
+	return JSON.stringify(parsed);
+}
+
+async function promptAndReadCurrentCodexAccount(): Promise<IAiEditorCurrentCodexAccountImportResult> {
+	const { dialog } = await import('electron');
+	const confirmation = await dialog.showMessageBox({
+		type: 'question',
+		title: '导入当前 Codex 账号',
+		message: '是否将本机当前 Codex 账号导入 ChatGPT 订阅池？',
+		detail: 'Code 只会在你确认后读取 CODEX_HOME/auth.json。凭据将提交给当前 AI Editor Gateway，页面和日志不会显示完整 Token。',
+		buttons: ['确认导入', '取消'],
+		defaultId: 1,
+		cancelId: 1,
+		noLink: true
+	});
+	if (confirmation.response !== 0) {
+		return { errorId: 'current_codex_account_import_cancelled' };
+	}
+
+	const path = await import('path');
+	const os = await import('os');
+	const fs = await import('fs/promises');
+	const configuredHome = process.env['CODEX_HOME']?.trim();
+	const codexHome = configuredHome
+		? path.resolve(configuredHome)
+		: path.join(os.homedir(), '.codex');
+	const authFile = path.join(codexHome, 'auth.json');
+	let raw: string | undefined;
+	try {
+		const stat = await fs.stat(authFile);
+		if (!stat.isFile() || stat.size <= 0 || stat.size > 256 * 1024) {
+			return { errorId: 'current_codex_auth_invalid' };
+		}
+		raw = await fs.readFile(authFile, 'utf8');
+		return { authJson: validateAiEditorCurrentCodexAuthJson(raw) };
+	} catch (error) {
+		const errorId = safeErrorId(error);
+		return {
+			errorId: errorId === 'current_codex_auth_invalid'
+				? errorId
+				: 'current_codex_auth_unavailable'
+		};
+	} finally {
+		raw = undefined;
+	}
+}
+
 function createRuntimeDependencies(
 	environmentMainService: IEnvironmentMainService,
 	productService: IProductService,
@@ -297,7 +374,8 @@ function createRuntimeDependencies(
 				gatewayOrigin,
 				client,
 				browserViewMainService: await getBrowserViewMainService(),
-				openExternal: loginDependencies.openExternal
+				openExternal: loginDependencies.openExternal,
+				importCurrentCodexAccount: promptAndReadCurrentCodexAccount
 			});
 		},
 		disposeManagementView: async viewId => disposeAiEditorManagementView(
@@ -310,6 +388,7 @@ function createRuntimeDependencies(
 }
 
 const managementPolicies = new WeakMap<Electron.WebContents, AiEditorGatewayOriginPolicy>();
+const managementImportOperations = new WeakSet<Electron.WebContents>();
 
 export async function prepareAiEditorManagementView(options: {
 	readonly viewId: string;
@@ -323,6 +402,7 @@ export async function prepareAiEditorManagementView(options: {
 		} | undefined;
 	};
 	readonly openExternal: (url: string) => Promise<void>;
+	readonly importCurrentCodexAccount?: () => Promise<IAiEditorCurrentCodexAccountImportResult>;
 }): Promise<void> {
 	if (options.viewId !== AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID || !isAiEditorManagementRoute(options.route)) {
 		throw new AiEditorAccountHttpError('account_management_request_invalid');
@@ -337,9 +417,66 @@ export async function prepareAiEditorManagementView(options: {
 	}
 
 	if (!managementPolicies.has(view.webContents)) {
+		const importCurrentCodexAccount = async () => {
+			if (!options.importCurrentCodexAccount || managementImportOperations.has(view.webContents)) {
+				return;
+			}
+			managementImportOperations.add(view.webContents);
+			let authJson: string | undefined;
+			try {
+				const result = await options.importCurrentCodexAccount();
+				authJson = result.authJson;
+				const errorId = typeof result.errorId === 'string' && /^[a-z0-9_]{1,80}$/.test(result.errorId)
+					? result.errorId
+					: undefined;
+				if ((authJson ? 1 : 0) + (errorId ? 1 : 0) !== 1) {
+					throw new AiEditorAccountHttpError('current_codex_account_import_failed');
+				}
+				if (
+					view.webContents.isDestroyed() ||
+					decideAiEditorGatewayNavigation(view.webContents.getURL(), options.gatewayOrigin!) !== AiEditorGatewayNavigationDecision.AllowInView
+				) {
+					return;
+				}
+				const payload = JSON.stringify({
+					type: 'ai-editor-current-codex-auth',
+					version: 1,
+					...(authJson ? { authJson } : { errorId })
+				});
+				const targetOrigin = JSON.stringify(options.gatewayOrigin);
+				await view.webContents.executeJavaScriptInIsolatedWorld(
+					1001,
+					[{ code: `window.postMessage(${payload}, ${targetOrigin});` }]
+				);
+			} catch {
+				if (
+					!view.webContents.isDestroyed() &&
+					decideAiEditorGatewayNavigation(view.webContents.getURL(), options.gatewayOrigin!) === AiEditorGatewayNavigationDecision.AllowInView
+				) {
+					const payload = JSON.stringify({
+						type: 'ai-editor-current-codex-auth',
+						version: 1,
+						errorId: 'current_codex_account_import_failed'
+					});
+					const targetOrigin = JSON.stringify(options.gatewayOrigin);
+					await view.webContents.executeJavaScriptInIsolatedWorld(
+						1001,
+						[{ code: `window.postMessage(${payload}, ${targetOrigin});` }]
+					);
+				}
+			} finally {
+				authJson = undefined;
+				managementImportOperations.delete(view.webContents);
+			}
+		};
 		managementPolicies.set(
 			view.webContents,
-			new AiEditorGatewayOriginPolicy(view.webContents, options.gatewayOrigin, options.openExternal)
+			new AiEditorGatewayOriginPolicy(
+				view.webContents,
+				options.gatewayOrigin,
+				options.openExternal,
+				importCurrentCodexAccount
+			)
 		);
 	}
 
