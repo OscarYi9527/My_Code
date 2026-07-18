@@ -2049,3 +2049,40 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `/live=ok`，未停止、重启或修改。
 - US4 尚未全部完成：一级管理员的角色任命/撤销（`PUT /accounts/{id}/role`）和对应
   管理页面仍是下一项工作，因此不把 T065 或整个 US4 提前标记为完成。
+
+## 75. 2026-07-18 US4 管理员角色任命与应用内最终验收
+
+- Gateway 分支 `codex/oscar-t091-account-security` 已继续提交并推送：
+  - `24dfb6f`：账号角色与组织归属 API、Repository、服务和管理 UI；
+  - `2a2e747`：角色变更被服务端拒绝时恢复界面草稿，避免下拉框显示未生效角色。
+- 新增 `PUT /api/v1/admin/accounts/{accountId}/role`：
+  - 只有一级管理员可以调用；
+  - 可在普通用户、二级管理员和一级管理员之间任命或撤销角色；
+  - 二级管理员和普通用户必须绑定有效组织，一级管理员不绑定组织；
+  - 角色变更与最后一个有效一级管理员保护在同一事务中执行；
+  - 账号版本随角色变化递增，使旧角色 Access Token 立即失效。
+- 管理页面现在明确提示“用户先通过组织邀请码注册，再由一级管理员任命管理员角色”，
+  并提供角色、组织归属和保存操作；二级管理员看不到该控件，不能依赖客户端绕过权限。
+- 账号页面和角色徽标已将 `level1/level2/user`、`active/disabled/expired` 改为中文显示。
+- 自动化验证：
+  - standalone/edge 根测试 `110/110`；
+  - Gateway `73/73`；
+  - Admin Web `15/15`；
+  - `npm run release:check`：通过；
+  - 最后一级管理员降级、一级管理员任命二级管理员、二级管理员直接调用角色 API 被拒绝、
+    被拒绝后的界面角色草稿恢复均有回归测试。
+- 真实开发版 Code 应用内验收已通过：
+  - “AI 服务正常”打开固定单实例“AI Editor 管理”标签页；
+  - 一级管理员在“组织用户”中把测试普通用户任命为二级管理员，再撤销回普通用户；
+  - 尝试降级最后一个一级管理员时服务端拒绝，账号仍显示“一级管理员”，下拉框也自动恢复；
+  - 页面正文不再显示原始 `level1` 或 `active` 英文状态。
+- 最终双构建：
+  - `npm run compile`：通过；
+  - `npm run core-ci`：通过；
+  - Windows 打包内容已更新；签名阶段仍仅因本机没有 `signtool.exe` 返回 `ENOENT`；
+  - `verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、
+    `cleanStart=true`、共享 Proxy `/live=ok`。
+- 隔离验证 Code/profile 已关闭并清理，Gateway/Edge `47920/47921` 已通过指定安全脚本停止；
+  共享 Proxy 始终为 PID `18120`、`/live=ok`，未停止、重启、修改或迁移。
+- T060–T068 的实现和验收证据现已齐备；`tasks.md` 的跨仓库复选框仍按既定协作规则由
+  对应仓库负责人统一更新，避免 Oscar 与 Black 同时修改任务状态产生冲突。
