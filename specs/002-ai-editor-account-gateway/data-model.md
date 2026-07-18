@@ -284,6 +284,7 @@ reserved/streaming → abandoned (reconciler only)
 | `displayName` | Admin display | Sanitized |
 | `status` | `enabled`, `disabled` | Level 1 only |
 | `configSanitized` | Non-secret routing config | JSON |
+| `internalBudgetCredits` | Optional Gateway-side Provider budget | Level 1 only; not an upstream balance |
 | `createdAt`, `updatedAt` | Lifecycle | UTC |
 
 ### ProviderCredential
@@ -294,6 +295,9 @@ reserved/streaming → abandoned (reconciler only)
 | `storageFormat` | `plaintext-v1`, later `envelope-v1` | MVP local only for plaintext |
 | `secretPayload` | Credential payload | Never return via API |
 | `maskedPreview` | Fixed safe preview | Returnable to Level 1 |
+| `label`, `accountIdPreview` | Administrator label and masked upstream identity | Level 1 only |
+| `accountPolicy` | Route enabled, weight, quota reserve, daily limits and reserved models | Reuses standalone account-pool semantics |
+| `quotaSnapshot`, `runtimeHealth` | Provider quota windows, cooldown, concurrency and health | Safe runtime projection; no Token or full credential |
 | `createdAt`, `updatedAt`, `lastUsedAt` | Lifecycle | UTC |
 | `revokedAt` | Revocation | Nullable |
 

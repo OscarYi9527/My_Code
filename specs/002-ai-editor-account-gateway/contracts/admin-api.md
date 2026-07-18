@@ -121,6 +121,10 @@ Rules:
 - `DELETE /providers/{providerId}`
 - `POST /providers/{providerId}/credentials`
 - `DELETE /providers/{providerId}/credentials/{credentialId}`
+- `PATCH /providers/{providerId}/credentials/{credentialId}/routing`
+- `POST /providers/{providerId}/credentials/{credentialId}/refresh-usage`
+- `PUT /providers/{providerId}/account-routing-strategy`
+- `PUT /providers/{providerId}/internal-budget`
 - `POST /providers/{providerId}/chatgpt-login/start`
 - `GET /providers/{providerId}/chatgpt-login/status`
 - `GET /models`
@@ -138,9 +142,80 @@ Credential responses contain only:
   "maskedPreview": "sk-...abcd",
   "storageFormat": "plaintext-v1",
   "updatedAt": "2026-07-15T10:00:00Z",
-  "lastUsedAt": null
+  "lastUsedAt": "2026-07-15T10:01:00Z",
+  "label": "订阅账号 A",
+  "accountIdPreview": "acct-a...93fd",
+  "status": "active",
+  "routing": {
+    "enabled": true,
+    "weight": 8,
+    "lowQuotaThreshold": 10,
+    "dailyRequestLimit": 0,
+    "dailyTokenLimit": 0,
+    "reservedModels": []
+  },
+  "quota": {
+    "source": "provider",
+    "primary": {
+      "usedPercent": 25,
+      "remainingPercent": 75,
+      "resetsAt": 1800000000,
+      "windowMinutes": 300
+    },
+    "secondary": null,
+    "updatedAt": "2026-07-15T10:01:00Z",
+    "syncStatus": "synced",
+    "syncError": null
+  },
+  "runtime": {
+    "activeRequests": 1,
+    "concurrencyLimit": 3,
+    "cooldownUntil": null,
+    "modelCooldowns": 0
+  },
+  "health": {
+    "requests": 20,
+    "successRate": 95,
+    "p95LatencyMs": 820,
+    "rateLimited": 1,
+    "lastRequestAt": "2026-07-15T10:01:00Z",
+    "lastErrorType": null,
+    "lastErrorMessage": null
+  }
 }
 ```
+
+Provider list responses also contain a safe account-pool summary with the active standalone-compatible
+routing strategy, queue depth and recent redacted route decisions. ChatGPT quota windows are read from
+the real upstream quota endpoint. When a Provider does not expose a quota endpoint, the response uses
+`quota.source="unavailable"` and MUST NOT fabricate a remaining percentage.
+
+Account-pool scheduling, quota reserve, cooldown, adaptive concurrency, daily request/Token limits,
+reserved models and route-selection behavior reuse the existing standalone Proxy implementation. The
+Gateway database remains the source of truth for administrator-controlled labels and routing policy;
+runtime usage, cooldown and health state never reveal access/refresh Tokens.
+
+For API/Relay Providers without an upstream quota endpoint, the Provider response includes Gateway
+settlement totals:
+
+```json
+{
+  "usage": {
+    "requests": 20,
+    "inputTokens": 12000,
+    "outputTokens": 4000,
+    "settledCredits": "80.000000",
+    "internalBudgetCredits": "500.000000",
+    "remainingCredits": "420.000000",
+    "usedPercent": "16",
+    "lastUsedAt": "2026-07-15T10:01:00Z"
+  }
+}
+```
+
+The internal budget is explicitly a Gateway accounting limit, not a fabricated upstream balance.
+Clearing `internalBudgetCredits` removes the limit while preserving actual request, Token and settlement
+history.
 
 MVP local `plaintext-v1` responses show a persistent warning and Gateway refuses non-loopback/public
 production startup while any real credential remains in that format.

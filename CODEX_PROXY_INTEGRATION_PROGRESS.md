@@ -2158,3 +2158,47 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 根测试 `110/110`、Gateway `89/89`、Admin Web `17/17` 通过；
   Gateway/Admin 类型检查与生产构建通过。完整 `release:check` 的隔离脚本阶段因用户正在
   使用 `47920/47921` 手动验证而未强制停止服务；未中断用户测试，也未操作共享 `47892`。
+
+## 78. 2026-07-18 一级管理员 Provider 账号池与模型管理增强
+
+- 用户确认：一级管理员的“Provider 与模型”页面同时迁移现有
+  `47892/admin#accounts` 的视觉层级和账号额度、健康、并发、路由策略等核心能力；
+  账号选择、额度保护、冷却、熔断和故障切换继续沿用现有 standalone Proxy 逻辑，
+  不创建第二套调度实现。
+- Gateway Provider 管理现在按“Provider 分组、上游账号/凭据卡片、模型路由”显示：
+  - ChatGPT 每个上游账号独立显示真实短/长额度窗口、重置时间、套餐、冷却、模型冷却、
+    自适应并发、成功率、请求数、P95 延迟和最近安全错误；
+  - 可编辑账号名称、是否参与路由、权重、额度保护线、每日请求/Token 上限和保留模型；
+  - 可选择现有 Proxy 的优先级、轮询、额度余量、最少使用、低延迟、稳定性、权重、
+    随机和会话粘性策略；
+  - 支持主动刷新单账号真实额度，并显示脱敏的最近账号路由决策；
+  - API/DeepSeek/Relay 不伪造官方剩余额度，改为显示 Gateway 实际请求、输入/输出
+    Token、已结算积分，并允许一级管理员设置明确标注的内部积分预算；
+  - Provider 卡片显示脱敏健康和熔断摘要，模型卡片可启停路由和修改优先级。
+- Gateway 数据库仍是账号名称、调度策略和内部预算的配置来源；嵌入式 standalone
+  运行时继续负责额度刷新、冷却、账号选择和健康统计。Gateway 对外只返回脱敏账号 ID
+  和白名单运行字段，Access Token、Refresh Token、API Key 和完整凭据均不回显。
+- 新增/扩展一级管理员 API：
+  - `PATCH /api/v1/admin/providers/{providerId}/credentials/{credentialId}/routing`
+  - `POST /api/v1/admin/providers/{providerId}/credentials/{credentialId}/refresh-usage`
+  - `PUT /api/v1/admin/providers/{providerId}/account-routing-strategy`
+  - `PUT /api/v1/admin/providers/{providerId}/internal-budget`
+  二级管理员和普通用户调用上述接口均由服务端返回 `403`，拒绝事件写入脱敏审计。
+- 合同已同步到 `spec.md`、`data-model.md` 和 `contracts/admin-api.md`；Black 所有权的
+  T081–T089 复选框仍不由 Oscar 代勾。
+- 自动化验证：
+  - standalone/edge 根测试：`110/110`；
+  - Gateway：`92/92`，覆盖率门禁通过；
+  - Admin Web：`19/19`；
+  - Gateway/Admin 类型检查与生产构建通过；
+  - `git diff --check` 通过。
+- Code 双构建与 Windows 成品：
+  - `npm run compile`：通过；
+  - `npm run core-ci`：通过；
+  - `vscode-win32-x64-min-ci` 已完成产品内容更新，最终仅因本机没有
+    `signtool.exe` 返回 `ENOENT`；
+  - `verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、
+    `cleanStart=true`、共享 Proxy `/live=ok`。
+- 当前隔离 `47920/47921` 仍为用户在本轮开始前启动的旧进程，未强制停止或替换；
+  因此新页面的应用内人工验收将在用户关闭测试窗口后进行。共享 `47892` 始终保持
+  PID `18120`、`/live=ok`，未停止、重启、修改或迁移。

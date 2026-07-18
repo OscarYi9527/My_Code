@@ -170,6 +170,15 @@ Provider、端口、熔断或凭据细节。
    可选模型与 Gateway 当前授权目录一致。
 4. **Given** Provider 发生路由失败，**When** 一级管理员打开诊断，**Then** 可以查看
    脱敏的 Provider 状态、熔断状态和最近路由错误。
+5. **Given** ChatGPT Provider 下存在多个上游账号，**When** 一级管理员打开 Provider
+   页面，**Then** 每个账号以独立卡片显示真实额度窗口、运行健康、并发、冷却和脱敏标识，
+   并可设置是否参与路由、权重、额度保护线及每日请求/Token 上限。
+6. **Given** 一级管理员修改账号池策略或账号调度参数，**When** 下一次请求进入 Gateway，
+   **Then** Gateway 沿用现有 standalone Proxy 的账号选择、额度保护、冷却和故障切换逻辑，
+   且配置在 Gateway 重启后仍然有效。
+7. **Given** API 或 Relay Provider 不提供上游余额查询接口，**When** 一级管理员查看该
+   Provider，**Then** 页面显示 Gateway 统计的请求、Token 和结算积分，可选显示内部预算
+   及剩余额度，并明确标识该预算不是上游官方余额。
 
 ---
 
