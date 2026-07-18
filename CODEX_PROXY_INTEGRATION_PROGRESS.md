@@ -2086,3 +2086,52 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   共享 Proxy 始终为 PID `18120`、`/live=ok`，未停止、重启、修改或迁移。
 - T060–T068 的实现和验收证据现已齐备；`tasks.md` 的跨仓库复选框仍按既定协作规则由
   对应仓库负责人统一更新，避免 Oscar 与 Black 同时修改任务状态产生冲突。
+
+## 76. 2026-07-18 US5 月度积分、并发风险预留与结算闭环
+
+- Gateway 分支 `codex/oscar-t091-account-security` 已提交并推送
+  `baa79e2`（`feat(credits): add monthly risk settlement (T069-T080)`）。
+- 本轮复用了初始迁移中已有的 `model_rates`、`organization_credit_periods`、
+  `user_credit_allocations`、`risk_policies`、`turn_risks` 和 `usage_records`，
+  未重复创建同义数据表；新增统一的固定六位积分运算、Repository 和事务服务。
+- 月度积分规则已闭环：
+  - 按组织 IANA 计费时区创建自然月周期，默认 `Asia/Shanghai`；
+  - 新月份复制月度总额和用户月度分配，但已结算值归零，未使用余额不结转；
+  - 一级管理员设置组织月度总积分和风险策略；
+  - 一级或本组织二级管理员可在组织总额内分配普通用户积分；
+  - Turn 完成后允许实际余额为负，已开始 Turn 不因余额变化中断。
+- 并发风险与结算已接入真实 `/v1/responses` 和 `/v1/chat/completions` 生命周期：
+  - 新 Turn 在上游转发前按最坏输入/输出 Token 和隐藏倍率计算风险；
+  - 同时检查单次最大透支和账号累计运行中风险；
+  - `Turn ID` 重复请求不会重复预留或重复扣费；
+  - 上游返回 usage 时按实际 Token 结算，缺少 usage 时按保守估算结算；
+  - 客户端断开后 Gateway 仍等待上游流完成并执行结算；
+  - 结算完成后释放运行中风险，并分别累计组织和用户已结算积分。
+- 管理 Web UI 新增“积分管理”：
+  - 一级管理员可查看和修改组织总积分、单次透支、累计风险和模型输入/输出费率及倍率；
+  - 二级管理员只看到本组织用户积分、请求次数和实际 Token，不返回费率、倍率或风险阈值；
+  - 普通用户仍只在“我的账号”查看自己的已分配、已结算和可用积分；
+  - Chat 下方安全状态现在使用真实可用积分和使用百分比。
+- 自动化验证：
+  - T069–T072 测试先于实现加入并通过；
+  - 20 个并发 Turn、每个 Turn 重复预留和重复结算的测试最终只生成 20 条风险记录和
+    20 条用量记录；
+  - Gateway `89/89`、Admin Web `17/17`，Gateway 全局覆盖率门禁通过；
+  - standalone/edge/Gateway/Admin 的 `npm run release:check` 全部通过。
+- 真实开发版 Code 应用内验收：
+  - 使用隔离 `47920/47921` 完成真实 PKCE、强制改密和 Edge handoff；
+  - “AI 服务正常”可打开固定单实例“AI Editor 管理”；
+  - “积分管理”实际显示组织月度积分、单次/累计风险、模型费率和 `1.500000×` 倍率；
+  - 在页面把组织月度总积分从 `1200` 修改为 `1250` 后，成功提示和服务端持久化值均正确。
+- Code 双构建与 Windows 成品验证：
+  - `npm run compile`：通过；
+  - `npm run core-ci`：通过；
+  - `vscode-win32-x64-min-ci` 完成产品内容更新，最终签名仍仅因本机缺少
+    `signtool.exe` 返回 `ENOENT`；
+  - `verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、
+    `cleanStart=true`、共享 Proxy `/live=ok`。
+- 验收后已关闭并清理隔离 Code、Gateway/Edge 和含测试 Token 的隔离数据目录；
+  `47920/47921` 均无监听。共享 Proxy 全程保持 PID `18120`、`/live=ok`，未停止、
+  重启、修改或迁移。
+- T069–T080 的实现、测试和验收证据已齐备；对应复选框仍按既定 Black/Oscar 所有权规则
+  由服务器负责人统一更新，Oscar 不在 My_Code 中代勾服务器任务，避免协作冲突。
