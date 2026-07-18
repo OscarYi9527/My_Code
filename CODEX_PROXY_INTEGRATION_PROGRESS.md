@@ -1984,3 +1984,14 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 安全状态合同新增只读的 `usedCreditsPercent` 字段；当前积分结算子系统尚未完成，未配置月度积分时
   返回 `0`，后续 T069–T080 会用真实结算数据替换。
 - 本轮 Code 开发构建、Windows 产品构建和产品 checksum 验证均通过；共享 `47892` 未停止或重启。
+
+## 72. 2026-07-18 Gate A 真实模型目录与 SSE 验收
+
+- 重新登录后，隔离 Gateway `47920` 与 Edge `47921` 的真实账号状态为 `ready`。
+- 已通过真实 Edge 验收：授权模型目录包含 11 个模型且不包含 `gpt-mock`；默认模型、
+  `openai-api-gpt-5.6-sol` 和 `deepseek-v4-pro` 的 `/v1/responses` SSE 均收到
+  `response.completed`。
+- GPT-5 的 `max_completion_tokens` 兼容修复已由真实 OpenAI API 路由验证，不再返回此前的
+  HTTP 400 `max_tokens` 参数错误。
+- 每次验收前后共享 Proxy `47892` 的 PID 与 `/live` 均保持不变。订阅 Provider 尚未配置到
+  隔离 Gateway，因此“订阅模型”独立验收仍保持待完成，不把它伪造为通过。
