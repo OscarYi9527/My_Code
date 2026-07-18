@@ -14,7 +14,7 @@ const fs = require('node:fs') as typeof import('node:fs');
 const path = require('node:path') as typeof import('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const blackRepository = 'D:\\AI_prejoct\\codex_proxy-gateway-dev';
+const blackRepository = resolveBlackRepository(getOption('--black-repository'));
 const dataRoot = getOption('--data-root') ?? path.join(blackRepository, '.ai-editor-dev', 'oscar-login-verify');
 const expectedModel = getOption('--model');
 const prompt = getOption('--prompt') ?? 'Reply only with: AI_EDITOR_SSE_OK';
@@ -24,7 +24,7 @@ const sharedProxyOrigin = 'http://127.0.0.1:47892';
 
 interface ICheck {
 	readonly name: string;
-	readonly result: 'PASS' | 'BLOCKED';
+	readonly result: 'PASS' | 'BLOCKED' | 'FAIL';
 	readonly detail: string;
 }
 
@@ -77,6 +77,11 @@ async function main(): Promise<void> {
 			body: JSON.stringify({ model, input: prompt, stream: true })
 		});
 		if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream') || !response.body) {
+			checks.push({
+				name: 'responses-sse',
+				result: 'FAIL',
+				detail: `Responses endpoint did not provide an SSE stream (HTTP ${response.status}).`
+			});
 			throw new Error('The real Responses request did not return an SSE stream.');
 		}
 		let bytesRead = 0;
@@ -97,6 +102,11 @@ async function main(): Promise<void> {
 			}
 		}
 		if (!sawCompleted) {
+			checks.push({
+				name: 'responses-sse',
+				result: 'FAIL',
+				detail: 'Responses endpoint returned SSE but did not emit response.completed.'
+			});
 			throw new Error('The Responses SSE stream did not emit response.completed.');
 		}
 		checks.push({ name: 'responses-sse', result: 'PASS', detail: 'Responses SSE emitted response.completed.' });
@@ -147,6 +157,25 @@ async function main(): Promise<void> {
 function getOption(name: string): string | undefined {
 	const index = process.argv.indexOf(name);
 	return index >= 0 ? process.argv[index + 1]?.trim() || undefined : undefined;
+}
+
+function resolveBlackRepository(option: string | undefined): string {
+	if (option) {
+		return path.resolve(option);
+	}
+
+	const candidates = [
+		process.env['AI_EDITOR_BLACK_REPOSITORY'],
+		path.resolve(repositoryRoot, '..', 'codex_proxy-oscar'),
+		path.resolve(repositoryRoot, '..', 'codex_proxy-gateway-dev'),
+		path.resolve(repositoryRoot, '..', 'codex_proxy-dev')
+	].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0);
+	const existing = candidates.find(candidate => fs.existsSync(path.join(candidate, '.git')));
+	if (existing) {
+		return existing;
+	}
+
+	throw new Error('No Black Gateway checkout was found. Pass --black-repository with its checkout root.');
 }
 
 function assertDataRoot(value: string): string {

@@ -1949,3 +1949,18 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
    Oscar 仅在正式 HTTPS Gateway、生产 Edge 与 macOS Keychain 前置齐备后再推进
    T116/T118 的 final-edge 门禁和 Windows/macOS 成品验收。当前不能把
    `legacy-standalone` 成品伪装为 Edge 正式发布。
+
+## 70. 2026-07-18 真实模型 SSE 验收脚本与 GPT-5 Chat Completions 兼容修复
+
+- 修复 `verify-ai-editor-account-real-model-sse`：现在可用
+  `--black-repository` 和 `--data-root` 指向当前隔离 Gateway checkout，不再硬编码旧的
+  `codex_proxy-gateway-dev` 路径；验收报告仍不记录 nonce、Token、提示词或回复。
+- 首次真实 Gate A 验收已确认：隔离 Edge 账户状态为 `ready`，模型目录有 11 个已授权模型，
+  且共享 Proxy `47892` 的 PID 和 `/live` 在测试前后保持不变。
+- 验收同时定位到独立 Gateway 的真实路由兼容问题：GPT-5 请求经过
+  Responses-to-Chat-Completions 转换时被发送为 `max_tokens`，OpenAI API 返回 HTTP 400 并要求
+  `max_completion_tokens`。这不是共享 Proxy 的路由错误。
+- 已在隔离 `codex_proxy` 分支修复转换逻辑：GPT-5 与 o1/o3/o4 系列使用
+  `max_completion_tokens`，旧模型仍使用 `max_tokens`；新增 3 个转换回归测试。
+- 下一步：仅重启隔离 Gateway/Edge `47920/47921` 以载入已提交修复，然后重新运行真实 SSE 验收。
+  不停止、不重启或修改共享 `47892`。
