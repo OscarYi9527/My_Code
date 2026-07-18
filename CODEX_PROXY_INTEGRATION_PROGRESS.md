@@ -2012,3 +2012,40 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 所有端点均复用统一的 Level 1/Level 2 组织范围授权策略；邀请码只在创建响应中返回明文，
   数据库存储带服务器密钥的摘要。
 - 管理 Web UI 与邀请码注册原子消费仍在后续实现中，当前 API 还不对普通用户开放。
+
+## 74. 2026-07-18 US4 组织用户与邀请码管理可视化闭环
+
+- Gateway 分支 `codex/oscar-t091-account-security` 已提交并推送
+  `bf15a61`（`feat(admin): add organization and invitation management (T061-T068)`）。
+- 管理 Web UI 已接入组织、组织用户和邀请码真实 API：
+  - 一级管理员可创建组织，并可启用或禁用权限范围内的账号；
+  - 二级管理员不显示创建组织入口，只能操作本组织普通用户；
+  - 一级/二级管理员可生成绑定组织、带有效期和使用次数的邀请码；
+  - 明文邀请码只在创建成功后显示一次，列表 API 和后续刷新均不返回明文；
+  - 有效邀请码可在页面中撤销，组织、角色、账号和邀请码状态均使用中文标签。
+- 服务端补齐 `POST /api/v1/admin/invitations/{id}/revoke`，并修复账号状态事务边界：
+  原 Repository 事务回调没有包装成事务内 Repository，会导致禁用账号时返回 HTTP 500；
+  现已在同一事务内完成账号读取、权限校验、最后一级管理员保护和状态更新。
+- 新增并通过以下安全回归：
+  - Level 2 组织列表、账号操作和邀请码创建均被服务端限制在本组织；
+  - 最后一个有效一级管理员禁用返回 `409 last_level1_protected`；
+  - 邀请码最后一次并发注册只允许一个请求成功；
+  - 过期邀请码不被消费；
+  - 管理页面验证 Level 1/Level 2 入口差异、账号状态操作、一次性邀请码显示和撤销。
+- Gateway 验证结果：
+  - Admin Web：`14/14`；
+  - Gateway：`72/72`；
+  - standalone/edge 根测试：`110/110`；
+  - `npm run release:check`：通过；
+  - Gateway/Admin TypeScript 构建与 `git diff --check`：通过。
+- Code 双构建验证：
+  - `npm run compile`：通过，开发版 `out` 已同步；
+  - `npm run core-ci`：通过，产品输出 `out-vscode-min` 已同步；
+  - Windows 打包内容已更新到 `D:\AI_prejoct\VSCode-win32-x64`，最终签名步骤仍仅因
+    本机缺少 `signtool.exe` 返回 `ENOENT`；
+  - `verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum `10/10`、
+    `cleanStart=true`、共享 Proxy `/live=ok`。
+- 隔离 Gateway/Edge 已通过指定安全脚本停止；共享 Proxy 始终为 PID `18120`、
+  `/live=ok`，未停止、重启或修改。
+- US4 尚未全部完成：一级管理员的角色任命/撤销（`PUT /accounts/{id}/role`）和对应
+  管理页面仍是下一项工作，因此不把 T065 或整个 US4 提前标记为完成。
