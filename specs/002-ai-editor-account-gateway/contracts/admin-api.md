@@ -74,7 +74,9 @@ Create request:
 ```
 
 Level 2 cannot choose an organization other than its own. Plain invitation code appears only in the
-successful creation response and is not returned by list APIs.
+successful creation response and is not returned by list APIs. `expiresAt` is the AI access
+deadline, not only a code-display or registration expiry: registration must complete before it, and
+the created account receives the same value as `account.expiresAt`.
 
 ## 5. Credits and Usage
 

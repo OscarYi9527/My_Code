@@ -71,7 +71,7 @@
 | `organizationId` | Bound organization | Required |
 | `codeDigest` | Keyed digest of invitation code | Plain code shown once |
 | `createdBy` | Level 1/Level 2 account | Must be in scope |
-| `expiresAt` | Expiry | Required |
+| `expiresAt` | Registration and AI access deadline | Required; the created account copies this value to `Account.expiresAt` |
 | `maxUses` | Allowed registrations | Positive integer |
 | `useCount` | Successful registrations | Atomic increment |
 | `status` | `active`, `revoked`, `exhausted`, `expired` | Derived/updated |

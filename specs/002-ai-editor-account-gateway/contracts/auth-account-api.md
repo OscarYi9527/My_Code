@@ -116,7 +116,9 @@ Used by the browser authorization page.
 ```
 
 Success atomically consumes one invitation use and creates an active user in the invitation
-organization. Common errors:
+organization. The created account copies `invitation.expiresAt` to `account.expiresAt`; therefore
+the same timestamp is both the registration deadline and the user's AI access deadline. Common
+errors:
 
 - `invitation_invalid`
 - `invitation_expired`
