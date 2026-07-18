@@ -77,7 +77,7 @@ export function getAiEditorAccountMenuItems(status: IAiEditorSafeStatus): readon
 		case AiEditorAccountState.PasswordChangeRequired:
 			return [
 				menuItem(AiEditorAccountMenuCommandId.Summary, localize('aiEditor.account.menu.passwordChangeRequired', "需要修改密码"), false),
-				menuItem(AiEditorAccountMenuCommandId.OpenAccount, localize('aiEditor.account.menu.changePassword', "修改密码")),
+				menuItem(AiEditorAccountMenuCommandId.OpenSecurity, localize('aiEditor.account.menu.changePassword', "修改密码")),
 				menuItem(AiEditorAccountMenuCommandId.Logout, localize('aiEditor.account.menu.logout', "退出登录"))
 			];
 		case AiEditorAccountState.Ready:

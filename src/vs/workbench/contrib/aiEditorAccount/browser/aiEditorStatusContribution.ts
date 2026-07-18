@@ -125,8 +125,9 @@ export class AiEditorStatusContribution extends Disposable implements IWorkbench
 				return accountService.retryStatus();
 			case AiEditorAccountState.Ready:
 			case AiEditorAccountState.AccountUnavailable:
-			case AiEditorAccountState.PasswordChangeRequired:
 				return accountService.openAccountManagement(AiEditorManagementRoute.Account);
+			case AiEditorAccountState.PasswordChangeRequired:
+				return accountService.openAccountManagement(AiEditorManagementRoute.Security);
 			default:
 				return undefined;
 		}

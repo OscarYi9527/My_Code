@@ -60,7 +60,7 @@ suite('AI Editor account menu', () => {
 			commandIds(status(AiEditorAccountState.PasswordChangeRequired)),
 			[
 				AiEditorAccountMenuCommandId.Summary,
-				AiEditorAccountMenuCommandId.OpenAccount,
+				AiEditorAccountMenuCommandId.OpenSecurity,
 				AiEditorAccountMenuCommandId.Logout
 			]
 		);
