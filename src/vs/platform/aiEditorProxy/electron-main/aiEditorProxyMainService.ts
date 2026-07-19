@@ -288,12 +288,11 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 				ELECTRON_RUN_AS_NODE: '1',
 				...(runtime.target === 'edge'
 					? edgeEnvironment
-					: {
-						CODEX_PROXY_DATA_DIR: process.env['VSCODE_AI_EDITOR_PROXY_DATA_DIR'] ??
-							join(this.environmentMainService.userHome.fsPath, '.claude', 'proxy'),
-						CODEX_PROXY_HOST: loopbackHost(url),
-						CODEX_PROXY_PORT: url.port || '80'
-					})
+					: createAiEditorStandaloneProxyEnvironment(
+						url,
+						process.env['VSCODE_AI_EDITOR_PROXY_DATA_DIR'] ??
+							join(this.environmentMainService.userHome.fsPath, '.claude', 'proxy')
+					))
 			},
 			stdio: 'ignore',
 			windowsHide: true
@@ -392,6 +391,18 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	private errorMessage(error: unknown): string {
 		return error instanceof Error ? error.message : String(error);
 	}
+}
+
+export function createAiEditorStandaloneProxyEnvironment(url: URL, storageRoot: string): NodeJS.ProcessEnv {
+	return {
+		// Keep the former variable for migration packages while passing the
+		// authoritative storage root used by current standalone Proxy builds.
+		// Both must point outside the immutable application resources.
+		CODEX_PROXY_DATA_DIR: storageRoot,
+		CODEX_PROXY_STORAGE_ROOT: storageRoot,
+		CODEX_PROXY_HOST: loopbackHost(url),
+		CODEX_PROXY_PORT: url.port || '80'
+	};
 }
 
 function loopbackHost(url: URL): string {

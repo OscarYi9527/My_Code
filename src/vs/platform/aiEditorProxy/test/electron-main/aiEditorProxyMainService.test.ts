@@ -8,6 +8,7 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/c
 import { AiEditorProxyLifecycleState, type IAiEditorProxyStatus } from '../../common/aiEditorProxy.js';
 import {
 	AiEditorProxyMainService,
+	createAiEditorStandaloneProxyEnvironment,
 	parseAiEditorBundledProxyRuntimeManifest
 } from '../../electron-main/aiEditorProxyMainService.js';
 
@@ -72,6 +73,20 @@ suite('AiEditorProxyMainService restart safety', () => {
 			target: 'edge',
 			entryPoint: 'src/server.js'
 		})), /entry point is invalid/);
+	});
+
+	test('keeps standalone runtime data outside the installed application resources', () => {
+		const storageRoot = 'C:\\Users\\example\\AppData\\Roaming\\AI Editor\\proxy';
+
+		assert.deepStrictEqual(
+			createAiEditorStandaloneProxyEnvironment(new URL('http://localhost:48765'), storageRoot),
+			{
+				CODEX_PROXY_DATA_DIR: storageRoot,
+				CODEX_PROXY_STORAGE_ROOT: storageRoot,
+				CODEX_PROXY_HOST: '127.0.0.1',
+				CODEX_PROXY_PORT: '48765'
+			}
+		);
 	});
 
 	test('reuses a healthy shared Proxy instead of invoking a forced restart', async () => {
