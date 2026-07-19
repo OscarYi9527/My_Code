@@ -459,6 +459,19 @@ interface IConnectionReady {
 }
 
 /**
+ * `thread/read` can reconstruct turns from a rollout without loading the
+ * thread into the app-server's live thread map. Keep that distinction so a
+ * restored session is resumed before its first follow-up turn.
+ */
+interface ICodexThreadReadResult extends ThreadReadResponse {
+	readonly isLoaded: boolean;
+}
+
+export function isCodexThreadUnavailableError(message: string): boolean {
+	return /\bthread (?:not found|not loaded)\b/i.test(message);
+}
+
+/**
  * `IAgent` implementation backed by `codex app-server`.
  *
  * Phase 2 surface: createSession (blocks on `thread/start`), sendMessage
@@ -2028,10 +2041,7 @@ export class CodexAgent extends Disposable implements IAgent {
 		const threadId = session.threadId!;
 		if (session.needsResume) {
 			try {
-				await conn.client.request<'thread/resume'>('thread/resume', {
-					threadId,
-				}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
-				session.needsResume = false;
+				await this._resumeThread(session, conn);
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
 				await this._recordRecoveryNeeded(session, effectiveTurnId, `Thread resume failed: ${message}`);
@@ -2079,6 +2089,34 @@ export class CodexAgent extends Disposable implements IAgent {
 				this._fire(sessionUri, { type: ActionType.ChatTurnCancelled, turnId: effectiveTurnId });
 				return;
 			}
+			// A persisted thread may disappear from the app-server's live map
+			// when that process restarts while Code remains open. A
+			// thread-not-found/not-loaded response is generated locally before
+			// any request reaches the Proxy, so it is safe to resume and retry
+			// this turn exactly once.
+			const firstErrorMessage = err instanceof Error ? err.message : String(err);
+			if (isCodexThreadUnavailableError(firstErrorMessage)) {
+				try {
+					await this._resumeThread(session, conn);
+					const resumedModel = await this._resolveModel(session);
+					const resumedTurnOptions = this._turnStartOptions(session, resumedModel.id);
+					await conn.client.request<'turn/start'>('turn/start', {
+						threadId,
+						input: input.slice(),
+						model: resumedModel.id,
+						responsesapiClientMetadata: {
+							vscode_session_id: session.sessionId,
+							vscode_turn_id: effectiveTurnId,
+						},
+						...resumedTurnOptions,
+					}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
+					session.firstTurnSent = true;
+					this._logService.info(`[Codex:${sessionId}] resumed missing thread and safely retried turn ${effectiveTurnId}`);
+					return;
+				} catch (resumeError) {
+					err = resumeError;
+				}
+			}
 			// A failed JSON-RPC turn/start is ambiguous: app-server may have
 			// accepted the turn and the Proxy could already be executing it.
 			// Retry exactly once only when the local Proxy positively confirms
@@ -2125,6 +2163,17 @@ export class CodexAgent extends Disposable implements IAgent {
 				}, 30_000);
 			}
 		}
+	}
+
+	private async _resumeThread(session: ICodexSession, conn: IConnectionReady): Promise<void> {
+		const threadId = session.threadId;
+		if (!threadId) {
+			throw new Error(`Cannot resume an unmaterialized Codex session: ${session.sessionId}`);
+		}
+		await conn.client.request<'thread/resume'>('thread/resume', {
+			threadId,
+		}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
+		session.needsResume = false;
 	}
 
 	setPendingMessages(sessionUri: URI, steeringMessage: PendingMessage | undefined, _queuedMessages: readonly PendingMessage[]): void {
@@ -2499,11 +2548,10 @@ export class CodexAgent extends Disposable implements IAgent {
 				currentAppTurnId: undefined,
 				hostTurnIdByAppTurnId: new Map<string, string>(),
 				codexTurnIdByHostTurnId: new Map<string, string>(),
-				// `_readSession` resumes an unloaded historical thread before
-				// returning its turns, so the first follow-up message can go
-				// straight to `turn/start`. Resuming it again would be
-				// redundant and risks replacing the hydrated conversation.
-				needsResume: false,
+				// `thread/read` may return persisted turns without registering
+				// the thread in the app-server's live map. Only the fallback
+				// `thread/resume` path guarantees that the thread is loaded.
+				needsResume: !read.isLoaded,
 				lastPromptText: '',
 				disposed: false,
 				materializePromise: undefined,
@@ -2525,7 +2573,7 @@ export class CodexAgent extends Disposable implements IAgent {
 		return this._threadToMetadata(read.thread, session);
 	}
 
-	private async _readSession(session: URI): Promise<ThreadReadResponse | undefined> {
+	private async _readSession(session: URI): Promise<ICodexThreadReadResult | undefined> {
 		// Resolve the codex thread id for this session URI. Resolution
 		// order: in-memory session → persisted metadata overlay → URI host
 		// (for sessions materialized in a prior process where sessionId
@@ -2543,21 +2591,27 @@ export class CodexAgent extends Disposable implements IAgent {
 				threadId,
 				includeTurns: true,
 			});
-			return response;
+			return {
+				...response,
+				// Reading a rollout does not itself load a historical thread.
+				// An already-live in-memory session is the only case where a
+				// successful read also means no resume is required.
+				isLoaded: existing !== undefined && !existing.needsResume,
+			};
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			// Historical threads are not loaded after an Agent Host restart.
 			// Their UI must still show the completed conversation before the
 			// user sends a new message, so resume and use its hydrated thread
 			// payload instead of returning an empty history.
-			if (/thread not loaded/i.test(message)) {
+			if (isCodexThreadUnavailableError(message)) {
 				this._logService.info(`[Codex:${threadId}] thread/read: resuming unloaded historical thread`);
 				try {
 					const conn = await this._ensureConnection();
 					const resumed = await conn.client.request<'thread/resume', ThreadResumeResponse>('thread/resume', {
 						threadId,
 					}, { timeoutMs: CODEX_LIFECYCLE_REQUEST_TIMEOUT_MS });
-					return { thread: resumed.thread };
+					return { thread: resumed.thread, isLoaded: true };
 				} catch (resumeError) {
 					const resumeMessage = resumeError instanceof Error ? resumeError.message : String(resumeError);
 					this._logService.warn(`[Codex:${threadId}] thread/resume while loading historical session failed: ${resumeMessage}`);
