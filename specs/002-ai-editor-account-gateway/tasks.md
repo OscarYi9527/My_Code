@@ -387,6 +387,36 @@ Turn 可结算为负积分。
 
 ---
 
+## Phase 12: Provider Worker PW0/PW1 and Public Evolution
+
+**Goal**: 在不依赖域名、云主机或真实凭据的前提下，冻结 Gateway ↔ Worker 合同并完成
+本地安全 Mock、幂等流式链路和独立制品。
+
+- [x] T121 [P] Freeze the Gateway/Worker signed internal API in `D:\AI_prejoct\My_code\specs\002-ai-editor-account-gateway\contracts\provider-worker-api.md`
+- [x] T122 Add `provider-worker` mode, fixed `47930` config and production mTLS startup gate in `D:\AI_prejoct\codex_proxy-provider-worker\src\provider-worker\`
+- [x] T123 Implement HMAC request canonicalization, body digest, timestamp and Gateway allowlist validation in `D:\AI_prejoct\codex_proxy-provider-worker\src\provider-worker\protocol.js`
+- [x] T124 Implement one-time nonce replay protection in `D:\AI_prejoct\codex_proxy-provider-worker\src\provider-worker\nonce-store.js`
+- [x] T125 Implement Turn fingerprint, conflict, replay, cancellation and expiry in `D:\AI_prejoct\codex_proxy-provider-worker\src\provider-worker\turn-store.js`
+- [x] T126 Implement signed models, Responses/Chat Completions SSE Mock, Turn status and cancel endpoints in `D:\AI_prejoct\codex_proxy-provider-worker\src\provider-worker\server.js`
+- [x] T127 Implement Gateway signing client, safe error mapping, SSE relay and usage extraction in `D:\AI_prejoct\codex_proxy-provider-worker\gateway\src\provider-worker\`
+- [x] T128 Add real CA/server/client mTLS handshake and unsigned/replay/tamper/Turn tests in `D:\AI_prejoct\codex_proxy-provider-worker\tests\test-provider-worker.js`
+- [x] T129 Extend isolated start/stop/reset and PID/port invariants to Worker `47930` in `D:\AI_prejoct\codex_proxy-provider-worker\tools\`
+- [x] T130 Add an independent Provider Worker runtime manifest, release builder and forbidden-file gate in `D:\AI_prejoct\codex_proxy-provider-worker\provider-worker-runtime-files.json`
+- [x] T131 Make Gateway and Worker consume the same signing vector in `D:\AI_prejoct\codex_proxy-provider-worker\gateway\tests\fixtures\provider-worker-signing-v1.json`
+- [x] T132 Run complete standalone, Gateway, Admin, script, type, build, audit and Worker release regression; record shared `47892` invariants
+- [ ] T133 [PW2] Extract the proven Provider runtime without forking conversion, streaming, tool-ID or error logic
+- [ ] T134 [PW2] Preserve the existing subscription admin switch, routing participation, automatic cooldown, removal and experimental-channel label through Worker
+- [ ] T135 [PW2] Add persistent execution/outbox usage reconciliation and signed Gateway settlement acknowledgements
+- [ ] T136 [PW3] Implement envelope encryption, KMS/Secret Manager, credential migration, rotation and backup recovery gates
+- [ ] T137 [PW4] Deploy an isolated domestic Gateway and authorized-region Worker after manual infrastructure approval
+- [ ] T138 [PW4] Complete the 72-hour, three-network, 20-SSE and 30-minute connection acceptance
+- [ ] T139 [PW5/PW6] Enforce 30-user short-term cap and require long-term core architecture before user 31
+
+**Checkpoint**: T121–T132 can be completed without purchasing a domain, cloud host, Provider quota
+or production certificate. T133 may use only dedicated test credentials after explicit confirmation.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -470,7 +500,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 
 ## Task Summary
 
-- Total tasks: **120**
+- Total tasks: **139**
 - Setup/Foundation: **22**
 - US1: **15**
 - US2: **11**
@@ -481,6 +511,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 - US7: **9**
 - US8: **9**
 - Polish/validation: **12**
+- Provider Worker/public evolution: **19**
 
 All tasks use the required checkbox, sequential ID, optional `[P]`, user-story label and explicit
 file path format.

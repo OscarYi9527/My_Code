@@ -2559,3 +2559,65 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 向 `deepseek-v4-pro` 发送配对的 `fc_*` item ID、原始 `tool_*` call ID 和工具
     结果，上游返回 HTTP `200`、`status=completed`、正文 `P0_OK`，未再返回
     DeepSeek HTTP 400。
+
+## 87. 2026-07-20 Provider Worker 与公网长期路线图
+
+- 用户确认在现有 `codex_proxy` 单仓库中新增独立 `provider-worker` 模式和发布制品，
+  不新建第二套服务器仓库。
+- 订阅通道现有的一级管理员开关、账号参与路由、自动冷却、故障摘除和“试验通道”
+  标识继续保留；Provider Worker 迁移只做兼容回归，不重复设计这些功能。
+- 已新增 `AI_EDITOR_PROVIDER_WORKER_PUBLIC_ROADMAP.md`，其中记录：
+  - 1–30 人使用单 Gateway + 单 Worker 的邀请码公网 MVP 短期架构；
+  - 第 31 个用户前强制完成双 Gateway、托管 PostgreSQL 主备、Redis、双 Worker/
+    热备 Worker、KMS 和集中监控等长期架构核心门禁；
+  - 100 人后继续演进多地区 Worker、托管 WAF/CDN/Anti-DDoS 和跨地域灾备；
+  - PW0–PW6 的阶段、退出门禁和粗略工期；
+  - 域名/备案、国内云、境外 Worker、Provider 额度、KMS、数据库、备份、监控等
+    需要 Oscar 人工处理的提前通知时间；
+  - 公网前的加密、mTLS、防重放、幂等、备份恢复和制品隔离硬门禁。
+- 每个阶段后续汇报必须附带“下一阶段人工门禁”，未经 Oscar 明确确认不得购买、
+  付费、导入凭据或切换生产。
+- 当前只进入 PW0 合同冻结；尚未安装服务器、购买云资源、修改 Proxy 源码或重启共享
+  `47892`。
+
+## 88. 2026-07-20 Provider Worker PW0/PW1 本地实现
+
+- 新建隔离工作树和分支：
+  - `D:\AI_prejoct\codex_proxy-provider-worker`
+  - `codex/provider-worker-mvp`
+- 基线使用 Oscar 完整 Gateway/Edge/P0 分支 `9b37554`，随后安全 cherry-pick Black
+  最新三个账号导入提交 `ccb1cd7`、`1721377`、`6e1efdb`；没有 reset、force-push 或
+  覆盖任一人的原分支。
+- 已完成 T121–T132：
+  - 新增 `provider-worker` 模式和固定回环端口 `47930`；
+  - 冻结 Gateway ↔ Worker `aieditor-v1` 签名合同；
+  - 实现 HMAC-SHA256、正文摘要、timestamp、Gateway allowlist、nonce 防重放；
+  - 实现 Turn 幂等、相同请求完成重放、不同正文冲突、状态、取消和过期清理；
+  - 实现分块 SSE Mock、Provider ID 和完成用量；
+  - 实现 Gateway `ProviderWorkerClient` 的模型目录、Responses/Chat Completions 转发、
+    安全错误映射和结算用量提取；
+  - 生产 Worker 和 Gateway 缺少 mTLS 凭据时拒绝启用，测试使用临时 CA、服务端证书和
+    客户端证书完成真实 TLS 握手，并确认无客户端证书时失败；
+  - 开发脚本可安全启动/停止 `47920` Gateway、`47921` Edge、`47930` Worker；
+  - 独立 Worker 制品白名单不包含 Gateway、Admin、Edge、用户数据库或 standalone。
+- 合同和路线图：
+  - `specs/002-ai-editor-account-gateway/contracts/provider-worker-api.md`
+  - `AI_EDITOR_PROVIDER_WORKER_PUBLIC_ROADMAP.md`
+  - Proxy `docs/AI_EDITOR_PROVIDER_WORKER_PW0_PW1_HANDOFF.md`
+- 完整验证：
+  - standalone/Edge/Worker 根测试：`148/148`；
+  - Gateway：`111/111`；
+  - Admin Web：`28/28`；
+  - `npm run release:check`：通过；
+  - `npm audit --audit-level=high`：`0 vulnerabilities`；
+  - Provider Worker 制品：`11` 个白名单源文件、`12` 个最终运行文件，隔离检查通过；
+  - 制品实际启动：`/live=ok, mode=provider-worker`，
+    `/ready=ready, transport=loopback-development`；
+  - 三进程生命周期测试和 PowerShell 语法检查通过。
+- 共享 Proxy 不变量：
+  - 验证前后 PID 均为 `28676`；
+  - `/live` 前后均为 `ok`；
+  - Worker 烟测结束后 `47930` 已释放；
+  - 本轮未停止、重启、迁移或修改共享 `47892`。
+- 下一阶段 PW2 将复用现有 Provider Runtime 并迁移订阅通道；进入真实凭据或远程联调
+  前再询问域名所有权、测试账号、Worker 地区和采购事项。

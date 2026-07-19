@@ -333,3 +333,19 @@ scripts/
 | SQLite/PostgreSQL 双方言 repository | 本机 MVP 与正式中央部署存储目标已明确不同 | 直接散落 SQL 会让迁移、事务和并发结算行为难以保持一致 |
 | Code/Edge/Webview 三段一次性票据 | 长期 Refresh Token 不能进入 Code 页面或 Webview | 直接把 Token 放入 URL/localStorage 会扩大泄露与重放风险 |
 | 运行中 Turn 风险预留 | 已确认允许并发 Turn、负积分和最大透支 | 仅在完成后扣费无法阻止并发请求无限扩大负余额 |
+
+## Public Provider Worker Evolution
+
+公网版本在现有 `standalone`、`edge`、`gateway` 三种模式之外，规划新增同仓库、独立制品
+的 `provider-worker` 模式。它只负责获授权的境外 Provider 调用、流式转发、订阅账号池
+调度、冷却、熔断和用量回报；产品账号、组织、积分、审计和路由决策继续由国内 Gateway
+负责。
+
+短期 MVP、长期高可用架构、开发阶段、发布门禁以及需要 Oscar 提前购买或订阅的事项，
+统一记录在仓库根目录
+[AI_EDITOR_PROVIDER_WORKER_PUBLIC_ROADMAP.md](../../AI_EDITOR_PROVIDER_WORKER_PUBLIC_ROADMAP.md)。
+Provider Worker 编码开始前，必须先冻结 Gateway ↔ Worker 内部合同并生成独立任务清单。
+
+PW0/PW1 已于 2026-07-20 在 `codex/provider-worker-mvp` 完成；冻结合同位于
+[contracts/provider-worker-api.md](./contracts/provider-worker-api.md)。真实 Provider
+Runtime、凭据迁移、KMS 和远程部署继续按 T133–T139 执行。

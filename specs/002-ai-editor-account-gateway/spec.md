@@ -371,6 +371,23 @@ Provider、端口、熔断或凭据细节。
 - **FR-052**: “一键导入当前 Codex 账号” MUST 仅由固定 Gateway 管理源触发，必须经过
   Code 原生确认，限制 `auth.json` 为 256 KB，并禁止完整凭据进入 URL、Workbench
   renderer IPC、localStorage、诊断或日志。
+- **FR-053**: Proxy MUST 新增与 standalone、edge、gateway 隔离的
+  `provider-worker` 模式；本地固定使用 `127.0.0.1:47930`，正式发布制品不得包含
+  Gateway 用户数据库、管理 UI、Edge 或 standalone 服务器。
+- **FR-054**: Gateway 与 Provider Worker 的每次内部调用 MUST 使用 mTLS、短期
+  HMAC 请求签名、正文摘要、timestamp、一次性 nonce 和 Gateway allowlist；生产缺少
+  任一 mTLS 凭据时 MUST 拒绝启动或拒绝启用 Worker。
+- **FR-055**: Provider Worker MUST 使用 Turn ID 保证执行幂等；相同 Turn/相同正文
+  可重放完成结果，相同 Turn/不同正文 MUST 拒绝，网络重试不得重复调用 Provider。
+- **FR-056**: Provider Worker MUST 支持 SSE、取消、安全 Turn 状态和实际用量回报，
+  且状态、错误和日志不得包含产品密码、Refresh Token、邀请码、用户原文或完整上游
+  凭据。
+- **FR-057**: ChatGPT 订阅通道迁移到 Provider Worker 时 MUST 保留现有一级管理员
+  开关、账号参与路由、自动冷却、故障摘除和试验通道标识；该通道不可用不得拖垮
+  国内 Provider、产品登录或管理页面。
+- **FR-058**: 公网 MVP 的短期架构 MUST 将用户数限制为 30；加入第 31 个用户前 MUST
+  完成长期架构核心门禁，包括双 Gateway、负载均衡、托管 PostgreSQL 主备、Redis、
+  双 Worker/热备 Worker、集中监控和故障切换验收。
 
 ### Key Entities
 
@@ -411,15 +428,22 @@ Provider、端口、熔断或凭据细节。
   低于 80%。
 - **SC-010**: Windows 开发版和 Windows 成品均通过登录、状态、管理标签页、模型刷新和
   真实流式回复验收；macOS 源码和打包链路没有引入平台专用阻断。
+- **SC-011**: Gateway/Worker 合同测试 100% 检出签名、正文、timestamp、Gateway ID
+  或 nonce 的篡改/重放；真实测试证书证明无获准客户端证书时 TLS 握手失败。
+- **SC-012**: 相同 Turn 的相同请求重试不增加 Provider 执行次数；不同正文复用 Turn
+  ID 100% 返回冲突，取消后安全状态不包含用户请求内容。
+- **SC-013**: Provider Worker 独立制品检查确认不包含 Gateway、Admin、Edge、用户
+  数据库、standalone 服务器和真实凭据。
 
 ## Assumptions
 
-- 当前 MVP 只在开发机本地运行 Gateway 和 SQLite；正式中央部署、域名、TLS、PostgreSQL
-  运维和多实例扩容属于部署阶段。
+- 当前 PW0/PW1 只在开发机本地运行 Gateway、Edge、Provider Worker Mock 和 SQLite；
+  正式中央部署、域名、TLS 证书采购、PostgreSQL 运维和多实例扩容属于部署阶段。
 - 正式版 Gateway 地址由产品配置固定为中央 HTTPS 地址；普通用户不能修改。调试版使用
   固定本机地址，仅开发启动参数可以覆盖。
 - Gateway 调试默认地址为 `http://127.0.0.1:47920`，隔离测试 Edge 为
-  `http://127.0.0.1:47921`；共享 Proxy `http://127.0.0.1:47892` 不参与开发验证。
+  `http://127.0.0.1:47921`，Provider Worker Mock 为 `http://127.0.0.1:47930`；
+  共享 Proxy `http://127.0.0.1:47892` 不参与开发验证。
 - 正式安装包只分发 Edge；Gateway Web UI 由中央 Gateway 提供。
 - 管理前端 MVP 使用 Gateway Web UI；把高频账号功能改造成 Code 全原生界面属于
   `AI_EDITOR_POST_MVP_NATIVE_ACCOUNT_UI_TODO.md`。

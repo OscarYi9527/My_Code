@@ -345,3 +345,27 @@ Expected:
 - PID did not change because of this feature validation.
 - Shared account/config/data hashes did not change.
 - No switch to shared `47892` occurs until the user gives a new explicit approval.
+
+## 16. Provider Worker PW0/PW1 Validation
+
+```powershell
+Set-Location D:\AI_prejoct\codex_proxy-provider-worker
+
+npm run test:provider-worker
+npm run gateway:test
+npm run test:dev-scripts
+npm run provider-worker:release-check
+npm run provider-worker:build-release
+```
+
+Expected:
+
+- test CA/server/client certificates prove an authorized Gateway can complete mTLS and a client
+  without its certificate cannot;
+- signing tamper, expired timestamp and nonce replay are rejected;
+- identical completed Turns replay the same SSE without another Provider execution;
+- a different request reusing a Turn ID returns `worker_turn_conflict`;
+- the isolated scripts start `47920`, `47921` and `47930`, then stop all three;
+- shared `47892` retains the same PID and `/live` result;
+- `.ai-editor-release/provider-worker` contains no Gateway, Admin, Edge, standalone server,
+  database or credential file.
