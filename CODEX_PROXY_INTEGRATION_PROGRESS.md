@@ -2545,6 +2545,17 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - `verify-ai-editor-windows-release.ps1 -SkipCleanStart` 返回 `PASS`，
     Workbench checksum `10/10`、Proxy payload `272`、共享 Proxy `/live=ok`；
   - 开发版和 Windows 成品均完成实际启动烟测，烟测结束后已关闭本轮启动的进程。
-- 共享 Proxy `47892` 仍运行修改前版本，PID `31852`、`/live=ok`；本轮未停止或
-  重启。只有取得用户明确批准后，才会通过
-  `scripts\restart-ai-proxy.ps1` 安全加载 P0 修复。
+- 2026-07-20 经用户明确批准后，仅使用
+  `scripts\restart-ai-proxy.ps1` 完成共享 Proxy 安全重启：
+  - PID 从 `31852` 切换为 `28676`；
+  - 进程命令行明确加载
+    `C:\Users\Oscar\.claude\proxy\src\server.js`，源码 HEAD 为
+    `f56093a756160a288a7a4b7a66cfd3d6bd71764c`；
+  - `/live=ok`、`/ready=ok`，模型目录返回 `20` 个模型，其中包含
+    `deepseek-v4-pro` 和六个 `gpt-*` 订阅模型。
+- 重启后的真实 P0 回归：
+  - 向 `gpt-5.6-sol` 发送包含旧 `tool_*` function-call item ID 的已完成工具历史，
+    上游返回 HTTP `200`，未再出现 `Expected an ID that begins with 'fc'`；
+  - 向 `deepseek-v4-pro` 发送配对的 `fc_*` item ID、原始 `tool_*` call ID 和工具
+    结果，上游返回 HTTP `200`、`status=completed`、正文 `P0_OK`，未再返回
+    DeepSeek HTTP 400。
