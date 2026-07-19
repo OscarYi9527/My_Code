@@ -2282,3 +2282,174 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   人工验收。共享 Proxy 始终保持 PID `18120`、`/live=ok`。
 - 按 Black/Oscar 任务所有权规则，`tasks.md` 中服务器复选框仍由服务器负责人统一更新；
   Oscar 在本节记录实现、测试和联调证据，不代改对方任务状态。
+
+## 81. 2026-07-19 模型登录后刷新、工具兼容与一级管理员额度入口修复
+
+- 用户实际验收发现三个关联问题：登录后模型选择器只保留 `auto`、发送 Turn 时 OpenAI
+  返回 `tools[42].function.name` 缺失、一级管理员错误显示 `0.000000` 且组织/额度入口
+  不明确。
+- 日志确认 Code 启动时账号尚未登录，首次 `/v1/models` 返回 HTTP 401；登录进入
+  `ready` 后没有触发第二次自动刷新。当前隔离 Edge 实际返回 11 个授权模型。
+- Code 现在在账号首次进入或重新进入 `ready` 时自动刷新 Codex 模型目录；若 Agent Host
+  或 Edge 此时尚未就绪，下一次 30 秒账号状态刷新会自动重试。原手动“刷新模型目录”
+  按钮继续保留。
+- Responses→Chat Completions 工具转换现在同时支持顶层 `tool.name` 与嵌套
+  `tool.function.name`；无法由 Chat Completions 表示的无名称 Responses 内置工具会被安全
+  省略，不再生成上游拒绝的空 `function.name`。真实验收又确认 GPT-5.6 的
+  Chat Completions 在 function tools 存在时会拒绝默认推理等级，因此兼容转换会对
+  `gpt-5.6-*` 显式发送 `reasoning_effort: none`；原生 Responses 请求的推理设置不受影响。
+- 一级管理员账号的 Turn 原本已在 Gateway 中跳过个人积分与风险预留，本轮补齐可视化：
+  - Chat 状态和左下角账号摘要显示“一级管理员额度不受限”，不再显示零余额；
+  - 左下角增加“组织与用户”和“组织额度”直接入口；
+  - 管理首页增加“管理组织与用户”“分配组织额度”快捷按钮；
+  - 管理导航使用更明确的“组织与用户”“组织额度”名称。
+- 自动化验证：
+  - standalone/Edge 根测试 `113/113`；
+  - Gateway `102/102`；
+  - Admin Web `28/28`；
+  - Code 定向 Electron 测试 `14/14`；
+  - `npm run typecheck-client`、定向 ESLint、`npm run compile`、`npm run core-ci` 通过；
+  - Windows 产品内容已更新；签名阶段仍仅因本机缺少 `signtool.exe` 返回 `ENOENT`；
+  - Windows release verify `PASS`，Workbench checksum `10/10`、共享 Proxy `/live=ok`。
+- 真实应用内验收已完成：
+  - 登录后安全状态为 `ready`，Chat 显示“AI 服务正常 · 一级管理员额度不受限”；
+  - 模型选择器展开 `Other Models` 后显示全部 11 个授权模型；
+  - 左下角账号菜单包含“组织与用户”和“组织额度”，组织额度页显示两个组织及月度额度、
+    单次最大透支和累计风险设置；
+  - 新建 Codex 任务发送“请只回复测试通过”后成功收到“测试通过”，Agent Host 日志记录
+    `chat/turnComplete`，未再出现 `tools[].function.name` 或 `reasoning_effort` 错误；
+  - 旧历史任务返回的 `thread not found` 已确认是 Agent Host 中该历史 thread 不存在，
+    与本轮模型路由修复无关。
+- 本轮仅通过隔离脚本重启 Gateway `47920` 和 Edge `47921`；共享 Proxy `47892` 前后均为
+  PID `53164` 且 `/live=ok`，未停止或重启。
+
+## 82. 2026-07-19 模型目录净化、订阅模型补齐与 Workspace Trust 默认策略
+
+- 用户实际验收发现模型选择器混入未配置的 `auto`、`auto-fast`、`auto-cheap` 和
+  `auto-reliable`，同时 ChatGPT 订阅模型消失。排查确认：
+  - 四个 `auto*` 是 standalone Proxy 内置的虚拟智能路由，不是上游真实模型；旧的
+    Gateway 目录合并规则错误地把它们当成已配置模型显示；
+  - 当前隔离数据根 `manual-visual-us5` 的 Gateway 数据库没有 Provider、Provider
+    Credential 或 Model Route，因此没有可调用的 ChatGPT 订阅账号；
+  - 共享 `47892` 虽有订阅账号和订阅模型，但按既定隔离规则不得静默复制凭据、迁移数据
+    或把不可调用的模型名称伪装到隔离 Gateway 目录。
+- Gateway 新增可独立测试的模型目录过滤：
+  - 未显式创建对应 Gateway 路由时隐藏全部内置 `auto*`；
+  - 仅在真实 Provider Ready 时显示其模型；
+  - ChatGPT 订阅 Provider Ready 后动态恢复 `gpt-*`，不需要重启 Code；
+  - 自动创建 ChatGPT 订阅池时的默认模型路由补齐
+    `gpt-5.6-terra` 和 `gpt-5.6-luna`，现在与 Proxy 当前六个订阅模型一致。
+- AI Editor 产品默认关闭额外的 VS Code Workspace Trust 提示；普通 VS Code/Code OSS
+  产品仍保持默认开启，用户也可在高级设置中重新开启。该变化不放宽 Codex Agent Host
+  的安全基线：工作区写入边界、网络审批和高风险命令确认继续生效。
+- 自动化验证：
+  - Gateway 类型检查通过；
+  - Gateway 模型目录与 Provider 合同定向测试 `12/12` 通过；
+  - Code AI Editor Account 定向测试 `10/10` 通过；
+  - `npm run compile` 与 `npm run core-ci` 通过；
+  - Windows 产品内容已更新；签名阶段仍仅因本机缺少 `signtool.exe` 返回 `ENOENT`；
+  - Windows release verify：`PASS`，Workbench checksum `10/10`、
+    `cleanStart=true`、共享 Proxy `/live=ok`；
+  - Windows 成品使用全新 Profile 打开工作区时，没有 Restricted Mode 横幅或
+    Workspace Trust 确认。
+- 最新实现已加载到隔离 Gateway `47920`（PID `38640`）和 Edge `47921`
+  （PID `22124`）。重启后 Edge 安全状态为 `login_required`；用户重新登录产品账号，
+  再从左下角“AI Editor 账户 → Provider 与模型 → 添加订阅账号”完成一次官方登录或
+  安全导入后，订阅模型会随目录刷新恢复。共享 Proxy `47892` 前后均为 PID `53164`
+  且 `/live=ok`，未停止、重启、修改或迁移。
+
+## 83. 2026-07-19 订阅账号导入状态与运行时配置引用修复
+
+- 用户导入订阅账号后仍看不到订阅模型。三层证据确认并非同一个缓存问题：
+  - Gateway 数据库已经存在 ChatGPT Provider、凭据和六条启用模型路由；
+  - 第一次“一键导入当前 Codex 账号”虽然在界面勾选了立即参与路由，但异步 Code
+    原生桥接监听器捕获了弹窗刚打开时的旧状态，实际保存为
+    `routingEnabled=false`；
+  - 用户在账号卡片中重新启用路由后，数据库已变为 `true`，但 Edge 目录仍没有
+    `gpt-*`，证明还存在第二层运行时问题。
+- 管理前端修复：
+  - Code 原生桥接消息改为通过 ref 调用最新导入函数，始终读取当前账号名称和路由勾选
+    状态；
+  - 回归测试现在先勾选“导入后立即参与自动路由”，再模拟异步原生消息，并断言提交值为
+    `true`。
+- standalone Proxy 运行时修复：
+  - `reloadProxyConfig()` 原先替换整个导出对象，导致 Gateway adapter 持有旧引用，
+    Provider 更新写入旧对象，而实际 `/ready`、`/v1/models` 和请求路由读取新对象；
+  - 现在热重载只原位更新对象内容并保持导出对象身份稳定，Gateway 数据库配置和
+    standalone 请求处理始终引用同一个运行时对象；
+  - 新增对象身份回归测试，并扩展真实 standalone adapter 集成测试：通过 Gateway
+    管理接口导入启用的订阅账号后，模型目录必须出现
+    `gpt-5.6-sol`、`gpt-5.6-terra` 和 `gpt-5.6-luna`。
+- 验证结果：
+  - standalone/Edge 根测试 `114/114`；
+  - Gateway 完整测试 `105/105`；
+  - Admin Web 完整测试 `28/28`；
+  - Gateway/Admin 类型检查和生产构建通过；
+  - 登录后的真实 Edge `47921/v1/models` 先恢复六个订阅模型；账号运行状态持久化并
+    热重载后，当前目录共 `13` 个模型：DeepSeek `1` 个、订阅 `6` 个、OpenAI API
+    `6` 个，未返回任何 `auto*`；
+  - 正在运行的 Code Agent Host 于 `2026-07-19T10:41:44Z` 完成
+    `refreshModels("codex")`，其 `root/agentsChanged` 同样包含上述六个订阅模型。
+- 最新隔离服务为 Gateway `47920` PID `5044`、Edge `47921` PID `40652`；共享
+  `47892` 保持 PID `53164` 和 `/live=ok`，未停止、重启、修改或迁移。
+- 另行记录：隔离 Edge 重启后本机产品会话仍可能降级为 `login_required`，本轮通过用户
+  重新登录完成模型目录验收；安全存储恢复问题需要作为独立后续缺陷修复，不能与本轮
+  Provider 模型识别结论混淆。
+
+## 84. 2026-07-19 Codex 历史任务首次续聊恢复修复
+
+- 用户确认新建任务可以正常回复，但历史任务首次续聊返回
+  `CodexTurnError: thread not found`。目标 rollout 文件实际存在，Agent Host
+  也能从 `thread/read` 恢复并显示旧消息，因此不是历史文件丢失，也不是
+  Proxy、模型目录或 Provider 路由问题。
+- 根因是 Codex app-server 的 `thread/read(includeTurns=true)` 可以直接从 rollout
+  重建消息，但不会把该 thread 注册到当前 app-server 的 live thread map。
+  旧实现错误地把“历史读取成功”当成“thread 已加载”，随后直接调用
+  `turn/start`，因此 app-server 返回 `thread not found`。
+- `CodexAgent` 现已：
+  - 区分“读取到 rollout”与“已加载到 live thread map”；
+  - 历史任务第一次发送前先执行 `thread/resume`，成功后再执行 `turn/start`；
+  - 同时兼容 app-server 的 `thread not loaded` 和 `thread not found` 两种返回；
+  - 若 Code 保持运行但 app-server 中途重启，`turn/start` 明确返回上述本地
+    thread 缺失错误时，会安全 resume 并仅重试一次；该错误发生在请求到达
+    Proxy 之前，不会重复执行已转发的 Turn。
+- 新增 `codexHistoricalSession.test.ts`，覆盖错误识别及“rollout-only 历史读取
+  必须在下次 Turn 前标记 resume”回归。
+- 自动化与构建验证：
+  - `npm run compile`：通过；
+  - 定向历史恢复测试：`2/2` 通过；
+  - 两个本轮源码文件的定向 ESLint：通过；
+  - 全仓 Node 测试：`11738 passing`、`182 pending`，仅 Windows Kerberos
+    凭据环境测试失败，与本功能无关；
+  - `npm run core-ci`：通过，`out-vscode-min` 已同步；
+  - Windows 产品内容已更新到 `D:\AI_prejoct\VSCode-win32-x64`；最终签名步骤
+    仍仅因本机缺少 `signtool.exe` 返回既有的 `ENOENT`；
+  - `verify-ai-editor-windows-release.ps1`：`PASS`，Workbench checksum
+    `10/10`、`cleanStart=true`、共享 Proxy `/live=ok`。
+- Windows 成品真实 UI 验证：
+  - 使用全新隔离 Profile 打开目标历史任务
+    `019f5741-d526-7872-be59-3d64e2d0fb56`，旧消息成功显示；
+  - Agent Host 日志记录该任务恢复出 `10 turns`；
+  - 首次续聊调用顺序明确为 `thread/resume` 成功后 `turn/start` 成功；
+  - 实际发送“历史恢复验证”并收到回复，回复能够引用最初的 `hi` 和后续
+    `你好1`，证明模型获得了原任务上下文；
+  - 未再出现 `thread not found` 或 `CodexTurnError`。
+- 验证期间未停止、重启或修改共享 Proxy `47892`，验证结束后仅关闭了隔离的
+  Windows 成品进程。
+
+### 当前迁移成品的账号入口边界
+
+- 上述 Windows 成品真实 UI 只验收“历史任务恢复与续聊”，不代表当前
+  `legacy-standalone` 迁移成品已经具备最终账号发布配置。
+- 直接运行 `D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe` 时，成品
+  `product.json` 尚无正式 `aiEditorAccountGatewayOrigin`，也没有最终 Edge 的
+  内存态 nonce 交接，因此按既定安全门禁禁用 AI Editor 账号菜单、状态栏和
+  pre-Turn 账号门禁；日志中的 `AccountPolicyGate state=inactive` 属于该门禁，
+  不表示 Edge 账号被删除。
+- 当前真实 Edge 中账号仍为 `ready`、`level1`。在 T116/T118 最终 Edge 与固定
+  HTTPS Gateway 发布条件完成前，账号 UI 联调必须通过
+  `scripts\launch-ai-editor-black-dev.ps1 -AuthenticationMode real` 注入受保护
+  nonce 后启动开发版 Code。
+- 不得为了让迁移成品临时显示账号而把本机 nonce、绝对开发路径或
+  `http://127.0.0.1:47920` 写入正式 `product.json`；最终成品由随包 Edge
+  安全交接本机授权，并使用固定生产 HTTPS Gateway。

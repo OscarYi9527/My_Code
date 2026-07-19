@@ -197,8 +197,8 @@ T113  共享 47892 不变性：Black 确认服务端未接触，Oscar 记录 PID
 - [ ] T044 [US2] Create a compatibility adapter over existing Provider route modules in `D:\AI_prejoct\codex_proxy-dev\gateway\src\routing\standalone-route-adapter.ts`
 - [ ] T045 [US2] Implement Gateway model catalog and central `/v1/models` route in `D:\AI_prejoct\codex_proxy-dev\gateway\src\routing\model-catalog.ts` and `gateway\src\api\v1-routes.ts`
 - [ ] T046 [US2] Implement streaming `/v1/responses` forwarding and completion hooks in `D:\AI_prejoct\codex_proxy-dev\gateway\src\routing\responses-gateway.ts`
-- [ ] T047 [US2] Update Code Agent Host proxy environment to use isolated Edge development override and fixed product Edge in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\chat\browser\agentSessions\agentHostSessionStarter.ts`
-- [ ] T048 [US2] Extend model startup/manual refresh tests for Gateway-backed Edge in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorProxy\test\common\aiEditorProxy.test.ts`
+- [x] T047 [US2] Update Code Agent Host proxy environment to use isolated Edge development override and fixed product Edge in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\chat\browser\agentSessions\agentHostSessionStarter.ts`
+- [x] T048 [US2] Extend model startup/manual refresh tests for Gateway-backed Edge in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorProxy\test\common\aiEditorProxy.test.ts`
 
 **Checkpoint**: US2 可使用测试 Token 独立验证中央模型路由，standalone 无回归。
 
@@ -308,7 +308,7 @@ Turn 可结算为负积分。
 - [ ] T087 [US6] Implement Provider, model, routing and safe diagnostics admin routes in `D:\AI_prejoct\codex_proxy-dev\gateway\src\api\admin-provider-routes.ts`
 - [ ] T088 [US6] Implement Level 1 Provider/model/routing/diagnostic pages in `D:\AI_prejoct\codex_proxy-dev\gateway\admin-web\src\pages\system\`
 - [ ] T089 [US6] Add non-production startup gate and plaintext credential warnings in `D:\AI_prejoct\codex_proxy-dev\gateway\src\providers\credential-policy.ts`
-- [ ] T090 [US6] Verify model catalog refresh through Edge and Code in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\chat\test\browser\agentSessions\agentHostLanguageModelProvider.test.ts`
+- [x] T090 [US6] Verify model catalog refresh through Edge and Code in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\chat\test\browser\agentSessions\agentHostLanguageModelProvider.test.ts`
 
 **Checkpoint**: US6 的上游账号只存在隔离 Gateway，动态模型和真实路由通过。
 
@@ -332,7 +332,7 @@ Turn 可结算为负积分。
 - [ ] T095 [US7] Implement device list, revoke, inactivity expiry and token-family revocation in `D:\AI_prejoct\codex_proxy-dev\gateway\src\auth\device-session-service.ts`
 - [ ] T096 [US7] Expose own-device, password and Level 1 reset routes in `D:\AI_prejoct\codex_proxy-dev\gateway\src\api\account-security-routes.ts`
 - [ ] T097 [US7] Implement account security/device pages and confirmation flows in `D:\AI_prejoct\codex_proxy-dev\gateway\admin-web\src\pages\account\security.tsx`
-- [ ] T098 [US7] Implement Edge logout/secure deletion and in-flight binding preservation in `D:\AI_prejoct\codex_proxy-dev\src\edge\local-account-store.js`
+- [x] T098 [US7] Implement Edge logout/secure deletion and in-flight binding preservation in `D:\AI_prejoct\codex_proxy-dev\src\edge\local-account-store.js`
 - [x] T099 [US7] Wire Code logout and password-required actions in `D:\AI_prejoct\My_code\src\vs\workbench\contrib\aiEditorAccount\browser\aiEditorAccountMenu.ts`
 
 **Checkpoint**: US7 可独立完成账号恢复和设备失窃处置。
@@ -371,9 +371,9 @@ Turn 可结算为负积分。
 
 - [ ] T109 [P] Run secret scans against DB/API/log/export fixtures and add regression cases in `D:\AI_prejoct\codex_proxy-dev\gateway\tests\security\secret-leak.test.ts`
 - [x] T110 [P] Run boundary tests for callback ports, Unicode/path spaces, duplicate clicks, timeouts and process crashes in `D:\AI_prejoct\My_code\src\vs\platform\aiEditorAccount\test\`
-- [ ] T111 Run existing standalone `npm test` and Gateway/admin coverage suites in `D:\AI_prejoct\codex_proxy-dev\`
-- [ ] T112 Run the full isolated quickstart and save a sanitized report under `D:\AI_prejoct\My_code\.build\ai-editor-account-gateway\`
-- [ ] T113 Verify shared `47892` PID, `/live` and selected data hashes remained unchanged using `D:\AI_prejoct\My_code\scripts\start-ai-editor-account-dev.ps1`
+- [x] T111 Run existing standalone `npm test` and Gateway/admin coverage suites in `D:\AI_prejoct\codex_proxy-dev\`
+- [x] T112 Run the full isolated quickstart and save a sanitized report under `D:\AI_prejoct\My_code\.build\ai-editor-account-gateway\`
+- [x] T113 Verify shared `47892` PID, `/live` and selected data hashes remained unchanged using `D:\AI_prejoct\My_code\scripts\start-ai-editor-account-dev.ps1`
 - [x] T114 Run Code `npm run typecheck-client`, focused tests and `npm run compile`, then validate `D:\AI_prejoct\My_code\scripts\code.bat`
 - [x] T115 Run Code `npm run core-ci` and rebuild `out-vscode-min` plus `D:\AI_prejoct\VSCode-win32-x64`
 - [ ] T116 Verify Windows product Workbench checksums and confirm the installer contains Edge but excludes Gateway/admin/database resources in `D:\AI_prejoct\My_code\scripts\verify-ai-editor-windows-release.ps1`
