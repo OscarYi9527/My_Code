@@ -10,6 +10,7 @@ import { IEnvironmentMainService } from '../../environment/electron-main/environ
 import { IInstantiationService } from '../../instantiation/common/instantiation.js';
 import { ILogService } from '../../log/common/log.js';
 import { IProductService } from '../../product/common/productService.js';
+import { IAiEditorEdgeRuntimeService } from '../../aiEditorProxy/electron-main/aiEditorEdgeRuntimeService.js';
 import {
 	AI_EDITOR_ACCOUNT_DEFAULT_EDGE_URL,
 	AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL,
@@ -209,9 +210,10 @@ export class AiEditorAccountMainService extends AiEditorAccountMainServiceCore {
 		@IEnvironmentMainService environmentMainService: IEnvironmentMainService,
 		@IProductService productService: IProductService,
 		@ILogService logService: ILogService,
-		@IInstantiationService instantiationService: IInstantiationService
+		@IInstantiationService instantiationService: IInstantiationService,
+		@IAiEditorEdgeRuntimeService edgeRuntimeService: IAiEditorEdgeRuntimeService
 	) {
-		super(createRuntimeDependencies(environmentMainService, productService, logService, instantiationService));
+		super(createRuntimeDependencies(environmentMainService, productService, logService, instantiationService, edgeRuntimeService));
 	}
 }
 
@@ -335,14 +337,15 @@ function createRuntimeDependencies(
 	environmentMainService: IEnvironmentMainService,
 	productService: IProductService,
 	logService: ILogService,
-	instantiationService: IInstantiationService
+	instantiationService: IInstantiationService,
+	edgeRuntimeService: IAiEditorEdgeRuntimeService
 ): IAiEditorAccountMainServiceDependencies {
 	const edgeOrigin = resolveEdgeOrigin(environmentMainService, productService);
 	const gatewayOrigin = resolveGatewayOrigin(environmentMainService, productService, logService);
 	const client = new AiEditorAccountHttpClient(
 		edgeOrigin,
 		gatewayOrigin,
-		resolveEdgeLocalAuthorization(environmentMainService)
+		resolveEdgeLocalAuthorization(environmentMainService, edgeRuntimeService)
 	);
 	const loginDependencies: IAiEditorAccountLoginDependencies = {
 		client,
@@ -544,10 +547,13 @@ export async function disposeAiEditorManagementView(
 }
 
 function resolveEdgeLocalAuthorization(
-	environmentMainService: IEnvironmentMainService
+	environmentMainService: IEnvironmentMainService,
+	edgeRuntimeService: IAiEditorEdgeRuntimeService
 ): IAiEditorEdgeLocalAuthorization | undefined {
 	if (environmentMainService.isBuilt) {
-		return undefined;
+		return {
+			getLocalNonce: () => edgeRuntimeService.getLocalNonce()
+		};
 	}
 	const nonceFile = process.env['VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE']?.trim();
 	if (!nonceFile) {
@@ -606,6 +612,7 @@ function isAiEditorManagementRoute(route: AiEditorManagementRoute): boolean {
 		case AiEditorManagementRoute.Security:
 		case AiEditorManagementRoute.Organization:
 		case AiEditorManagementRoute.Invitations:
+		case AiEditorManagementRoute.Credits:
 		case AiEditorManagementRoute.Usage:
 		case AiEditorManagementRoute.Providers:
 		case AiEditorManagementRoute.Diagnostics:

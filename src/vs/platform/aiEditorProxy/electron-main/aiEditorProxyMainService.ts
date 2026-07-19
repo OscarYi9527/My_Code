@@ -4,16 +4,18 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { spawn } from 'child_process';
-import { access } from 'fs/promises';
-import * as http from 'http';
-import { dirname, join } from 'path';
+import { access, readFile } from 'fs/promises';
 import { shell } from 'electron';
 import { timeout } from '../../../base/common/async.js';
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
+import { dirname, join } from '../../../base/common/path.js';
 import { IConfigurationService } from '../../configuration/common/configuration.js';
 import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
 import { ILogService } from '../../log/common/log.js';
+import { IProductService } from '../../product/common/productService.js';
+import { normalizeAiEditorAccountGatewayUrl } from '../../aiEditorAccount/common/aiEditorAccount.js';
+import { IAiEditorEdgeRuntimeService } from './aiEditorEdgeRuntimeService.js';
 import {
 	AI_EDITOR_PROXY_AUTO_START_SETTING_ID,
 	AI_EDITOR_PROXY_BASE_URL_SETTING_ID,
@@ -40,6 +42,38 @@ interface IHttpJsonResponse {
 	readonly body?: IAiEditorProxyHealthResponse;
 }
 
+export interface IAiEditorBundledProxyRuntime {
+	readonly root: string;
+	readonly target: 'legacy-standalone' | 'edge';
+	readonly entryPoint: string;
+}
+
+export function parseAiEditorBundledProxyRuntimeManifest(raw: string): Omit<IAiEditorBundledProxyRuntime, 'root'> {
+	let value: {
+		readonly schemaVersion?: unknown;
+		readonly target?: unknown;
+		readonly entryPoint?: unknown;
+	};
+	try {
+		value = JSON.parse(raw);
+	} catch {
+		throw new Error('The bundled AI Proxy release manifest is invalid.');
+	}
+	const target = value.schemaVersion === 1
+		? 'legacy-standalone'
+		: value.schemaVersion === 2
+			? value.target
+			: undefined;
+	if (target !== 'legacy-standalone' && target !== 'edge') {
+		throw new Error('The installed AI Proxy is not an Edge or standalone product runtime.');
+	}
+	const expectedEntryPoint = target === 'edge' ? 'src/launcher.js' : 'src/server.js';
+	if (value.entryPoint !== expectedEntryPoint) {
+		throw new Error(`The installed AI Proxy ${target} entry point is invalid.`);
+	}
+	return { target, entryPoint: expectedEntryPoint };
+}
+
 export class AiEditorProxyMainService extends Disposable implements IAiEditorProxyService {
 	declare readonly _serviceBrand: undefined;
 
@@ -53,7 +87,9 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	constructor(
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IEnvironmentMainService private readonly environmentMainService: IEnvironmentMainService,
-		@ILogService private readonly logService: ILogService
+		@ILogService private readonly logService: ILogService,
+		@IProductService private readonly productService: IProductService,
+		@IAiEditorEdgeRuntimeService private readonly edgeRuntimeService: IAiEditorEdgeRuntimeService
 	) {
 		super();
 		this.status = {
@@ -94,10 +130,23 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 			});
 		}
 
+		let live: IHttpJsonResponse;
 		try {
-			const live = await requestJson(`${baseUrl}/live`);
+			live = await requestJson(`${baseUrl}/live`);
 			if (live.statusCode < 200 || live.statusCode >= 300) {
 				throw new Error(`Proxy liveness check returned HTTP ${live.statusCode}.`);
+			}
+			if (
+				this.productService.aiEditorAccountGatewayOrigin &&
+				(await this.findProxyRuntime()).target === 'edge' &&
+				live.body?.mode !== 'edge'
+			) {
+				return this.updateStatus({
+					state: AiEditorProxyLifecycleState.Degraded,
+					baseUrl,
+					restartAttempts: this.status.restartAttempts,
+					lastError: 'Another local service is using the product Edge address. Close it and retry without forcing a shared Proxy restart.'
+				});
 			}
 		} catch (error) {
 			return this.updateStatus({
@@ -110,6 +159,13 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 
 		try {
 			const ready = await requestJson(`${baseUrl}/ready`);
+			if (live.body?.mode === 'edge') {
+				const state = ready.statusCode >= 200 && ready.statusCode < 300 && ready.body?.status === 'ready'
+					? AiEditorProxyLifecycleState.Ready
+					: AiEditorProxyLifecycleState.RunningUnconfigured;
+				this.circuitOpen = false;
+				return this.updateStatus({ state, baseUrl, restartAttempts: 0 });
+			}
 			const providers = parseAiEditorProxyProviderStatus(ready.body);
 			const hasProvider = hasAvailableAiEditorProxyProvider(providers);
 			const state = ready.statusCode >= 200 && ready.statusCode < 300 && hasProvider
@@ -215,28 +271,58 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	}
 
 	private async startProxy(baseUrl: string): Promise<void> {
-		const proxyRoot = await this.findProxyRoot();
-		const entryPoint = join(proxyRoot, 'src', 'server.js');
+		const runtime = await this.findProxyRuntime();
+		const entryPoint = join(runtime.root, ...runtime.entryPoint.split('/'));
 		const url = new URL(baseUrl);
-		const child = spawn(process.execPath, [entryPoint], {
-			cwd: proxyRoot,
+		const edgeEnvironment = runtime.target === 'edge'
+			? await this.createEdgeEnvironment(url)
+			: undefined;
+		const child = spawn(process.execPath, [
+			entryPoint,
+			...(runtime.target === 'edge' ? ['--mode', 'edge'] : [])
+		], {
+			cwd: runtime.root,
 			detached: true,
 			env: {
 				...process.env,
 				ELECTRON_RUN_AS_NODE: '1',
-				CODEX_PROXY_DATA_DIR: process.env['VSCODE_AI_EDITOR_PROXY_DATA_DIR'] ??
-					join(this.environmentMainService.userHome.fsPath, '.claude', 'proxy'),
-				CODEX_PROXY_HOST: url.hostname === '[::1]' ? '::1' : (url.hostname === 'localhost' ? '127.0.0.1' : url.hostname),
-				CODEX_PROXY_PORT: url.port || '80'
+				...(runtime.target === 'edge'
+					? edgeEnvironment
+					: {
+						CODEX_PROXY_DATA_DIR: process.env['VSCODE_AI_EDITOR_PROXY_DATA_DIR'] ??
+							join(this.environmentMainService.userHome.fsPath, '.claude', 'proxy'),
+						CODEX_PROXY_HOST: loopbackHost(url),
+						CODEX_PROXY_PORT: url.port || '80'
+					})
 			},
 			stdio: 'ignore',
 			windowsHide: true
 		});
 		child.unref();
-		this.logService.info(`[aiEditorProxy] Started bundled Proxy process from ${proxyRoot}.`);
+		this.logService.info(`[aiEditorProxy] Started bundled ${runtime.target} process from ${runtime.root}.`);
 	}
 
-	private async findProxyRoot(): Promise<string> {
+	private async createEdgeEnvironment(url: URL): Promise<NodeJS.ProcessEnv> {
+		const configuredGatewayOrigin = this.productService.aiEditorAccountGatewayOrigin;
+		if (!configuredGatewayOrigin) {
+			throw new Error('The product Gateway origin is not configured.');
+		}
+		const gatewayOrigin = normalizeAiEditorAccountGatewayUrl(configuredGatewayOrigin, false);
+		const localNonce = await this.edgeRuntimeService.getOrCreateLocalNonce();
+		return {
+			NODE_ENV: 'production',
+			CODEX_PROXY_MODE: 'edge',
+			AI_EDITOR_EDGE_AUTH_MODE: 'real',
+			AI_EDITOR_ENABLE_MOCK_CONTROL: 'false',
+			AI_EDITOR_EDGE_HOST: loopbackHost(url),
+			AI_EDITOR_EDGE_PORT: url.port || '80',
+			AI_EDITOR_EDGE_DATA_ROOT: this.edgeRuntimeService.dataRoot,
+			AI_EDITOR_GATEWAY_ORIGIN: gatewayOrigin,
+			AI_EDITOR_EDGE_LOCAL_NONCE: localNonce
+		};
+	}
+
+	private async findProxyRuntime(): Promise<IAiEditorBundledProxyRuntime> {
 		const override = process.env['VSCODE_AI_EDITOR_PROXY_ROOT'];
 		const candidates = [
 			override,
@@ -247,10 +333,26 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 
 		for (const candidate of candidates) {
 			try {
-				await access(join(candidate, 'src', 'server.js'));
-				return candidate;
-			} catch {
-				// Continue looking through the supported product installation locations.
+				const raw = await readFile(join(candidate, 'release-manifest.json'), 'utf8');
+				const manifest = parseAiEditorBundledProxyRuntimeManifest(raw);
+				await access(join(candidate, ...manifest.entryPoint.split('/')));
+				return { root: candidate, ...manifest };
+			} catch (error) {
+				if (!isFileNotFound(error)) {
+					throw error;
+				}
+				// Source checkouts used during development predate artifact
+				// manifests and remain standalone-only.
+				try {
+					await access(join(candidate, 'src', 'server.js'));
+					return {
+						root: candidate,
+						target: 'legacy-standalone',
+						entryPoint: 'src/server.js'
+					};
+				} catch {
+					// Continue looking through supported product locations.
+				}
 			}
 		}
 		throw new Error('The bundled AI Proxy runtime was not found. Repair or reinstall Code.');
@@ -292,7 +394,16 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	}
 }
 
-function requestJson(url: string): Promise<IHttpJsonResponse> {
+function loopbackHost(url: URL): string {
+	return url.hostname === '[::1]' ? '::1' : (url.hostname === 'localhost' ? '127.0.0.1' : url.hostname);
+}
+
+function isFileNotFound(error: unknown): boolean {
+	return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
+}
+
+async function requestJson(url: string): Promise<IHttpJsonResponse> {
+	const http = await import('http');
 	return new Promise((resolve, reject) => {
 		const request = http.request(url, { method: 'GET', timeout: 3_000 }, response => {
 			const chunks: Buffer[] = [];

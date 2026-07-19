@@ -147,6 +147,7 @@ import { AgentNetworkFilterService, IAgentNetworkFilterService } from '../../pla
 import { ITerminalSandboxService, NullTerminalSandboxService } from '../../platform/sandbox/common/terminalSandboxService.js';
 import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetry.js';
 import { AI_EDITOR_PROXY_CHANNEL_NAME, IAiEditorProxyService } from '../../platform/aiEditorProxy/common/aiEditorProxy.js';
+import { AiEditorEdgeRuntimeService, IAiEditorEdgeRuntimeService } from '../../platform/aiEditorProxy/electron-main/aiEditorEdgeRuntimeService.js';
 import { AiEditorProxyMainService } from '../../platform/aiEditorProxy/electron-main/aiEditorProxyMainService.js';
 import { IAiEditorAccountMainService } from '../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { AI_EDITOR_ACCOUNT_CHANNEL_NAME } from '../../platform/aiEditorAccount/common/aiEditorAccountIpc.js';
@@ -1138,6 +1139,7 @@ export class CodeApplication extends Disposable {
 		services.set(INativeHostMainService, new SyncDescriptor(NativeHostMainService, undefined, false /* proxied to other processes */));
 
 		// AI Editor Proxy
+		services.set(IAiEditorEdgeRuntimeService, new SyncDescriptor(AiEditorEdgeRuntimeService));
 		services.set(IAiEditorProxyService, new SyncDescriptor(AiEditorProxyMainService, undefined, false /* proxied to other processes */));
 		services.set(IAiEditorAccountMainService, new SyncDescriptor(AiEditorAccountMainService, undefined, false /* proxied to other processes */));
 

@@ -1,10 +1,15 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import { AiEditorProxyLifecycleState, type IAiEditorProxyStatus } from '../../common/aiEditorProxy.js';
-import { AiEditorProxyMainService } from '../../electron-main/aiEditorProxyMainService.js';
+import {
+	AiEditorProxyMainService,
+	parseAiEditorBundledProxyRuntimeManifest
+} from '../../electron-main/aiEditorProxyMainService.js';
 
 interface IRestartHarness {
 	circuitOpen: boolean;
@@ -39,6 +44,36 @@ function createRestartHarness(current: IAiEditorProxyStatus, recovered: IAiEdito
 }
 
 suite('AiEditorProxyMainService restart safety', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('accepts only standalone and Edge product runtime manifests', () => {
+		assert.deepStrictEqual(parseAiEditorBundledProxyRuntimeManifest(JSON.stringify({
+			schemaVersion: 2,
+			target: 'edge',
+			entryPoint: 'src/launcher.js'
+		})), {
+			target: 'edge',
+			entryPoint: 'src/launcher.js'
+		});
+		assert.deepStrictEqual(parseAiEditorBundledProxyRuntimeManifest(JSON.stringify({
+			schemaVersion: 1,
+			entryPoint: 'src/server.js'
+		})), {
+			target: 'legacy-standalone',
+			entryPoint: 'src/server.js'
+		});
+		assert.throws(() => parseAiEditorBundledProxyRuntimeManifest(JSON.stringify({
+			schemaVersion: 2,
+			target: 'gateway',
+			entryPoint: 'gateway/dist/server.js'
+		})), /not an Edge or standalone product runtime/);
+		assert.throws(() => parseAiEditorBundledProxyRuntimeManifest(JSON.stringify({
+			schemaVersion: 2,
+			target: 'edge',
+			entryPoint: 'src/server.js'
+		})), /entry point is invalid/);
+	});
+
 	test('reuses a healthy shared Proxy instead of invoking a forced restart', async () => {
 		const ready = status(AiEditorProxyLifecycleState.Ready);
 		const { service, calls } = createRestartHarness(ready, status(AiEditorProxyLifecycleState.Ready));

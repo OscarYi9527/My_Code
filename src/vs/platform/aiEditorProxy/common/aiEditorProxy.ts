@@ -52,6 +52,8 @@ export interface IAiEditorProxyService {
 
 export interface IAiEditorProxyHealthResponse {
 	readonly status?: string;
+	readonly service?: string;
+	readonly mode?: string;
 	readonly providers?: {
 		readonly deepseek?: boolean;
 		readonly 'openai-api'?: boolean;
