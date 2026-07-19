@@ -114,6 +114,10 @@ UI actions:
 | Service unavailable | 服务暂不可用 | Retry and show safe error ID |
 | Password change required | 需要修改密码 | Open account security route |
 
+For a Level 1 account, the Ready label reports that personal credits are unlimited and omits the
+numeric available/used summary. Level 1 configures organization pools and user allocations; the
+Level 1 account itself is not reserved, settled or blocked by personal credit/risk policy.
+
 Level 1 and Level 2 receive the organization-scoped `调用审计` route. Only Level 1 may select another
 organization or change the 7–180 day body retention policy. Level 1 may additionally open
 diagnostics; that action is absent for other roles.

@@ -21,6 +21,16 @@ export function isAiEditorProduct(aiEditorProxyBundled: boolean | undefined): bo
 	return aiEditorProxyBundled === true;
 }
 
+/**
+ * AI Editor relies on the Codex Agent Host sandbox and approval policy for
+ * workspace safety, so the additional VS Code Workspace Trust prompt is
+ * disabled by default. Users can still opt back into Workspace Trust from
+ * advanced settings.
+ */
+export function isAiEditorWorkspaceTrustEnabledByDefault(aiEditorProxyBundled: boolean | undefined): boolean {
+	return !isAiEditorProduct(aiEditorProxyBundled);
+}
+
 export const enum AiEditorAccountState {
 	Ready = 'ready',
 	LoginRequired = 'loginRequired',
@@ -47,6 +57,7 @@ export const enum AiEditorManagementRoute {
 	Security = 'security',
 	Organization = 'organization',
 	Invitations = 'invitations',
+	Credits = 'credits',
 	Usage = 'usage',
 	Providers = 'providers',
 	Diagnostics = 'diagnostics'

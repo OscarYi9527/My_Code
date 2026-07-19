@@ -24,6 +24,10 @@ by the Gateway API and repository scope, not by hidden UI elements.
 
 Denied requests return `403 forbidden` with a safe request ID and create an admin audit event.
 
+Level 1 accounts do not consume a personal allocation and are not blocked by personal credit,
+overdraft or cumulative-risk limits. Their management account page links directly to organization
+creation/user management and organization credit allocation.
+
 ## 2. Organizations
 
 - `GET /organizations`

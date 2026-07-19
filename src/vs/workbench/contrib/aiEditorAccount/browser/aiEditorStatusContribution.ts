@@ -9,11 +9,13 @@ import { MenuId, MenuRegistry } from '../../../../platform/actions/common/action
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import {
+	AiEditorAccountRole,
 	AiEditorAccountState,
 	AiEditorManagementRoute,
 	IAiEditorAccountService,
 	IAiEditorSafeStatus
 } from '../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
+import { IAgentHostService } from '../../../../platform/agentHost/common/agentService.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
@@ -29,6 +31,12 @@ export interface IAiEditorAccountStatusPresentation {
 export function getAiEditorAccountStatusPresentation(status: IAiEditorSafeStatus): IAiEditorAccountStatusPresentation {
 	switch (status.state) {
 		case AiEditorAccountState.Ready: {
+			if (status.role === AiEditorAccountRole.Level1) {
+				return {
+					label: localize('aiEditor.account.status.readyLevel1', "AI 服务正常 · 一级管理员额度不受限"),
+					tooltip: localize('aiEditor.account.status.readyLevel1Tooltip', "一级管理员账号不参与个人积分限制。点击管理组织与额度。")
+				};
+			}
 			const credits = localize(
 				'aiEditor.account.status.credits',
 				" · 剩余额度 {0}",
@@ -75,17 +83,26 @@ function withSafeErrorId(label: string, errorId: string | undefined): string {
 	return errorId ? localize('aiEditor.account.status.errorId', "{0} · 错误编号 {1}", label, errorId) : label;
 }
 
+export function shouldRefreshCodexModels(
+	previous: IAiEditorSafeStatus | undefined,
+	next: IAiEditorSafeStatus
+): boolean {
+	return next.state === AiEditorAccountState.Ready && previous?.state !== AiEditorAccountState.Ready;
+}
+
 export class AiEditorStatusContribution extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.aiEditorAccountStatus';
 
 	private readonly menuItem = this._register(new MutableDisposable());
 	private accountService: IAiEditorAccountService | undefined;
 	private status: IAiEditorSafeStatus | undefined;
+	private modelCatalogRefreshPending = true;
 
 	constructor(
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IWorkbenchEnvironmentService environmentService: IWorkbenchEnvironmentService,
-		@IProductService productService: IProductService
+		@IProductService productService: IProductService,
+		@IAgentHostService private readonly agentHostService: IAgentHostService
 	) {
 		super();
 
@@ -105,6 +122,11 @@ export class AiEditorStatusContribution extends Disposable implements IWorkbench
 	}
 
 	private updateStatus(status: IAiEditorSafeStatus): void {
+		if (status.state !== AiEditorAccountState.Ready) {
+			this.modelCatalogRefreshPending = true;
+		}
+		const refreshModels = status.state === AiEditorAccountState.Ready
+			&& (this.modelCatalogRefreshPending || shouldRefreshCodexModels(this.status, status));
 		this.status = status;
 		const presentation = getAiEditorAccountStatusPresentation(status);
 		this.menuItem.value = MenuRegistry.appendMenuItem(MenuId.ChatInputStatus, {
@@ -116,6 +138,14 @@ export class AiEditorStatusContribution extends Disposable implements IWorkbench
 				tooltip: presentation.tooltip
 			}
 		});
+		if (refreshModels) {
+			this.modelCatalogRefreshPending = false;
+			void this.agentHostService.refreshModels('codex').catch(() => {
+				// Retry on the next 30-second account status update if the
+				// Agent Host or Edge catalog is not ready immediately after login.
+				this.modelCatalogRefreshPending = true;
+			});
+		}
 	}
 
 	private runStatusAction(): Promise<unknown> | undefined {

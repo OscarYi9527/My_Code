@@ -30,6 +30,7 @@ export const enum AiEditorAccountMenuCommandId {
 	OpenSecurity = 'aiEditor.account.openSecurity',
 	OpenOrganization = 'aiEditor.account.openOrganization',
 	OpenInvitations = 'aiEditor.account.openInvitations',
+	OpenCredits = 'aiEditor.account.openCredits',
 	OpenUsage = 'aiEditor.account.openUsage',
 	OpenProviders = 'aiEditor.account.openProviders',
 	OpenDiagnostics = 'aiEditor.account.openDiagnostics',
@@ -94,8 +95,9 @@ function getReadyMenuItems(status: IAiEditorSafeStatus): readonly IAiEditorAccou
 
 	if (status.role === AiEditorAccountRole.Level1 || status.role === AiEditorAccountRole.Level2) {
 		items.push(
-			menuItem(AiEditorAccountMenuCommandId.OpenOrganization, localize('aiEditor.account.menu.organization', "组织用户")),
+			menuItem(AiEditorAccountMenuCommandId.OpenOrganization, localize('aiEditor.account.menu.organization', "组织与用户")),
 			menuItem(AiEditorAccountMenuCommandId.OpenInvitations, localize('aiEditor.account.menu.invitations', "邀请码")),
+			menuItem(AiEditorAccountMenuCommandId.OpenCredits, localize('aiEditor.account.menu.credits', "组织额度")),
 			menuItem(AiEditorAccountMenuCommandId.OpenUsage, localize('aiEditor.account.menu.organizationUsage', "组织使用情况"))
 		);
 	}
@@ -114,6 +116,9 @@ function getReadyMenuItems(status: IAiEditorSafeStatus): readonly IAiEditorAccou
 function getReadySummary(status: IAiEditorSafeStatus): string {
 	const display = status.accountDisplay ?? localize('aiEditor.account.menu.accountFallback', "AI Editor 用户");
 	const role = getRoleLabel(status.role);
+	if (status.role === AiEditorAccountRole.Level1) {
+		return localize('aiEditor.account.menu.readyLevel1Summary', "{0} · {1} · 额度不受限", display, role);
+	}
 	const credits = status.availableCredits
 		? localize('aiEditor.account.menu.creditsSummary', " · {0} 积分", status.availableCredits)
 		: '';
@@ -169,6 +174,7 @@ export class AiEditorAccountMenuContribution extends Disposable implements IWork
 		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenSecurity, () => accountService.openAccountManagement(AiEditorManagementRoute.Security)));
 		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenOrganization, () => accountService.openAccountManagement(AiEditorManagementRoute.Organization)));
 		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenInvitations, () => accountService.openAccountManagement(AiEditorManagementRoute.Invitations)));
+		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenCredits, () => accountService.openAccountManagement(AiEditorManagementRoute.Credits)));
 		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenUsage, () => accountService.openAccountManagement(AiEditorManagementRoute.Usage)));
 		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenProviders, () => accountService.openAccountManagement(AiEditorManagementRoute.Providers)));
 		this._register(CommandsRegistry.registerCommand(AiEditorAccountMenuCommandId.OpenDiagnostics, () => accountService.openAccountManagement(AiEditorManagementRoute.Diagnostics)));

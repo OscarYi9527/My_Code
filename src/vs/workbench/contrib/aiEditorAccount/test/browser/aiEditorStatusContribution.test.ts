@@ -10,7 +10,10 @@ import {
 	AiEditorAccountState,
 	IAiEditorSafeStatus
 } from '../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
-import { getAiEditorAccountStatusPresentation } from '../../browser/aiEditorStatusContribution.js';
+import {
+	getAiEditorAccountStatusPresentation,
+	shouldRefreshCodexModels
+} from '../../browser/aiEditorStatusContribution.js';
 
 suite('AI Editor account status contribution', () => {
 	ensureNoDisposablesAreLeakedInTestSuite();
@@ -44,6 +47,40 @@ suite('AI Editor account status contribution', () => {
 		assert.ok(presentation.tooltip.includes('account_edge_unavailable'));
 		assert.ok(presentation.tooltip.includes('重试'));
 		assert.ok(!presentation.tooltip.includes('http://'));
+	});
+
+	test('Level 1 status reports unlimited personal credits instead of a zero balance', () => {
+		const presentation = getAiEditorAccountStatusPresentation({
+			...status(AiEditorAccountState.Ready),
+			role: AiEditorAccountRole.Level1,
+			availableCredits: '0.000000',
+			usedCreditsPercent: '0'
+		});
+
+		assert.ok(presentation.label.includes('一级管理员'));
+		assert.ok(presentation.label.includes('不受限'));
+		assert.ok(!presentation.label.includes('0.000000'));
+	});
+
+	test('refreshes the Codex model catalog whenever account state becomes ready', () => {
+		assert.strictEqual(
+			shouldRefreshCodexModels(undefined, status(AiEditorAccountState.Ready)),
+			true
+		);
+		assert.strictEqual(
+			shouldRefreshCodexModels(
+				status(AiEditorAccountState.LoginRequired),
+				status(AiEditorAccountState.Ready)
+			),
+			true
+		);
+		assert.strictEqual(
+			shouldRefreshCodexModels(
+				status(AiEditorAccountState.Ready),
+				status(AiEditorAccountState.Ready)
+			),
+			false
+		);
 	});
 
 	test('login, account and password states have distinct safe labels', () => {

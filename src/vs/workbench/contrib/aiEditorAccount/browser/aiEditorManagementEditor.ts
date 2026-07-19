@@ -197,6 +197,7 @@ function isManagementRoute(route: AiEditorManagementRoute): boolean {
 		case AiEditorManagementRoute.Security:
 		case AiEditorManagementRoute.Organization:
 		case AiEditorManagementRoute.Invitations:
+		case AiEditorManagementRoute.Credits:
 		case AiEditorManagementRoute.Usage:
 		case AiEditorManagementRoute.Providers:
 		case AiEditorManagementRoute.Diagnostics:

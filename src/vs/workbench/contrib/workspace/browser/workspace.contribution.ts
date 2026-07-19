@@ -41,7 +41,9 @@ import { IWorkbenchEnvironmentService } from '../../../services/environment/comm
 import { WORKSPACE_TRUST_SETTING_TAG } from '../../preferences/common/preferences.js';
 import { IPreferencesService } from '../../../services/preferences/common/preferences.js';
 import { ILabelService, Verbosity } from '../../../../platform/label/common/label.js';
+import product from '../../../../platform/product/common/product.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
+import { isAiEditorWorkspaceTrustEnabledByDefault } from '../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { MANAGE_TRUST_COMMAND_ID, WorkspaceTrustContext } from '../common/workspace.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IRemoteAgentService } from '../../../services/remote/common/remoteAgentService.js';
@@ -798,7 +800,7 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
 		properties: {
 			[WORKSPACE_TRUST_ENABLED]: {
 				type: 'boolean',
-				default: true,
+				default: isAiEditorWorkspaceTrustEnabledByDefault(product.aiEditorProxyBundled),
 				description: localize('workspace.trust.description', "Controls whether or not Workspace Trust is enabled within VS Code."),
 				tags: [WORKSPACE_TRUST_SETTING_TAG],
 				scope: ConfigurationScope.APPLICATION,

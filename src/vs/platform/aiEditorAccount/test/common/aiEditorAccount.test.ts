@@ -11,6 +11,7 @@ import {
 	AiEditorAccountState,
 	createAiEditorTurnGateResult,
 	isAiEditorProduct,
+	isAiEditorWorkspaceTrustEnabledByDefault,
 	normalizeAiEditorAccountEdgeUrl,
 	normalizeAiEditorAccountGatewayUrl
 } from '../../common/aiEditorAccount.js';
@@ -76,6 +77,12 @@ suite('AI Editor Account', () => {
 		assert.strictEqual(isAiEditorProduct(true), true);
 		assert.strictEqual(isAiEditorProduct(false), false);
 		assert.strictEqual(isAiEditorProduct(undefined), false);
+	});
+
+	test('disables the extra Workspace Trust prompt only for AI Editor products', () => {
+		assert.strictEqual(isAiEditorWorkspaceTrustEnabledByDefault(true), false);
+		assert.strictEqual(isAiEditorWorkspaceTrustEnabledByDefault(false), true);
+		assert.strictEqual(isAiEditorWorkspaceTrustEnabledByDefault(undefined), true);
 	});
 
 	test('normalizes loopback Edge URLs', () => {

@@ -87,6 +87,7 @@ suite('AI Editor account menu', () => {
 				AiEditorAccountMenuCommandId.OpenSecurity,
 				AiEditorAccountMenuCommandId.OpenOrganization,
 				AiEditorAccountMenuCommandId.OpenInvitations,
+				AiEditorAccountMenuCommandId.OpenCredits,
 				AiEditorAccountMenuCommandId.OpenUsage,
 				AiEditorAccountMenuCommandId.Logout
 			]
@@ -94,19 +95,31 @@ suite('AI Editor account menu', () => {
 	});
 
 	test('adds provider and diagnostic actions only for level 1', () => {
+		const items = getAiEditorAccountMenuItems(readyStatus(AiEditorAccountRole.Level1));
 		assert.deepStrictEqual(
-			commandIds(readyStatus(AiEditorAccountRole.Level1)),
+			items.map(item => item.id),
 			[
 				AiEditorAccountMenuCommandId.Summary,
 				AiEditorAccountMenuCommandId.OpenAccount,
 				AiEditorAccountMenuCommandId.OpenSecurity,
 				AiEditorAccountMenuCommandId.OpenOrganization,
 				AiEditorAccountMenuCommandId.OpenInvitations,
+				AiEditorAccountMenuCommandId.OpenCredits,
 				AiEditorAccountMenuCommandId.OpenUsage,
 				AiEditorAccountMenuCommandId.OpenProviders,
 				AiEditorAccountMenuCommandId.OpenDiagnostics,
 				AiEditorAccountMenuCommandId.Logout
 			]
+		);
+		assert.ok(items[0].label.includes('额度不受限'));
+		assert.ok(!items[0].label.includes('100 积分'));
+		assert.strictEqual(
+			items.find(item => item.id === AiEditorAccountMenuCommandId.OpenOrganization)?.label,
+			'组织与用户'
+		);
+		assert.strictEqual(
+			items.find(item => item.id === AiEditorAccountMenuCommandId.OpenCredits)?.label,
+			'组织额度'
 		);
 	});
 });
