@@ -39,7 +39,7 @@ export class AiEditorEdgeRuntimeService implements IAiEditorEdgeRuntimeService {
 
 	readonly dataRoot: string;
 	private readonly authorizationFile: string;
-	private operation: Promise<string | undefined> | undefined;
+	private operation: Promise<void> = Promise.resolve();
 
 	constructor(
 		@IEnvironmentMainService environmentMainService: IEnvironmentMainService,
@@ -130,11 +130,10 @@ export class AiEditorEdgeRuntimeService implements IAiEditorEdgeRuntimeService {
 		}
 	}
 
-	private runExclusive(operation: () => Promise<string | undefined>): Promise<string | undefined> {
-		if (!this.operation) {
-			this.operation = operation().finally(() => this.operation = undefined);
-		}
-		return this.operation;
+	private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+		const result = this.operation.then(operation, operation);
+		this.operation = result.then(() => undefined, () => undefined);
+		return result;
 	}
 }
 

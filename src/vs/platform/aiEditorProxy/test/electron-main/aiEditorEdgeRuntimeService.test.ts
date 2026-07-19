@@ -57,6 +57,20 @@ suite('AiEditorEdgeRuntimeService', () => {
 		assert.strictEqual(await restarted.getOrCreateLocalNonce(), nonce);
 	});
 
+	test('serializes an initial read with local authorization creation', async () => {
+		const environment = { userDataPath: root } as IEnvironmentMainService;
+		const service = new AiEditorEdgeRuntimeService(environment, encryptionService(), new NullLogService());
+
+		const [initial, created] = await Promise.all([
+			service.getLocalNonce(),
+			service.getOrCreateLocalNonce()
+		]);
+
+		assert.strictEqual(initial, undefined);
+		assert.ok(Buffer.byteLength(created, 'utf8') >= 32);
+		assert.strictEqual(await service.getLocalNonce(), created);
+	});
+
 	test('fails closed and removes a malformed encrypted authorization envelope', async () => {
 		const environment = { userDataPath: root } as IEnvironmentMainService;
 		const service = new AiEditorEdgeRuntimeService(environment, encryptionService(), new NullLogService());
