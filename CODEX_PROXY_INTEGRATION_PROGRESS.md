@@ -2505,3 +2505,46 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
      `-RequireEdgeTarget`、macOS `--require-final-edge` 和 T117 真实产品登录/模型/
      管理页/回复验收。
 - 本轮没有停止、重启、修改或迁移共享 Proxy `47892`。
+
+## 86. 2026-07-19 P0 跨 Provider 工具调用兼容修复
+
+- 修复用户在同一任务中切换 DeepSeek、OpenAI API 和 ChatGPT 订阅模型后出现的两类
+  阻断错误：
+  - GPT Responses 拒绝旧工具项 ID：
+    `Expected an ID that begins with 'fc'`；
+  - DeepSeek 因跨 Provider 工具调用与工具结果无法正确配对而返回 HTTP 400。
+- Responses 输出现在严格区分两类标识：
+  - `function_call.id` 统一生成稳定、有长度上限的 `fc_*`；
+  - `function_call.call_id` 保留上游原始 `tool_*` 或 `toolu_*`，用于关联工具结果。
+- ChatGPT Responses 转发前会自动修复旧任务中已保存的非法 `tool_*` item ID，
+  同时保持 `call_id` 不变，因此不再要求用户仅为该错误新建任务。
+- 普通和流式 Chat Completions、Anthropic/DeepSeek 三条转换路径已统一；交错并行的
+  多工具流按 `tool_calls[].index` 独立累计参数，不会串到最后一个工具调用。
+- DeepSeek 400 增加安全诊断，只记录状态、消息数、工具数、工具调用/结果数量及经过
+  脱敏的 `type/code/param/message`；不记录用户正文、API Key、密码或完整上游响应。
+- 两套 Proxy 源码均已提交并推送：
+  - 共享 standalone 修复分支
+    `codex/fix-cross-provider-tool-ids@f56093a756160a288a7a4b7a66cfd3d6bd71764c`；
+  - AI Editor Edge/Gateway 修复分支
+    `codex/fix-cross-provider-tool-ids-edge@9b375542e64b55a535c38033606300c36b3ac7b2`。
+- 自动化验证：
+  - 共享 Proxy 根测试 `71/71`；
+  - AI Editor Proxy 根测试 `122/122`，其中新增专项回归 `6/6`；
+  - Gateway `105/105`、Admin Web `28/28`、类型检查和生产构建通过；
+  - `npm run release:check` 已有完整通过记录；重复执行时还观察到既有 T086 Windows
+    临时登录目录清理偶发 `EPERM`，与本次工具 ID 修复无关，重跑后可通过。
+- 发布固定版本已从 `0616c77` 更新到 `9b37554`，新增的
+  `src/convert/tool-ids.js` 已加入 Proxy 运行时文件清单。
+- Code 双构建与 Windows 成品同步验证：
+  - `npm run compile`、`npm run core-ci` 通过；
+  - P0 standalone 制品生成成功，固定提交为 `9b37554`、共 `272` 个文件，
+    `src/convert/tool-ids.js` 及其校验值均存在；
+  - `npm run gulp vscode-win32-x64-min-ci` 已完成打包并更新
+    `D:\AI_prejoct\VSCode-win32-x64`，最终签名仍仅因本机缺少
+    `signtool.exe` 返回既有 `ENOENT`；
+  - `verify-ai-editor-windows-release.ps1 -SkipCleanStart` 返回 `PASS`，
+    Workbench checksum `10/10`、Proxy payload `272`、共享 Proxy `/live=ok`；
+  - 开发版和 Windows 成品均完成实际启动烟测，烟测结束后已关闭本轮启动的进程。
+- 共享 Proxy `47892` 仍运行修改前版本，PID `31852`、`/live=ok`；本轮未停止或
+  重启。只有取得用户明确批准后，才会通过
+  `scripts\restart-ai-proxy.ps1` 安全加载 P0 修复。
