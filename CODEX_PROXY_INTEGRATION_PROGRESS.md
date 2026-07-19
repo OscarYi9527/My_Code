@@ -2453,3 +2453,55 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 不得为了让迁移成品临时显示账号而把本机 nonce、绝对开发路径或
   `http://127.0.0.1:47920` 写入正式 `product.json`；最终成品由随包 Edge
   安全交接本机授权，并使用固定生产 HTTPS Gateway。
+
+## 85. 2026-07-19 发布收口复核、Edge 重启安全与成品存储隔离
+
+- 两个仓库已先完成收口：
+  - Code 分支 `codex/account-gateway-mvp` 的模型、历史任务和发布准备提交已推送；
+  - Proxy 分支 `codex/oscar-t091-account-security` 固定为
+    `0616c77b50fa934c30321c487aefb2a24071d7c4`，工作树与远端一致；
+  - `specs/002-ai-editor-account-gateway.zip` 是本机导出物，只加入本机
+    `.git/info/exclude`，未删除也未上传。
+- Edge 重启后的安全存储恢复已复核：
+  - Windows DPAPI 真实进程重启、Refresh Token 解封和轮换测试 `6/6` 通过；
+  - Proxy 根测试当前为 `116/116`；
+  - 旧版在修复前写入的 version 1 损坏封装无法安全迁移，启动时会按 fail-closed
+    清除并回到 `login_required`；用户只需在新代码下重新登录一次，后续写入的
+    version 2 DPAPI 封装可跨 Edge 进程恢复；
+  - Code 首次安装还修复了一个 nonce 竞态：账号服务的首次只读请求与 Edge 创建请求
+    现在严格串行，不会误复用 `undefined` 结果。Electron 回归 `4/4` 通过。
+- T111–T113 已使用最新固定提交重新执行：
+  - Gateway `105/105`，覆盖率
+    `87.99% statements / 71.45% branches / 90.82% lines`；
+  - Admin Web `28/28`，组织页行覆盖率 `93.47%`、审计页行覆盖率 `80.95%`；
+  - `npm run release:check` 完整通过；
+  - 全新隔离 quickstart 报告结果为 `PASS`，Gateway `47920`、Edge `47921`
+    已在结束时释放；
+  - 共享 Proxy PID `31852`、`/live=ok`、程序哈希和选定数据哈希前后不变；
+  - 脱敏报告位于
+    `.build/ai-editor-account-gateway/rerun-20260719/t112-t113/`。
+- Windows 成品复核发现并修复一个真实运行数据边界问题：
+  - Code 原来只传递旧变量 `CODEX_PROXY_DATA_DIR`，当前 standalone Proxy 实际读取
+    `CODEX_PROXY_STORAGE_ROOT`，会把 `.credential-key.dpapi.json` 错写到安装资源目录；
+  - 现在新旧变量同时指向用户数据目录，兼容迁移包且不再污染只读安装资源；
+  - 新增环境合同回归，Electron 定向测试 `5/5`、定向 ESLint、`npm run compile` 和
+    `npm run core-ci` 均通过；
+  - Windows 产品内容已更新；最终签名步骤仍仅因本机缺少 `signtool.exe` 返回既有
+    `ENOENT`；
+  - 静态发布验收 `PASS`：Workbench checksum `10/10`、Proxy payload `271` 个文件、
+    共享 Proxy `/live=ok`。当前迁移版因 standalone 的全机单实例锁不能在共享
+    `47892` 在线时再启动第二个隔离 standalone，因此本轮使用 `-SkipCleanStart`；
+    最终 Edge 成品不依赖该 standalone 验收路径。
+- 最终 Edge 候选已提前生成并执行运行烟测：
+  - 候选清单为 schema 2、`target=edge`、入口 `src/launcher.js`、`228` 个文件；
+  - 制品校验确认不包含 Gateway、Admin、数据库、Provider 凭据仓库或 standalone
+    `src/server.js`；
+  - 候选在独立 `47923` 返回 `/live status=ok, mode=edge`，烟测结束后端口已释放；
+  - macOS 静态检查中 Edge 源码和 Keychain 读写删除路径均为 `PASS`。
+- T116–T118 仍不能勾选最终完成，剩余阻断只有两项：
+  1. 冻结正式、非 loopback、无路径的 HTTPS `aiEditorAccountGatewayOrigin`；
+  2. 将 `build/ai-editor-proxy/release.json` 的 `productTarget` 从
+     `legacy-standalone` 正式切换为 `edge`，再执行 Windows
+     `-RequireEdgeTarget`、macOS `--require-final-edge` 和 T117 真实产品登录/模型/
+     管理页/回复验收。
+- 本轮没有停止、重启、修改或迁移共享 Proxy `47892`。
