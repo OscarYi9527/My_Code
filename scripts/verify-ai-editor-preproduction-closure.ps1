@@ -315,8 +315,11 @@ function Invoke-DetachedLifecycleCommand(
 			-ArgumentList $processArguments `
 			-WorkingDirectory $ProxyRepository `
 			-WindowStyle Hidden `
-			-Wait `
 			-PassThru
+		# Start-Process -Wait follows the full descendant tree on Windows. The
+		# lifecycle script intentionally leaves Edge running, so wait only for
+		# the direct PowerShell child instead.
+		$process.WaitForExit()
 		$exitCode = [int]$process.ExitCode
 	} catch {
 		$invokeError = Protect-Text $_.Exception.Message $script:knownSecrets.ToArray()
