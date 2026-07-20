@@ -419,10 +419,20 @@ function Get-GitValue([string]$Repository, [string[]]$Arguments) {
 function Test-RepositoryState([string]$Id, [string]$Repository) {
 	$fetchPassed = $true
 	if (-not $NoFetch) {
-		$fetch = Invoke-LoggedCommand "$Id-fetch" 'git' @('-C', $Repository, 'fetch', '--quiet', 'origin') $repositoryRoot
-		$fetchPassed = $fetch.exitCode -eq 0
+		$fetchPassed = $false
+		$fetch = $null
+		for ($attempt = 1; $attempt -le 3; $attempt++) {
+			$fetch = Invoke-LoggedCommand "$Id-fetch" 'git' @('-C', $Repository, 'fetch', '--quiet', 'origin') $repositoryRoot
+			if ($fetch.exitCode -eq 0) {
+				$fetchPassed = $true
+				break
+			}
+			if ($attempt -lt 3) {
+				Start-Sleep -Seconds ([Math]::Pow(2, $attempt - 1))
+			}
+		}
 		if (-not $fetchPassed) {
-			Add-Check "$Id-fetch" 'source' 'FAIL' "Unable to fetch origin (exit $($fetch.exitCode))." $fetch.log
+			Add-Check "$Id-fetch" 'source' 'FAIL' "Unable to fetch origin after three attempts (last exit $($fetch.exitCode))." $fetch.log
 		}
 	}
 	$branch = Get-GitValue $Repository @('rev-parse', '--abbrev-ref', 'HEAD')

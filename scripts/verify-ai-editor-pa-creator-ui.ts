@@ -79,6 +79,10 @@ async function main(): Promise<void> {
 		const workbench = page.locator('.monaco-workbench');
 		await workbench.waitFor({ state: 'visible', timeout: 20_000 });
 		await workbench.click({ position: { x: 20, y: 20 } });
+		// The packaged Workbench becomes paint-ready before all restored-phase
+		// contributions are registered. Wait for that deterministic startup
+		// boundary before querying the Command Palette.
+		await page.waitForTimeout(surface === 'product' ? 3_000 : 500);
 
 		await openPaPlazaFromCommandPalette(page);
 		const plaza = page.locator('.pa-plaza-editor');
@@ -194,22 +198,25 @@ async function openPaPlazaFromCommandPalette(page: import('@playwright/test').Pa
 	await page.keyboard.press('Control+Shift+P');
 	const input = page.locator('.quick-input-widget input:visible').last();
 	await input.waitFor({ state: 'visible', timeout: 10_000 });
-	await input.fill('>PA');
 	const rows = page.locator('.quick-input-list .monaco-list-row');
-	await waitFor(
-		() => rows.allInnerTexts(),
-		values => values.some(value => value.includes('PA')),
-		'PA Plaza command'
-	);
-	const labels = await rows.allInnerTexts();
-	const preferredIndex = labels.findIndex(value => value.includes('PA') && (value.includes('广场') || value.toLowerCase().includes('plaza')));
-	const fallbackIndex = labels.findIndex(value => value.includes('PA'));
-	const index = preferredIndex >= 0 ? preferredIndex : fallbackIndex;
-	if (index < 0) {
-		throw new Error('The PA Plaza command was not found.');
+	const queries = ['>打开 PA 广场', '>Open PA Plaza', '>PA 广场'];
+	const observedResults: string[] = [];
+	for (const query of queries) {
+		await input.fill(query);
+		await page.waitForTimeout(250);
+		const labels = await rows.allInnerTexts();
+		observedResults.push(`${query}: ${JSON.stringify(labels.slice(0, 20))}`);
+		const index = labels.findIndex(value =>
+			value.toUpperCase().includes('PA')
+			&& (value.includes('广场') || value.includes('廣場') || value.toLowerCase().includes('plaza'))
+		);
+		if (index >= 0) {
+			await rows.nth(index).click();
+			await page.locator('.quick-input-widget').waitFor({ state: 'hidden', timeout: 10_000 });
+			return;
+		}
 	}
-	await rows.nth(index).click();
-	await page.locator('.quick-input-widget').waitFor({ state: 'hidden', timeout: 10_000 });
+	throw new Error(`The PA Plaza command was not found with precise queries. Observed results: ${observedResults.join('; ')}`);
 }
 
 function startCode(
