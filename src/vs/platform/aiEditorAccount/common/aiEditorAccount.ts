@@ -16,6 +16,7 @@ export const AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID = 'ai-editor-management';
 
 export const IAiEditorAccountService = createDecorator<IAiEditorAccountService>('aiEditorAccountService');
 export const IAiEditorAccountMainService = createDecorator<IAiEditorAccountMainService>('aiEditorAccountMainService');
+export const IAiEditorManagementService = createDecorator<IAiEditorManagementService>('aiEditorManagementService');
 
 export function isAiEditorProduct(aiEditorProxyBundled: boolean | undefined): boolean {
 	return aiEditorProxyBundled === true;
@@ -105,6 +106,13 @@ export interface IAiEditorAccountTransport {
 }
 
 export interface IAiEditorAccountMainService extends IAiEditorAccountTransport {
+	readonly _serviceBrand: undefined;
+
+	prepareManagementView(viewId: string, route: AiEditorManagementRoute): Promise<void>;
+	disposeManagementView(viewId: string): Promise<void>;
+}
+
+export interface IAiEditorManagementService {
 	readonly _serviceBrand: undefined;
 
 	prepareManagementView(viewId: string, route: AiEditorManagementRoute): Promise<void>;

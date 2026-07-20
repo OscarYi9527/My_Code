@@ -612,6 +612,17 @@ async function stripAuthenticodeSignature(filePath: string): Promise<void> {
 	});
 }
 
+async function isPortableExecutable(filePath: string): Promise<boolean> {
+	const handle = await fs.promises.open(filePath, 'r');
+	try {
+		const magic = Buffer.allocUnsafe(2);
+		const { bytesRead } = await handle.read(magic, 0, magic.length, 0);
+		return bytesRead === magic.length && magic[0] === 0x4D && magic[1] === 0x5A;
+	} finally {
+		await handle.close();
+	}
+}
+
 function patchWin32DependenciesTask(destinationFolderName: string) {
 	const cwd = path.join(path.dirname(root), destinationFolderName);
 
@@ -631,6 +642,11 @@ function patchWin32DependenciesTask(destinationFolderName: string) {
 			const basename = path.basename(dep);
 			const fullPath = path.join(cwd, dep);
 
+			// Some extension SDKs ship cross-platform `.node` payloads in one
+			// package. Only Windows PE files can be inspected by signtool/rcedit.
+			if (!await isPortableExecutable(fullPath)) {
+				return;
+			}
 			await stripAuthenticodeSignature(fullPath);
 			await rcedit(fullPath, {
 				'file-version': baseVersion,

@@ -151,6 +151,8 @@ import { AiEditorProxyMainService } from '../../platform/aiEditorProxy/electron-
 import { IAiEditorAccountMainService } from '../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { AI_EDITOR_ACCOUNT_CHANNEL_NAME } from '../../platform/aiEditorAccount/common/aiEditorAccountIpc.js';
 import { AiEditorAccountMainService } from '../../platform/aiEditorAccount/electron-main/aiEditorAccountMainService.js';
+import { IPaPublicationMainService, PA_PUBLICATION_CHANNEL_NAME } from '../../workbench/services/paRegistry/common/paPublication.js';
+import { PaPublicationMainService } from '../../workbench/services/paRegistry/electron-main/paPublicationMainService.js';
 
 /**
  * The main VS Code application. There will only ever be one instance,
@@ -1140,6 +1142,7 @@ export class CodeApplication extends Disposable {
 		// AI Editor Proxy
 		services.set(IAiEditorProxyService, new SyncDescriptor(AiEditorProxyMainService, undefined, false /* proxied to other processes */));
 		services.set(IAiEditorAccountMainService, new SyncDescriptor(AiEditorAccountMainService, undefined, false /* proxied to other processes */));
+		services.set(IPaPublicationMainService, new SyncDescriptor(PaPublicationMainService, undefined, false /* proxied to renderer */));
 
 		// Metered Connection
 		const meteredConnectionService = new MeteredConnectionMainService(this.configurationService);
@@ -1344,6 +1347,9 @@ export class CodeApplication extends Disposable {
 
 		const aiEditorAccountChannel = ProxyChannel.fromService(accessor.get(IAiEditorAccountMainService), disposables);
 		mainProcessElectronServer.registerChannel(AI_EDITOR_ACCOUNT_CHANNEL_NAME, aiEditorAccountChannel);
+
+		const paPublicationChannel = ProxyChannel.fromService(accessor.get(IPaPublicationMainService), disposables);
+		mainProcessElectronServer.registerChannel(PA_PUBLICATION_CHANNEL_NAME, paPublicationChannel);
 
 		// Web Content Extractor
 		const webContentExtractorChannel = ProxyChannel.fromService(accessor.get(IWebContentExtractorService), disposables);
