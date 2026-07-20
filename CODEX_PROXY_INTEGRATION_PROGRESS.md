@@ -3039,3 +3039,33 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 预发布 Edge 已按原 Quick Tunnel 和原数据目录恢复为 PID `48732`、`/live=ok`。
 - T136b、T137、T138 仍未完成；下一步必须由 Oscar 确认云/KMS/PostgreSQL/对象存储
   选择及生产批准，不能用该预检替代人工门禁。
+
+## 96. 2026-07-21 生产 PostgreSQL TLS 与迁移身份边界
+
+- Proxy 仓库提交：`53892dc`（`codex/provider-worker-mvp`）。
+- 完成不依赖云厂商的 T136b PostgreSQL 前置边界：
+  - production Gateway 强制 `AI_EDITOR_GATEWAY_DB_DIALECT=postgres`；
+  - 强制使用存在的可信 CA 文件，`pg.Pool` 固定
+    `rejectUnauthorized=true`；
+  - 可选客户端证书/私钥必须成对配置，可选 TLS server name 经过语法限制；
+  - PostgreSQL URL 中全部 `ssl*` 查询参数被拒绝，防止 node-postgres 覆盖显式
+    TLS 对象；
+  - production Gateway 永不使用运行时数据库身份自动迁移，
+    `AI_EDITOR_GATEWAY_MIGRATE_ON_START=true` 会 fail closed；
+  - 新增 `npm run gateway:bootstrap`，供部署时使用独立、临时授权的 migration
+    身份执行迁移与首次管理员初始化。
+- 自动验证：
+  - Gateway TypeScript：通过；
+  - TLS/config 定向测试 `11/11`；
+  - Gateway 全量 `140/140`；
+  - Proxy/Edge/Worker `170/170`；
+  - Admin Web `31/31`；
+  - 完整 `npm run release:check` 通过。
+- 运行不变量：
+  - 共享 `47892` 保持 PID `32260`、`/live=ok`；
+  - 隔离 Edge 通过项目脚本恢复到原 Quick Tunnel 和原数据目录，当前 PID `9680`、
+    `/live=ok`。
+- 仍需人工/真实云验证：
+  - 选择 PostgreSQL 服务并取得真实 CA；
+  - 创建分离的 migration/runtime 角色并验证 runtime 无 DDL/角色/建库权限；
+  - 生产形态迁移、回滚、异机备份和恢复演练。

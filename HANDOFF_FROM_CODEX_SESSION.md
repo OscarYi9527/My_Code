@@ -622,3 +622,42 @@ When Oscar returns, the required decisions are:
 4. versioned off-host object storage;
 5. stable production domains and ICP path;
 6. infrastructure/security/deployment approvals.
+
+## 2026-07-21 production PostgreSQL TLS boundary
+
+The remaining vendor-neutral PostgreSQL work was completed and pushed:
+
+- repository: `D:\AI_prejoct\codex_proxy-provider-worker`;
+- branch: `codex/provider-worker-mvp`;
+- commit: `53892dc`.
+
+Production Gateway now:
+
+- requires PostgreSQL rather than SQLite;
+- requires a mounted trusted CA;
+- creates `pg.Pool` with `rejectUnauthorized=true`;
+- accepts an optional client certificate/key only as a complete pair;
+- supports a bounded certificate server-name override;
+- rejects all PostgreSQL URL `ssl*` parameters so node-postgres cannot replace
+  the explicit TLS object;
+- never auto-runs migrations with the runtime database identity;
+- rejects `AI_EDITOR_GATEWAY_MIGRATE_ON_START=true`.
+
+`npm run gateway:bootstrap` is the explicit migration/bootstrap entry point
+for a separately injected migration identity.
+
+Validation:
+
+- focused config/TLS tests: `11/11`;
+- Gateway: `140/140`;
+- root Proxy/Edge/Worker: `170/170`;
+- Admin Web: `31/31`;
+- full `npm run release:check`: passed.
+
+Shared `47892` remains PID `32260`, `/live=ok`. Preview Edge is restored as
+PID `9680` against the same Quick Tunnel and data root.
+
+This still does not finish T136b: the selected managed PostgreSQL CA, separated
+migration/runtime roles, real least-privilege verification, migration/rollback
+drill and off-host backup/restore drill require the cloud choice and operator
+approval.
