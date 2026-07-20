@@ -2667,6 +2667,51 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 未完成时被阻断的任务：真实上游回应验收；不阻断 T135 自动化开发。
 - 当前是否需要付款：否。
 
+## 93. 2026-07-20 大请求上传死锁修复与公网预发布部署
+
+- 根因已通过目标长任务复现并确认：
+  - 旧版请求体上限为 `16 MiB`；
+  - 超限后服务器停止消费剩余上传数据，客户端继续上传，双方因 TCP 背压互相等待；
+  - 最终由 Node HTTP 默认超时在约 5 分钟后返回无明确正文的 HTTP `408`；
+  - 故障发生在请求体解析阶段，因此会影响所有 `/v1` Provider，而不是账号、额度、
+    VMware 或某个模型上游故障。
+- 共享 standalone Proxy 修复：
+  - 工作树：`C:\Users\Oscar\.claude\proxy`；
+  - 分支：`codex/fix-cross-provider-tool-ids`；
+  - 提交：`f1be606`、`38a436c2ef3ae4b98940011f8dc6b3fd3c461add`；
+  - 默认上限提升到 `64 MiB`，可用 `CODEX_PROXY_MAX_BODY_MIB` 调整，硬上限
+    `256 MiB`；
+  - `CODEX_PROXY_BODY_TIMEOUT_MS` 默认 `60000`，硬上限 `300000`；
+  - 超限后排空或关闭上传连接，明确返回 `413 request_too_large`；
+  - 不完整上传明确返回带错误信息的 `408`，不再等待 Node 默认 5 分钟；
+  - 根测试 `74/74`，目标长任务真实请求返回 HTTP `200`。
+- AI Editor 长期架构同步修复：
+  - 工作树：`D:\AI_prejoct\codex_proxy-provider-worker`；
+  - 分支：`codex/provider-worker-mvp`；
+  - 提交：`a34aa5c3fd2735fbac1a4fe56418e0aa11abe09e`；
+  - 同步覆盖 standalone、Edge、Gateway/Fastify 和 Provider Worker 四层；
+  - 新增统一大请求边界回归 `tests/test-request-body.js`；
+  - 根测试 `166/166`、Gateway `130/130`、Admin Web `28/28`；
+  - `npm run check`、`npm run release:check` 和 29 文件 Worker 制品边界检查通过。
+- VMware 公网预发布实例已部署提交 `a34aa5c`：
+  - Gateway `127.0.0.1:47920`、Provider Worker `127.0.0.1:47930`；
+  - Quick Tunnel `/live` 返回 HTTP `200`；
+  - 公网 Gateway 的 `17 MiB` 请求完成 body 解析后返回预期鉴权错误，而不是
+    `413/408`；
+  - 本地 Edge 的 `17 MiB` 请求完成状态校验，声明 `65 MiB` 的请求在约
+    `21 ms` 内返回明确 `413 request_too_large`；
+  - Quick Tunnel 仅用于预发布连通性验证，不作为正式生产域名或长期部署架构。
+- 2026-07-20 最终只读复核：
+  - 两个目标分支均与远端一致，ahead/behind 为 `0/0`；
+  - 共享 `47892` 为 PID `32260`，`/live=200`、`/ready=200`；
+  - 隔离 Edge `47921` 为 PID `38016`，`/live=200`；
+  - 公网预发布 Gateway `/live=200`；
+  - 本任务没有再次停止或重启共享 `47892`。
+- 保留的无关本地状态：
+  - 共享 Proxy 的 `tests/test-codex-proxy.js` 仍有一组未暂存的额度阈值测试隔离改动；
+  - `codex-proxy-requests.log.1` 为未跟踪运行日志；
+  - 两者均未纳入本次提交，也未被丢弃或覆盖。
+
 ## 90. 2026-07-20 ChatGPT 订阅账号熔断恢复 P0 修复
 
 - 用户实际遇到：

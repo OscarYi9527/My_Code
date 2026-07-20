@@ -336,3 +336,72 @@ approval, and then use only scripts\restart-ai-proxy.ps1.
   T136a.
 - Detailed Proxy handoff:
   `docs/AI_EDITOR_PROVIDER_CREDENTIAL_ENCRYPTION_T136A_HANDOFF.md`.
+
+## 2026-07-20 large-request upload deadlock checkpoint
+
+The upload deadlock affecting long Codex tasks has been fixed, pushed, and
+deployed to the VMware public-preview stack.
+
+Confirmed root cause:
+
+- the old parser stopped consuming uploads after the `16 MiB` limit;
+- the client kept uploading while the server attempted to reply;
+- TCP backpressure deadlocked both sides until Node emitted an unhelpful HTTP
+  `408` after about five minutes;
+- parsing happens before Provider routing, so every `/v1` Provider was affected.
+
+Shared standalone source:
+
+- worktree: `C:\Users\Oscar\.claude\proxy`;
+- branch: `codex/fix-cross-provider-tool-ids`;
+- pushed commits:
+  - `f1be606 fix(proxy): prevent oversized upload deadlocks`;
+  - `38a436c docs(proxy): document request upload safety limits`;
+- root tests: `74/74`.
+
+Long-term Edge/Gateway/Worker source:
+
+- worktree: `D:\AI_prejoct\codex_proxy-provider-worker`;
+- branch: `codex/provider-worker-mvp`;
+- pushed commit:
+  `a34aa5c3fd2735fbac1a4fe56418e0aa11abe09e`;
+- root tests: `166/166`;
+- Gateway tests: `130/130`;
+- Admin tests: `28/28`;
+- `npm run check` and `npm run release:check`: passed;
+- Provider Worker 29-file artifact boundary: passed.
+
+Behavior:
+
+- default body limit is `64 MiB`;
+- `CODEX_PROXY_MAX_BODY_MIB` can tune it up to `256 MiB`;
+- incomplete uploads time out after `60000 ms` by default;
+- `CODEX_PROXY_BODY_TIMEOUT_MS` can tune this up to `300000 ms`;
+- oversized uploads are drained or closed and return typed HTTP `413`;
+- incomplete uploads return a typed HTTP `408` without waiting for Node's
+  default five-minute timeout.
+
+Deployment:
+
+- VMware repository is at `a34aa5c`;
+- Gateway runs on `127.0.0.1:47920`;
+- Provider Worker runs on `127.0.0.1:47930`;
+- the existing Cloudflare Quick Tunnel remains preview-only and `/live=200`;
+- a public `17 MiB` request passed body parsing and reached authentication;
+- local Edge accepted a `17 MiB` body and rejected a declared `65 MiB` body
+  with typed `413` in about `21 ms`.
+
+Final read-only audit:
+
+- both Proxy target branches match their upstream branches (`0/0`);
+- shared `47892` is PID `32260`, `/live=200`, `/ready=200`;
+- isolated Edge `47921` is PID `38016`, `/live=200`;
+- public preview Gateway `/live=200`;
+- shared `47892` was not restarted again during the final audit.
+
+Preserve these unrelated local files in the shared Proxy worktree:
+
+- unstaged `tests/test-codex-proxy.js` quota-threshold test isolation;
+- untracked `codex-proxy-requests.log.1`.
+
+Do not stage or discard them as part of the upload fix.
