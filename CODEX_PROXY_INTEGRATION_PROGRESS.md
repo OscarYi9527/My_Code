@@ -2761,3 +2761,62 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - `docs/AI_EDITOR_PROVIDER_WORKER_T135_HANDOFF.md`
 - 下一项为 T136/PW3：信封加密、KMS/Secret Manager、刷新 Token 安全持久化、
   凭据迁移/轮换和备份恢复；T136 未完成前禁止公网开放用户。
+
+## 92. 2026-07-20 Provider 凭据安全 T136a 本地检查点
+
+- Proxy 仓库：
+  - 工作树：`D:\AI_prejoct\codex_proxy-provider-worker`
+  - 分支：`codex/provider-worker-mvp`
+  - 提交：`9b1c4848dcc9ce197e4ddeade3a86a47a3a9ec22`
+- 已完成 T136 中当前无需云资源即可实现的 T136a：
+  - Gateway 每条 Provider 凭据生成独立随机 DEK，使用 AES-256-GCM；
+  - KEK 只包装 DEK，AAD 绑定凭据 ID、Provider ID、凭据版本和用途；
+  - 数据库新增 `envelope-v1`、`key_version` 和单调递增的
+    `credential_version`；
+  - 新增凭据自动加密，旧 `plaintext-v1` 支持逐条回读验证、幂等迁移和中断恢复；
+  - 主密钥轮换只重包 DEK，不重复加密业务正文；
+  - 新增 SQLite online backup 的整库认证加密、错误密钥/篡改拒绝和恢复后
+    `integrity_check`；
+  - `migrate`/`rotate` 在任何结构或凭据修改前先创建加密备份；
+  - Worker 独立加密 vault 持久化滚动后的 ChatGPT Access/Refresh/ID Token 和过期时间；
+  - Gateway 同步 `credential_version`，管理员替换凭据后 Worker 不会用旧 Token
+    覆盖新版本；
+  - 开发密钥、Worker vault 和备份均被 Git/制品边界隔离；生产环境缺少外部
+    KMS/Secret Manager Provider 时 fail closed。
+- 本地运维入口：
+
+  ```powershell
+  npm run gateway:credentials -- status
+  npm run gateway:credentials -- verify
+  npm run gateway:credentials -- backup
+  npm run gateway:credentials -- migrate
+  npm run gateway:credentials -- rotate
+  npm run gateway:credentials -- restore --source <backup> --destination <new.sqlite>
+  ```
+
+- 自动化与制品验证：
+  - 根测试 `156/156`；
+  - Gateway `126/126`；
+  - Admin Web `28/28`；
+  - Provider Worker 定向测试 `18/18`；
+  - `npm run release:check` 通过；
+  - `npm audit --audit-level=high`：`0 vulnerabilities`；
+  - Worker runtime allowlist `29` 个文件，最终制品含 manifest 共 `30` 个文件；
+  - commit 后制品 manifest 指向 `9b1c4848dcc9ce197e4ddeade3a86a47a3a9ec22`；
+  - 独立制品在 `127.0.0.1:47930` 实际启动并返回 `/live.status=ok`。
+- 共享 Proxy 不变量：
+  - 完整回归前后均为 PID `26120`、`/live=ok`、`/ready=ok`；
+  - 本轮没有停止、重启、修改或迁移共享 `47892`。
+- T136 仍保持未整体勾选：
+  - `T136a local checkpoint` 已完成；
+  - `T136b production checkpoint` 等待 Oscar 选择国内 Gateway 与境外 Worker 的
+    云平台/KMS、生产 PostgreSQL 和对象存储备份方案。
+- Proxy 交接文档：
+  `docs/AI_EDITOR_PROVIDER_CREDENTIAL_ENCRYPTION_T136A_HANDOFF.md`。
+
+下一阶段人工门禁：
+
+- 需要 Oscar 操作的购买/订阅：先完成供应商和地区选型；当前无需立即购买。
+- 最迟完成时间：T136b 编码冻结前。
+- 未完成时被阻断的任务：生产密钥适配、T137 远程部署和公网邀请码测试。
+- 当前是否需要付款：否。

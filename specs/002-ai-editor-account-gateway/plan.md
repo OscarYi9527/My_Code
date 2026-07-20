@@ -110,7 +110,8 @@ Oscar 维护 `contracts/code-edge-webview.md` 的 Code 端实现。
 - MVP 开发：隔离 SQLite 数据库。
 - 正式中央服务：PostgreSQL。
 - Edge：Windows DPAPI/macOS Keychain 保存 Refresh Token，Access Token 仅内存。
-- 上游凭据：MVP 本机 SQLite 临时 `plaintext-v1`，公开部署前必须完成信封加密待办。
+- 上游凭据：本机 T136a 已切换为 `envelope-v1`，使用独立 DEK、AES-256-GCM 和
+  Git 忽略的开发密钥环；正式部署仍必须完成 T136b 云 KMS/Secret Manager 适配。
 
 **Testing**:
 
@@ -147,8 +148,8 @@ Oscar 维护 `contracts/code-edge-webview.md` 的 Code 端实现。
 
 - MVP 覆盖 3 种角色、多个组织、多个设备会话和多个并发 Turn。
 - 本机验收至少覆盖 2 个组织、20 个用户、20 个并发 Turn、2 类 Provider 和 20 个模型。
-- MVP 不包含邮箱验证、公开中央部署、KMS/信封加密、Code 全原生账号管理页和 macOS
-  签名/公证。
+- MVP 不包含邮箱验证、公开中央部署、生产 KMS 供应商适配、Code 全原生账号管理页和
+  macOS 签名/公证；本地信封格式、迁移、轮换和加密备份已纳入 T136a。
 
 ## Constitution Check
 
@@ -162,7 +163,7 @@ Oscar 维护 `contracts/code-edge-webview.md` 的 Code 端实现。
 | Simplicity first | PASS | 保留 standalone；Edge、Gateway 和管理 UI 只增加必要边界 |
 | Quality/testing ownership | PASS | 每个用户故事有独立验收，新增代码要求 >=80% 覆盖 |
 | Observability/documentation | PASS | 安全错误编号、路由诊断、审计和本地进度文档均在范围内 |
-| Security/responsible AI | PASS with temporary gate | 仅上游凭据信封加密延期，且公开部署被明确阻断 |
+| Security/responsible AI | PASS with production gate | 本地信封加密已完成；云 KMS、异地备份和恢复演练完成前继续阻断公开部署 |
 | OOP/interface-first | PASS | 存储、令牌、Provider、计费和审计使用接口与注入 |
 | Framework constraints | PASS | 不改变 Codex Agent Host 主链，不整体迁移现有 Proxy |
 
@@ -172,7 +173,7 @@ Oscar 维护 `contracts/code-edge-webview.md` 的 Code 端实现。
 - [x] Security gate: 密码、Token、票据、角色、审计和临时明文边界已定义。
 - [x] Compatibility gate: standalone 与共享 `47892` 隔离要求已定义。
 - [x] Cross-platform gate: DPAPI/Keychain 和 Windows/macOS 产品边界已定义。
-- [x] Deployment gate: Gateway 公开部署在信封加密完成前被阻断。
+- [x] Deployment gate: Gateway 公开部署在 T136b 生产 KMS、异地备份和恢复门禁完成前被阻断。
 
 ## Project Structure
 
@@ -347,5 +348,6 @@ scripts/
 Provider Worker 编码开始前，必须先冻结 Gateway ↔ Worker 内部合同并生成独立任务清单。
 
 PW0/PW1 已于 2026-07-20 在 `codex/provider-worker-mvp` 完成；冻结合同位于
-[contracts/provider-worker-api.md](./contracts/provider-worker-api.md)。真实 Provider
-Runtime、凭据迁移、KMS 和远程部署继续按 T133–T139 执行。
+[contracts/provider-worker-api.md](./contracts/provider-worker-api.md)。T133–T135 和
+T136a 本地信封加密检查点已完成；生产 KMS/Secret Manager、PostgreSQL/异地备份和远程
+部署继续按 T136b–T139 执行。

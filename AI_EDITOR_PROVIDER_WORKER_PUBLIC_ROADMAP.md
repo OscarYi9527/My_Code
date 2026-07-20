@@ -1,9 +1,8 @@
 # AI Editor Provider Worker 与公网演进路线图
 
 更新时间：2026-07-20
-状态：PW0/PW1 已完成；PW2 的 ChatGPT 订阅账号池、持久化 execution/outbox、
-签名用量对账与结算确认已完成自动化隔离验收，等待专用真实测试账号联合验收；
-尚未购买服务器或公网部署
+状态：PW0/PW1、PW2 自动化链路和 T136a 本地凭据安全检查点已完成；等待专用真实
+测试账号联合验收与 T136b 云 KMS/Secret Manager 选型；尚未购买服务器或公网部署
 
 ## 1. 已确认的决策
 
@@ -475,15 +474,33 @@ PW2 已先按用户决策完成 ChatGPT 订阅账号池迁移和 T135 对账：
 - Gateway 通过签名内部接口同步一级管理员配置的订阅账号、路由开关和模型目录；
 - Worker 直接复用现有 Proxy 的账号选择、并发租约、额度保护、429 冷却、401/403
   摘除、Token 刷新、SSE、用量提取和跨 Provider 工具 ID 修复；
-- Worker 凭据当前仅在内存中保存，不读取或复制共享 `47892` 的账号与配置；
+- Worker 明文凭据只在执行进程内存中存在，滚动 Token 写入独立加密 vault；不读取或
+  复制共享 `47892` 的账号与配置；
 - 管理页继续显示一级管理员总开关、账号参与路由、脱敏健康和“试验通道”提示；
 - Worker 已持久化不含正文和凭据的 execution/outbox，用量回执使用独立
   `aieditor-usage-v1` HMAC 签名；
 - Gateway 已支持即时确认和每 15 秒后台对账，重启或网络失败不会重复执行上游 Turn；
 - 重启前未完成的 Worker Turn 进入 `recovery_required`，禁止静默自动重跑。
 
-下一步可先开发 T136 的本地信封加密、凭据版本和迁移测试；正式 KMS/Secret Manager
-适配需要 Oscar 确认国内 Gateway 与境外 Worker 的云平台。专用真实订阅测试账号仍用于
-Gateway → Worker → ChatGPT 联合验收。开始使用真实测试凭据或远程 Worker 前，再集中
-确认测试账号、Worker 云地区和人工采购时间；当前不安装服务器、不购买云资源、不更改
-共享 Proxy。
+T136a 本地检查点已完成：
+
+- Gateway 新凭据使用每条独立 DEK 的 AES-256-GCM `envelope-v1`；
+- 提供幂等明文迁移、回读验证、密钥重包和加密 SQLite 备份恢复命令；
+- Worker 加密持久化滚动后的 ChatGPT Token，并使用 `credential_version` 防止旧 Token
+  覆盖管理员替换的新凭据；
+- 开发密钥、Worker vault 和加密备份均与共享 `47892` 隔离并被 Git/制品边界保护；
+- 生产环境未注入外部密钥 Provider 时 Gateway/Worker 均拒绝启动。
+
+下一步是 T136b。正式 KMS/Secret Manager 适配需要 Oscar 确认国内 Gateway 与境外
+Worker 的云平台，同时确定生产 PostgreSQL 和加密对象存储备份方案。专用真实订阅测试
+账号仍用于 Gateway → Worker → ChatGPT 联合验收。开始远程 Worker 或公网预发布前，
+再集中确认云地区、供应商、预算和人工采购时间；当前不安装服务器、不购买云资源、
+不更改共享 Proxy。
+
+下一阶段人工门禁：
+
+- 需要 Oscar 操作的购买/订阅：选择国内 Gateway 云、境外 Worker 云、两侧
+  KMS/Secret Manager、PostgreSQL 与对象存储方案；当前只需选型，不要求立即付款。
+- 最迟完成时间：T136b 编码冻结前。
+- 未完成时被阻断的任务：生产密钥适配、远程部署 T137 和公网邀请码测试。
+- 当前是否需要付款：否。

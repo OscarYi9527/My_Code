@@ -97,6 +97,7 @@ aieditor-v1
       "account_id": "upstream_account_example",
       "access_token": "[SECRET]",
       "refresh_token": "[SECRET]",
+      "credential_version": 2,
       "routing_enabled": true,
       "routing_weight": 1,
       "low_quota_threshold": 10,
@@ -114,10 +115,15 @@ aieditor-v1
 
 - 生产必须同时使用 mTLS 和本合同 HMAC 签名；
 - 请求正文、Header、错误和日志均不得回显凭据；
-- Worker 当前只在内存中保存本次同步的明文凭据，不生成
-  `codex-proxy-config.json`；
-- 同一凭据版本重复同步时保留 Worker 内的刷新 Token、冷却、摘除和用量状态；
-- 一级管理员更新凭据后，凭据摘要变化，Worker 必须使用新版本并清除旧版本运行状态；
+- Worker 不生成 `codex-proxy-config.json`，明文凭据只在执行进程内存中存在；
+- Worker 使用与 Gateway 数据目录分离的 `envelope-v1` vault 持久化最新滚动 Access、
+  Refresh、ID Token 和过期时间，每个账号使用独立随机 DEK；
+- `credential_version` 是正整数。同一版本重复同步时优先恢复 Worker 已安全持久化的最新
+  Refresh Token，并保留冷却、摘除和用量状态；
+- 一级管理员更新凭据时 Gateway 必须递增 `credential_version`；Worker 不得用旧 vault
+  Token 覆盖新版本，并清除旧版本运行状态；
+- 开发环境 vault 密钥文件必须被 Git/制品排除；生产环境没有注入 KMS/Secret Manager
+  vault 时 Worker 必须拒绝启动，不能回退到开发密钥文件；
 - `enabled=false`、Provider 停用、账号全部退出路由或模型路由停用时，不再对外发布对应
   模型；
 - `experimental=true` 是固定语义，表示订阅通道为试验通道且不承诺 SLA。
@@ -378,12 +384,16 @@ Gateway 在本地结算事务成功后发送签名确认，`x-ai-editor-turn-id`
 Gateway 面向普通用户时只保留错误码、脱敏提示和可重试属性，不传递 Worker 原始错误
 消息。
 
-## 5. 后续兼容扩展
+## 5. T136 凭据安全兼容扩展
 
-T136/PW3 仍需在保持 `aieditor-v1` 兼容的前提下增加：
+T136a 在不改变 `aieditor-v1` 签名语义的前提下完成：
 
-- Worker 凭据版本和 KMS key version；
-- 信封加密、刷新 Token 安全持久化、轮换和备份恢复；
-- 多 Worker 池调度和更完整的脱敏路由决策摘要。
+- Gateway `credential_version` 同步；
+- Gateway Provider 凭据和 Worker 刷新 Token 的信封加密；
+- 开发密钥版本、DEK 重包、明文迁移、加密备份与恢复；
+- 错误密钥、密文/AAD 篡改和旧凭据版本的 fail-closed 检查。
+
+T136b 仍需在保持当前字段含义的前提下增加所选云厂商的 KMS/Secret Manager 适配、
+生产备份密钥托管和恢复演练。多 Worker 池调度继续属于后续扩展。
 
 禁止静默改变已有字段含义；破坏性变更必须使用新版本并由 Oscar 与 Black 共同确认。

@@ -293,3 +293,46 @@ approval, and then use only scripts\restart-ai-proxy.ps1.
 - Do not claim the durable P0 is deployed. Installing it requires preparing the
   shared runtime branch and obtaining a new explicit restart approval, then using
   only `scripts\restart-ai-proxy.ps1`.
+
+## 2026-07-20 Provider credential encryption T136a checkpoint
+
+- Proxy worktree: `D:\AI_prejoct\codex_proxy-provider-worker`
+- Branch: `codex/provider-worker-mvp`
+- Pushed commit:
+  `9b1c4848dcc9ce197e4ddeade3a86a47a3a9ec22`
+- T136a is complete:
+  - Gateway Provider credentials use per-record DEKs and AES-256-GCM
+    `envelope-v1`;
+  - AAD binds credential ID, Provider ID, credential version and secret purpose;
+  - plaintext migration is idempotent, read-back verified and restartable;
+  - KEK rotation rewraps DEKs without re-encrypting credential payloads;
+  - SQLite backups are encrypted and authenticated before mutating migration or
+    rotation operations;
+  - restore rejects tampering/wrong keys and runs SQLite integrity checking;
+  - Worker persists rotated ChatGPT Tokens in an independent encrypted vault;
+  - `credential_version` prevents an old Worker Token from overwriting an
+    administrator replacement;
+  - production Gateway/Worker fail closed when no external KMS/Secret Manager
+    implementation is injected.
+- Validation:
+  - root `156/156`;
+  - Gateway `126/126`;
+  - Admin `28/28`;
+  - Provider Worker focused `18/18`;
+  - release check passed;
+  - audit `0 vulnerabilities`;
+  - Worker allowlist `29`, built artifact `30` files;
+  - post-commit release manifest points to `9b1c4848dcc9ce197e4ddeade3a86a47a3a9ec22`;
+  - isolated Worker artifact started successfully on `127.0.0.1:47930`.
+- Shared `47892` remained PID `26120`, `/live=ok`, `/ready=ok`; it was not
+  stopped, restarted, modified or migrated.
+- T136 remains open only for T136b:
+  - selected production KMS/Secret Manager adapters;
+  - PostgreSQL TLS and least-privilege deployment;
+  - off-host encrypted backup/key custody;
+  - production key and mTLS certificate rotation/recovery drills.
+- Oscar must select the domestic Gateway cloud and authorized-region Worker
+  cloud before T136b can be frozen. No purchase is required merely to review
+  T136a.
+- Detailed Proxy handoff:
+  `docs/AI_EDITOR_PROVIDER_CREDENTIAL_ENCRYPTION_T136A_HANDOFF.md`.

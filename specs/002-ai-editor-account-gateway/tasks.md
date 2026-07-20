@@ -408,6 +408,8 @@ Turn 可结算为负积分。
 - [x] T134 [PW2] Preserve the existing subscription admin switch, routing participation, automatic cooldown, removal and experimental-channel label through Worker
 - [x] T135 [PW2] Add persistent execution/outbox usage reconciliation and signed Gateway settlement acknowledgements
 - [ ] T136 [PW3] Implement envelope encryption, KMS/Secret Manager, credential migration, rotation and backup recovery gates
+  - `T136a local checkpoint: COMPLETE` — envelope format, credential versioning, plaintext migration, key rewrap, encrypted SQLite backup/restore and restart-safe Worker Token vault.
+  - `T136b production checkpoint: PENDING` — selected KMS/Secret Manager providers, PostgreSQL TLS/least privilege, off-host backup, certificate rotation and production recovery gates.
 - [ ] T137 [PW4] Deploy an isolated domestic Gateway and authorized-region Worker after manual infrastructure approval
 - [ ] T138 [PW4] Complete the 72-hour, three-network, 20-SSE and 30-minute connection acceptance
 - [ ] T139 [PW5/PW6] Enforce 30-user short-term cap and require long-term core architecture before user 31

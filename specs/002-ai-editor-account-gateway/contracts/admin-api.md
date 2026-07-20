@@ -183,8 +183,8 @@ page. They remain Level-1-only:
   while preserving the Gateway credential ID; it MUST NOT create duplicate account cards.
 - New accounts default to `routingEnabled=false` unless explicitly enabled.
 - Responses return only Provider/credential IDs, a masked account-ID preview, created/updated state,
-  routing state and the MVP plaintext warning. Access Token, Refresh Token, ID Token and full
-  `authJson` are never returned.
+  routing state, `envelope-v1` key version and monotonic credential version. Access Token, Refresh
+  Token, ID Token, wrapped DEK, encrypted payload and full `authJson` are never returned.
 - Shortcut official login accepts the same `label` and `routingEnabled` settings, automatically
   creates/reuses the pool, and imports the completed login through the same upsert operation.
 - All allowed and denied shortcut operations create redacted admin audit events.
@@ -195,7 +195,9 @@ Credential responses contain only:
 {
   "id": "cred_opaque",
   "maskedPreview": "sk-...abcd",
-  "storageFormat": "plaintext-v1",
+  "storageFormat": "envelope-v1",
+  "keyVersion": "kms-or-development-key-version",
+  "credentialVersion": 2,
   "updatedAt": "2026-07-15T10:00:00Z",
   "lastUsedAt": "2026-07-15T10:01:00Z",
   "label": "订阅账号 A",
@@ -272,8 +274,11 @@ The internal budget is explicitly a Gateway accounting limit, not a fabricated u
 Clearing `internalBudgetCredits` removes the limit while preserving actual request, Token and settlement
 history.
 
-MVP local `plaintext-v1` responses show a persistent warning and Gateway refuses non-loopback/public
-production startup while any real credential remains in that format.
+T136a local writes use `envelope-v1`; existing `plaintext-v1` records remain identifiable until the
+idempotent migration command converts and verifies them. `keyVersion` is exposed only through these
+Level-1-only Provider endpoints. Gateway production startup refuses a local development key provider,
+and public production remains blocked until T136b supplies the selected KMS/Secret Manager adapter and
+all real credentials have been verified as encrypted.
 
 ## 8. Initial Administration
 
