@@ -3069,3 +3069,25 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 选择 PostgreSQL 服务并取得真实 CA；
   - 创建分离的 migration/runtime 角色并验证 runtime 无 DDL/角色/建库权限；
   - 生产形态迁移、回滚、异机备份和恢复演练。
+
+## 97. 2026-07-21 生产 PostgreSQL 运行时角色自检
+
+- Proxy 仓库提交：`34c59a4`（`codex/provider-worker-mvp`）。
+- production Gateway 启动连接 PostgreSQL 后会执行只读权限审计；以下任一权限存在即
+  fail closed：
+  - superuser、建角色、建库、复制、绕过 RLS；
+  - 数据库 `CREATE`/`TEMP`、当前 schema `CREATE`；
+  - 当前运行时角色拥有应用表/分区表/视图/物化视图/序列/外部表；
+  - `pg_read_server_files`、`pg_write_server_files`、
+    `pg_execute_server_program` 成员权限。
+- 因此 migration 角色必须拥有对象并负责 DDL，Gateway runtime 角色只获得所需
+  table/sequence DML；预检中的 `leastPrivilegeVerified` 不再只是人工勾选。
+- 自动验证：
+  - 角色/TLS 定向测试 `17/17`；
+  - Gateway `153/153`；
+  - Proxy/Edge/Worker `170/170`；
+  - Admin Web `31/31`；
+  - 完整 `npm run release:check` 通过。
+- 共享 `47892` 保持 PID `32260`、`/live=ok`；预发布 Edge 已通过项目脚本恢复为
+  PID `35172`、`/live=ok`，仍连接原 Quick Tunnel。
+- 真实 PostgreSQL 端仍需在选型后执行角色授权 SQL、启动自检、迁移/回滚和恢复演练。

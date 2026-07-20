@@ -661,3 +661,31 @@ This still does not finish T136b: the selected managed PostgreSQL CA, separated
 migration/runtime roles, real least-privilege verification, migration/rollback
 drill and off-host backup/restore drill require the cloud choice and operator
 approval.
+
+## 2026-07-21 production PostgreSQL runtime-role self-check
+
+The vendor-neutral least-privilege runtime gate was completed and pushed:
+
+- Proxy commit: `34c59a4`;
+- branch: `codex/provider-worker-mvp`.
+
+Production Gateway now inspects the effective PostgreSQL role before serving.
+It fails closed for superuser, role/database creation, replication, RLS
+bypass, database CREATE/TEMP, schema CREATE, ownership of application
+relations, and predefined server file/program roles. The migration role must
+own schema objects; the Gateway runtime role receives only required
+table/sequence DML.
+
+Validation:
+
+- focused role/TLS tests: `17/17`;
+- Gateway: `153/153`;
+- root Proxy/Edge/Worker: `170/170`;
+- Admin Web: `31/31`;
+- full `npm run release:check`: passed.
+
+Shared `47892` remains PID `32260`, `/live=ok`. Preview Edge is restored as
+PID `35172`, `/live=ok`, against the unchanged Quick Tunnel/data root.
+
+The real cloud database role grants and the live startup check still wait for
+the PostgreSQL provider selection.
