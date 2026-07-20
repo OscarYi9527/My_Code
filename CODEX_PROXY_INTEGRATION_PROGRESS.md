@@ -2722,3 +2722,42 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 部署门禁：再次获得用户明确授权后，只能通过
   `D:\AI_prejoct\My_code\scripts\restart-ai-proxy.ps1` 安全切换和重启，
   随后验证 `/live`、`/ready`、运行提交及真实 ChatGPT 订阅请求。
+
+## 91. 2026-07-20 Provider Worker T135 持久化用量对账
+
+- Proxy 工作树和分支：
+  - `D:\AI_prejoct\codex_proxy-provider-worker`
+  - `codex/provider-worker-mvp`
+- 已完成 T135：
+  - Worker 新增独立持久化 `provider-worker-executions-v1.json`；
+  - 只保存 Turn/request digest、execution/outbox ID、Provider、实际 Token 用量和
+    结算确认，不保存用户正文、AI 回复、工具输出、API Key、订阅 Token 或
+    `auth.json`；
+  - 完成记录在 Worker 重启后仍可对账，未完成记录进入 `recovery_required`，禁止
+    自动重复调用可能已经到达上游的 Turn；
+  - 新增 `aieditor-usage-v1` HMAC-SHA256 用量回执，绑定 Worker ID、地区、Turn、
+    Provider、输入/输出 Token 和完成时间；
+  - Gateway 使用常量时间验证回执，并新增即时结算确认和每 15 秒后台 outbox 对账；
+  - Gateway 结算事务成功后发送签名确认；确认丢失可幂等重试，不重复调用 Provider；
+  - 批量确认先完整验证后原子更新，错误批次不会部分吞掉待结算记录。
+- 合同已更新：
+  - `specs/002-ai-editor-account-gateway/contracts/provider-worker-api.md`
+  - 新接口：
+    - `GET /internal/v1/usage/outbox?limit=1..100`
+    - `POST /internal/v1/usage/outbox/ack`
+  - T135 已在 `tasks.md` 标记完成。
+- 自动化验证：
+  - Proxy/Edge/Worker 根测试 `155/155`；
+  - Gateway `117/117`；
+  - Admin Web `28/28`；
+  - `npm run release:check` 通过；
+  - `npm audit --audit-level=high` 为 `0 vulnerabilities`；
+  - Provider Worker 制品共 `29` 个文件，实际启动返回
+    `/live=ok`、`/ready=ready`，结束后 `47930` 已释放。
+- 共享 Proxy 不变量：
+  - T135 完整回归前后均为 PID `26120`、`/live=ok`；
+  - 本任务没有停止、重启、修改或迁移共享 `47892`。
+- Proxy 交接文档：
+  - `docs/AI_EDITOR_PROVIDER_WORKER_T135_HANDOFF.md`
+- 下一项为 T136/PW3：信封加密、KMS/Secret Manager、刷新 Token 安全持久化、
+  凭据迁移/轮换和备份恢复；T136 未完成前禁止公网开放用户。

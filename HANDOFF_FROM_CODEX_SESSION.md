@@ -250,3 +250,46 @@ Read D:\AI_prejoct\My_code\HANDOFF_FROM_CODEX_SESSION.md. Continue from the
 shared runtime before acting. Do not restart shared 47892 without a new explicit
 approval, and then use only scripts\restart-ai-proxy.ps1.
 ```
+
+## 2026-07-20 current Provider Worker T135 checkpoint
+
+- Proxy worktree: `D:\AI_prejoct\codex_proxy-provider-worker`
+- Proxy branch: `codex/provider-worker-mvp`
+- T121–T135 are complete in the current working tree.
+- T135 adds:
+  - restart-safe execution/outbox metadata without prompts, replies or credentials;
+  - signed `aieditor-usage-v1` receipts;
+  - Gateway idempotent settlement acknowledgements;
+  - 15-second background reconciliation;
+  - fail-closed `recovery_required` for interrupted executions.
+- Validation:
+  - root `155/155`;
+  - Gateway `117/117`;
+  - Admin `28/28`;
+  - release check passed;
+  - audit `0 vulnerabilities`;
+  - 29-file Worker artifact started with `/live=ok`, `/ready=ready`;
+  - shared `47892` remained PID `26120`, `/live=ok`.
+- Contract:
+  `specs/002-ai-editor-account-gateway/contracts/provider-worker-api.md`
+- Proxy handoff:
+  `docs/AI_EDITOR_PROVIDER_WORKER_T135_HANDOFF.md`
+- Next server task is T136/PW3 envelope encryption, KMS/Secret Manager,
+  restart-safe refreshed credentials, migration, rotation and backup recovery.
+- T136 local abstraction/tests can begin without purchasing infrastructure, but
+  the production KMS adapter cannot be frozen until Oscar selects the domestic
+  Gateway and overseas Worker cloud platforms.
+
+### Shared P0 deployment correction
+
+- The user approved and the safe restart script was run after the earlier P0.
+- The restart cleared the current circuit state, but a later read-only audit shows
+  the shared runtime source is still:
+  `C:\Users\Oscar\.claude\proxy`,
+  `codex/fix-cross-provider-tool-ids@f56093a`.
+- Therefore the durable circuit-recovery commits are still not installed in the
+  shared source. The current circuit is healthy (`closed`, failures `0`), but a
+  future DNS failure can still reproduce the old recovery behavior.
+- Do not claim the durable P0 is deployed. Installing it requires preparing the
+  shared runtime branch and obtaining a new explicit restart approval, then using
+  only `scripts\restart-ai-proxy.ps1`.
