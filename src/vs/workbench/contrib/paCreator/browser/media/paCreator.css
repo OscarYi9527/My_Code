@@ -1,0 +1,146 @@
+.pa-creator-editor {
+	height: 100%;
+	overflow: hidden;
+	background: var(--vscode-editor-background);
+	color: var(--vscode-foreground);
+}
+
+.pa-creator-layout {
+	display: grid;
+	grid-template-rows: auto 1fr;
+	height: 100%;
+}
+
+.pa-creator-progress {
+	display: grid;
+	grid-template-columns: repeat(9, minmax(70px, 1fr));
+	gap: 6px;
+	padding: 14px 18px;
+	overflow-x: auto;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.pa-creator-step {
+	padding: 8px;
+	border-radius: 6px;
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-sideBar-background);
+	font-size: 11px;
+	text-align: left;
+}
+
+.pa-creator-step.current {
+	outline: 1px solid var(--vscode-focusBorder);
+	color: var(--vscode-foreground);
+}
+
+.pa-creator-step.completed {
+	color: var(--vscode-testing-iconPassed);
+}
+
+.pa-creator-main {
+	display: grid;
+	grid-template-columns: minmax(420px, 1fr) minmax(300px, 38%);
+	min-height: 0;
+}
+
+.pa-creator-conversation,
+.pa-creator-details {
+	min-height: 0;
+	overflow: auto;
+	padding: 20px;
+}
+
+.pa-creator-details {
+	border-left: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+}
+
+.pa-creator-message {
+	max-width: 760px;
+	margin: 0 0 14px;
+	padding: 12px 14px;
+	border-radius: 8px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	background: var(--vscode-textBlockQuote-background);
+}
+
+.pa-creator-message.user {
+	margin-left: auto;
+	background: var(--vscode-button-secondaryBackground);
+}
+
+.pa-creator-message-label {
+	margin-bottom: 5px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.pa-creator-confirmation {
+	margin: 20px 0;
+	padding: 16px;
+	border: 1px solid var(--vscode-focusBorder);
+	border-radius: 8px;
+	background: var(--vscode-editorWidget-background);
+}
+
+.pa-creator-confirmation-actions,
+.pa-creator-composer-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.pa-creator-editor button {
+	min-height: 28px;
+	padding: 4px 10px;
+	border: 1px solid var(--vscode-button-border, transparent);
+	color: var(--vscode-button-secondaryForeground);
+	background: var(--vscode-button-secondaryBackground);
+	cursor: pointer;
+}
+
+.pa-creator-editor button.primary {
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
+}
+
+.pa-creator-composer {
+	margin-top: 18px;
+}
+
+.pa-creator-composer textarea {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 82px;
+	padding: 9px;
+	resize: vertical;
+	border: 1px solid var(--vscode-input-border, transparent);
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+}
+
+.pa-creator-artifact {
+	margin-bottom: 10px;
+	padding: 10px;
+	border: 1px solid var(--vscode-widget-border);
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.pa-creator-artifact-detail {
+	white-space: pre-wrap;
+	line-height: 1.5;
+}
+
+@media (max-width: 850px) {
+	.pa-creator-main {
+		grid-template-columns: 1fr;
+	}
+
+	.pa-creator-details {
+		border-top: 1px solid var(--vscode-panel-border);
+		border-left: 0;
+	}
+}

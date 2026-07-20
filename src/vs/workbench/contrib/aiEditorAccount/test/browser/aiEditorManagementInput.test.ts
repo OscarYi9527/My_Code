@@ -6,8 +6,7 @@
 import * as assert from 'assert';
 import { Event } from '../../../../../base/common/event.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
-import { AiEditorManagementRoute } from '../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
-import { IMainProcessService } from '../../../../../platform/ipc/common/mainProcessService.js';
+import { AiEditorManagementRoute, IAiEditorManagementService } from '../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { EditorInputCapabilities } from '../../../../common/editor.js';
 import { IBrowserViewWorkbenchService } from '../../../browserView/common/browserView.js';
 import { BrowserEditorInput } from '../../../browserView/common/browserEditorInput.js';
@@ -45,9 +44,23 @@ suite('AI Editor management input', () => {
 			input.dispose();
 		}
 	});
+
+	test('prepares the selected route through the browser-safe management service', async () => {
+		const preparedRoutes: AiEditorManagementRoute[] = [];
+		const input = createInput(preparedRoutes);
+		try {
+			input.setRoute(AiEditorManagementRoute.Usage);
+
+			await input.prepareManagementView();
+
+			assert.deepStrictEqual(preparedRoutes, [AiEditorManagementRoute.Usage]);
+		} finally {
+			input.dispose();
+		}
+	});
 });
 
-function createInput(): AiEditorManagementInput {
+function createInput(preparedRoutes: AiEditorManagementRoute[] = []): AiEditorManagementInput {
 	const browserInput = {
 		dispose: () => undefined,
 		resolve: () => Promise.resolve(undefined)
@@ -56,12 +69,13 @@ function createInput(): AiEditorManagementInput {
 		onDidChangeBrowserViews: Event.None,
 		getOrCreatePrivateLazy: () => browserInput
 	} as unknown as IBrowserViewWorkbenchService;
-	const channel = {
-		call: () => Promise.resolve(undefined),
-		listen: () => Event.None
+	const managementService = {
+		_serviceBrand: undefined,
+		prepareManagementView: (_viewId: string, route: AiEditorManagementRoute) => {
+			preparedRoutes.push(route);
+			return Promise.resolve();
+		},
+		disposeManagementView: () => Promise.resolve()
 	};
-	const mainProcessService = {
-		getChannel: () => channel
-	} as unknown as IMainProcessService;
-	return new AiEditorManagementInput(browserService, mainProcessService);
+	return new AiEditorManagementInput(browserService, managementService as IAiEditorManagementService);
 }

@@ -3,18 +3,13 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { ProxyChannel } from '../../../../base/parts/ipc/common/ipc.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { URI } from '../../../../base/common/uri.js';
 import {
-	AI_EDITOR_ACCOUNT_CHANNEL_NAME
-} from '../../../../platform/aiEditorAccount/common/aiEditorAccountIpc.js';
-import {
 	AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
 	AiEditorManagementRoute,
-	IAiEditorAccountMainService
+	IAiEditorManagementService
 } from '../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
-import { IMainProcessService } from '../../../../platform/ipc/common/mainProcessService.js';
 import { EditorInputCapabilities } from '../../../common/editor.js';
 import { EditorInput } from '../../../common/editor/editorInput.js';
 import { IBrowserViewModel, IBrowserViewWorkbenchService } from '../../browserView/common/browserView.js';
@@ -26,7 +21,6 @@ export class AiEditorManagementInput extends EditorInput {
 	static readonly RESOURCE = URI.from({ scheme: 'ai-editor-management', path: '/account' });
 
 	private readonly browserInput: BrowserEditorInput;
-	private readonly accountMainService: IAiEditorAccountMainService;
 	private readonly _onDidChangeRoute = this._register(new Emitter<AiEditorManagementRoute>());
 	readonly onDidChangeRoute: Event<AiEditorManagementRoute> = this._onDidChangeRoute.event;
 
@@ -34,15 +28,12 @@ export class AiEditorManagementInput extends EditorInput {
 
 	constructor(
 		@IBrowserViewWorkbenchService browserViewWorkbenchService: IBrowserViewWorkbenchService,
-		@IMainProcessService mainProcessService: IMainProcessService
+		@IAiEditorManagementService private readonly managementService: IAiEditorManagementService
 	) {
 		super();
 		this.browserInput = browserViewWorkbenchService.getOrCreatePrivateLazy(AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID, {
 			title: this.getName()
 		});
-		this.accountMainService = ProxyChannel.toService<IAiEditorAccountMainService>(
-			mainProcessService.getChannel(AI_EDITOR_ACCOUNT_CHANNEL_NAME)
-		);
 	}
 
 	get route(): AiEditorManagementRoute {
@@ -62,7 +53,7 @@ export class AiEditorManagementInput extends EditorInput {
 	}
 
 	prepareManagementView(): Promise<void> {
-		return this.accountMainService.prepareManagementView(AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID, this._route);
+		return this.managementService.prepareManagementView(AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID, this._route);
 	}
 
 	override get typeId(): string {
@@ -93,7 +84,7 @@ export class AiEditorManagementInput extends EditorInput {
 		super.dispose();
 		const model = this.browserInput.model;
 		if (model) {
-			void this.accountMainService.disposeManagementView(AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID)
+			void this.managementService.disposeManagementView(AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID)
 				.finally(() => model.clearStorage())
 				.finally(() => this.browserInput.dispose(true));
 		} else {

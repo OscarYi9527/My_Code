@@ -46,6 +46,7 @@ import './services/host/electron-browser/nativeHostService.js';
 import '../platform/meteredConnection/electron-browser/meteredConnectionService.js';
 import '../platform/aiEditorProxy/electron-browser/aiEditorProxyService.js';
 import '../platform/aiEditorAccount/electron-browser/aiEditorAccountService.js';
+import '../platform/aiEditorAccount/electron-browser/aiEditorManagementService.js';
 import './contrib/aiEditorAccount/browser/aiEditorAccountMenu.js';
 import './contrib/aiEditorAccount/browser/aiEditorStatusContribution.js';
 import './contrib/aiEditorAccount/browser/aiEditorManagementEditor.js';
@@ -101,6 +102,7 @@ import '../platform/agentHost/electron-browser/remoteAgentHostService.js';
 import './services/browserView/electron-browser/playwrightWorkbenchService.js';
 import './services/process/electron-browser/processService.js';
 import './services/power/electron-browser/powerService.js';
+import './services/paRegistry/electron-browser/paPublicationService.js';
 
 import { registerSingleton } from '../platform/instantiation/common/extensions.js';
 import { IUserDataInitializationService, UserDataInitializationService } from './services/userData/browser/userDataInit.js';
