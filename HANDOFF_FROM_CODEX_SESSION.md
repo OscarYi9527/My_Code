@@ -579,3 +579,46 @@ artifacts must not be committed.
 The next human gates remain T136b, T137 and T138. Do not weaken VMware SSH or
 replace the temporary Quick Tunnel with a production claim while no operator
 is available.
+
+## 2026-07-21 production decision preflight
+
+The next vendor-neutral pre-run item was completed and pushed without making
+any infrastructure purchase or production claim:
+
+- repository: `D:\AI_prejoct\codex_proxy-provider-worker`;
+- branch: `codex/provider-worker-mvp`;
+- commit: `6ceaad0`;
+- command: `npm run production:preflight`.
+
+The preflight records only non-secret decisions and checks the 30-account
+capacity, minimum Gateway/Worker sizing, stable HTTPS origins, ICP/WAF,
+Gateway and Worker KMS adapters, mTLS rotation, PostgreSQL TLS/least privilege,
+migration/rollback drills, off-host encrypted backups, restore drills,
+monitoring, pinned release SHAs and explicit human approvals. It rejects
+secret-shaped fields and refuses localhost, IP and `trycloudflare.com`
+production origins.
+
+The committed placeholder intentionally reports `blocked` with 7/27 checks
+passing and 20 decisions/gates still missing. This is the correct pre-purchase
+state; it does not complete T136b.
+
+Automated evidence:
+
+- production preflight tests: `4/4`;
+- root Proxy/Edge/Worker: `170/170`;
+- Gateway: `136/136`;
+- Admin Web: `31/31`;
+- full `npm run release:check`: passed.
+
+Shared `47892` remains PID `32260`, `/live=ok`. The preview Edge was stopped
+and restored only through the repository isolated lifecycle scripts and is now
+PID `48732`, still targeting the existing Quick Tunnel.
+
+When Oscar returns, the required decisions are:
+
+1. domestic Gateway cloud/region/KMS;
+2. Provider-authorized Worker cloud/region/KMS or Secret Manager;
+3. PostgreSQL service;
+4. versioned off-host object storage;
+5. stable production domains and ICP path;
+6. infrastructure/security/deployment approvals.

@@ -2999,3 +2999,43 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 共享 `47892` 前后均为 PID `32260`、`/live=ok`，未停止或重启；
   - 预发布 Edge `47921` 前后均为 PID `37496`、`/live=ok`；
   - 人工验收按用户要求暂时跳过。
+
+## 95. 2026-07-21 T136b/T137 生产决策预检
+
+- Proxy 仓库：
+  - 工作树：`D:\AI_prejoct\codex_proxy-provider-worker`
+  - 分支：`codex/provider-worker-mvp`
+  - 提交：`6ceaad0`
+- 在不替人工选择云厂商、不采购资源、不部署生产服务的前提下，新增 vendor-neutral
+  生产预检：
+  - `deploy/production/readiness.example.json`
+  - `scripts/check-production-readiness.mjs`
+  - `npm run production:preflight`
+- 预检 fail closed 覆盖：
+  - 30 账号短期容量；
+  - 国内 Gateway 4C8G/100GB/5Mbps/固定 IP、稳定 HTTPS origin、ICP备案、WAF、
+    KMS 实现与轮换；
+  - Provider 授权地区 Worker 2C4G/40GB/固定 IP、稳定 HTTPS、mTLS 和
+    KMS/Secret Manager；
+  - PostgreSQL 16+、`verify-full`、最小权限、迁移/回滚演练；
+  - 异机加密版本化备份、保留期、恢复演练；
+  - 主机/磁盘/证书/Gateway/Worker/备份告警；
+  - 三仓完整 commit SHA、release/secret/final-Edge 门禁和三项人工批准。
+- 安全边界：
+  - 决策文件禁止出现密码、数据库 URL、API Key、Token、签名秘密、私钥或 Provider
+    凭据字段；
+  - localhost、IP 和 `trycloudflare.com` 不能作为生产 origin；
+  - 当前示例报告为 `blocked`（7/27 通过、20 项待完成），这是人工离线和未采购阶段的
+    正确结果，不代表测试失败。
+- 自动验证：
+  - 生产预检定向测试 `4/4`；
+  - Proxy/Edge/Worker `170/170`；
+  - Gateway `136/136`；
+  - Admin Web `31/31`；
+  - 完整 `npm run release:check` 通过。
+- 运行不变量：
+  - release gate 仅使用仓库隔离脚本临时释放/恢复 `47921`；
+  - 共享 `47892` 保持 PID `32260`、`/live=ok`，未重启；
+  - 预发布 Edge 已按原 Quick Tunnel 和原数据目录恢复为 PID `48732`、`/live=ok`。
+- T136b、T137、T138 仍未完成；下一步必须由 Oscar 确认云/KMS/PostgreSQL/对象存储
+  选择及生产批准，不能用该预检替代人工门禁。
