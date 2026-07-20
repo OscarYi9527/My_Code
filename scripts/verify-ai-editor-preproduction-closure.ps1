@@ -559,6 +559,25 @@ function Test-GatewayOrigin([string]$Origin) {
 	}
 }
 
+function Resolve-WindowsSignToolDirectory {
+	$available = Get-Command 'signtool.exe' -ErrorAction SilentlyContinue
+	if ($available) {
+		return Split-Path -Parent $available.Source
+	}
+	$kitsRoot = 'C:\Program Files (x86)\Windows Kits\10\bin'
+	if (-not (Test-Path -LiteralPath $kitsRoot -PathType Container)) {
+		return $null
+	}
+	$candidate = Get-ChildItem -LiteralPath $kitsRoot -Filter 'signtool.exe' -File -Recurse -ErrorAction SilentlyContinue |
+		Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+		Sort-Object FullName -Descending |
+		Select-Object -First 1
+	if ($candidate) {
+		return $candidate.DirectoryName
+	}
+	return $null
+}
+
 function Copy-IfPresent([string]$Source, [string]$DestinationName) {
 	if (Test-Path -LiteralPath $Source -PathType Leaf) {
 		$destination = Join-Path $artifactsDirectory $DestinationName
@@ -739,7 +758,20 @@ try {
 		}
 		$coreResult = Invoke-Step 'code-core-build' 'code' 'npm.cmd' @('run', 'core-ci') $repositoryRoot
 		if ($coreResult.exitCode -eq 0) {
-			Invoke-Step 'windows-product-package' 'product' 'npm.cmd' @('run', 'gulp', 'vscode-win32-x64-min-ci') $repositoryRoot | Out-Null
+			$signToolDirectory = Resolve-WindowsSignToolDirectory
+			if ($signToolDirectory) {
+				Add-Check 'windows-signing-tool' 'product' 'PASS' 'Located the Windows SDK x64 signing tool without changing the user environment.'
+				$originalPath = [Environment]::GetEnvironmentVariable('PATH', 'Process')
+				try {
+					[Environment]::SetEnvironmentVariable('PATH', "$signToolDirectory;$originalPath", 'Process')
+					Invoke-Step 'windows-product-package' 'product' 'npm.cmd' @('run', 'gulp', 'vscode-win32-x64-min-ci') $repositoryRoot | Out-Null
+				} finally {
+					[Environment]::SetEnvironmentVariable('PATH', $originalPath, 'Process')
+				}
+			} else {
+				Add-Check 'windows-signing-tool' 'product' 'FAIL' 'The Windows SDK x64 signing tool was not found.'
+				Add-Check 'windows-product-package' 'product' 'FAIL' 'Windows packaging requires signtool.exe.'
+			}
 		} else {
 			Add-Check 'windows-product-package' 'product' 'FAIL' 'Windows packaging was not run because core-ci failed.'
 		}
