@@ -404,8 +404,8 @@ Turn 可结算为负积分。
 - [x] T130 Add an independent Provider Worker runtime manifest, release builder and forbidden-file gate in `D:\AI_prejoct\codex_proxy-provider-worker\provider-worker-runtime-files.json`
 - [x] T131 Make Gateway and Worker consume the same signing vector in `D:\AI_prejoct\codex_proxy-provider-worker\gateway\tests\fixtures\provider-worker-signing-v1.json`
 - [x] T132 Run complete standalone, Gateway, Admin, script, type, build, audit and Worker release regression; record shared `47892` invariants
-- [ ] T133 [PW2] Extract the proven Provider runtime without forking conversion, streaming, tool-ID or error logic
-- [ ] T134 [PW2] Preserve the existing subscription admin switch, routing participation, automatic cooldown, removal and experimental-channel label through Worker
+- [x] T133 [PW2] Extract the proven Provider runtime without forking conversion, streaming, tool-ID or error logic
+- [x] T134 [PW2] Preserve the existing subscription admin switch, routing participation, automatic cooldown, removal and experimental-channel label through Worker
 - [ ] T135 [PW2] Add persistent execution/outbox usage reconciliation and signed Gateway settlement acknowledgements
 - [ ] T136 [PW3] Implement envelope encryption, KMS/Secret Manager, credential migration, rotation and backup recovery gates
 - [ ] T137 [PW4] Deploy an isolated domestic Gateway and authorized-region Worker after manual infrastructure approval

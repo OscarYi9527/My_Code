@@ -144,6 +144,31 @@ Get-Content -Tail 80 typecheck-client.log
 
 5. If a full build is required, redirect output to a log and inspect only the last 80-120 lines.
 
+## 2026-07-20 current account/Gateway continuation
+
+The layout section above is historical. The current active server task is the AI Editor
+Gateway/Provider Worker MVP:
+
+- Code repository branch: `codex/account-gateway-mvp`
+- Proxy worktree: `D:\AI_prejoct\codex_proxy-provider-worker`
+- Proxy branch: `codex/provider-worker-mvp`
+- Current Proxy commits: `2257ce7` and `a8aef6a`
+- PW0/PW1 and T121–T132 are complete.
+- PW2 T133/T134 now reuse the existing ChatGPT subscription account-pool runtime through
+  signed Gateway → Worker configuration.
+- Root/Gateway/Admin tests are `149/149`, `112/112`, and `28/28`.
+- Shared `127.0.0.1:47892` must remain untouched; the last verified PID was `26404`.
+- T135 persistent execution/outbox and secure restart-safe refreshed credentials remain next.
+- Real credentials may only be imported through the isolated Gateway level-1 management page;
+  never copy shared `47892` credentials or send tokens/auth.json through chat.
+
+Current sources of truth:
+
+- `AI_EDITOR_PROVIDER_WORKER_PUBLIC_ROADMAP.md`
+- `CODEX_PROXY_INTEGRATION_PROGRESS.md` section 89
+- `specs/002-ai-editor-account-gateway/contracts/provider-worker-api.md`
+- Proxy `docs/AI_EDITOR_PROVIDER_WORKER_CHATGPT_POOL_HANDOFF.md`
+
 ## Prompt to paste into a new Codex thread
 
 ```text

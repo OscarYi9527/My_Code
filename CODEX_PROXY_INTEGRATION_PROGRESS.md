@@ -2621,3 +2621,48 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 本轮未停止、重启、迁移或修改共享 `47892`。
 - 下一阶段 PW2 将复用现有 Provider Runtime 并迁移订阅通道；进入真实凭据或远程联调
   前再询问域名所有权、测试账号、Worker 地区和采购事项。
+
+## 89. 2026-07-20 Provider Worker PW2 ChatGPT 订阅账号池迁移
+
+- 用户明确决定先直接接入现有 ChatGPT 订阅账号池，暂不优先接 OpenAI API。
+- Proxy 分支 `codex/provider-worker-mvp` 的交付提交：
+  - `2257ce7`：订阅运行时、签名同步、管理状态和发布边界；
+  - `a8aef6a`：账号轮换、摘除、路由开关、工具 ID 和凭据不落盘回归。
+- 已完成 T133/T134：
+  - Gateway 通过新签名接口向 Worker 同步订阅 URL、订阅账号、账号池策略和获准
+    `gpt-*` 模型，不发送 DeepSeek、OpenAI API 或 Relay 凭据；
+  - Worker 新执行器直接复用现有 `chatgpt-sub` 路由、账号选择、并发租约、Token
+    刷新、额度保护、429 冷却、401/403 摘除、故障轮换、SSE 和用量提取；
+  - 跨 Provider 工具历史继续复用 `tool-ids.js`，旧 `tool_*` item ID 自动转为
+    `fc_*`，原始 `call_id` 保持不变；
+  - 动态模型目录只发布 Gateway 已授权、存在可路由账号的订阅模型；
+  - 一级管理员管理页可读取 Worker 脱敏账号池、冷却、健康、熔断和路由决策，并可
+    触发用量刷新；
+  - 管理页明确显示“ChatGPT 订阅（试验通道）”，Provider 总开关和单账号参与路由
+    开关继续有效。
+- 隔离和安全：
+  - Worker 不读取、复制或迁移共享 `47892` 的账号与配置；
+  - 本阶段同步凭据只保存在 Worker 内存，不生成明文 `codex-proxy-config.json`；
+  - 请求日志使用 Worker 独立数据目录；
+  - Worker 制品只新增订阅执行所需共享 Runtime，并增加相对 import 完整性检查。
+- 自动化验证：
+  - 根测试 `149/149`；
+  - Gateway `112/112`；
+  - Admin Web `28/28`；
+  - 两账号 429 冷却轮换、401 摘除轮换、账号退出路由、SSE、实际用量和工具 ID
+    专项均通过；
+  - `npm run release:check` 通过；
+  - `npm audit --audit-level=high` 为 `0 vulnerabilities`；
+  - Worker 制品为 `27` 个白名单源文件、`28` 个最终文件；
+  - 三进程测试结束后 `47920/47921/47930` 均释放。
+- 共享 Proxy 验证前后均为 PID `26404`、`/live=ok`，本轮未停止、重启、修改或迁移。
+- T135 持久化 execution/outbox、用量对账与刷新 Token 安全持久化仍未完成；因此当前
+  可以进入隔离真实账号联调，但不能发布公网。
+
+### 下一阶段人工门禁
+
+- 需要 Oscar 操作的购买/订阅：当前无需购买；真实联调时准备一个获授权的专用
+  ChatGPT 测试订阅账号，并仅通过隔离 Gateway 管理页导入。
+- 最迟完成时间：真实 ChatGPT 联合验收前。
+- 未完成时被阻断的任务：真实上游回应验收；不阻断 T135 自动化开发。
+- 当前是否需要付款：否。
