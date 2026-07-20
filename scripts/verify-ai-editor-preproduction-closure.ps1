@@ -218,6 +218,37 @@ function Write-SanitizedLog([string]$RawPath, [string]$SafePath, [string[]]$Know
 	Remove-Item -LiteralPath $RawPath -Force -ErrorAction SilentlyContinue
 }
 
+function ConvertTo-NativeCommandLineArgument([string]$Value) {
+	if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') {
+		return $Value
+	}
+	$builder = New-Object Text.StringBuilder
+	[void]$builder.Append([char]34)
+	$backslashes = 0
+	foreach ($character in $Value.ToCharArray()) {
+		if ($character -eq [char]92) {
+			$backslashes++
+			continue
+		}
+		if ($character -eq [char]34) {
+			[void]$builder.Append([char]92, ($backslashes * 2) + 1)
+			[void]$builder.Append([char]34)
+			$backslashes = 0
+			continue
+		}
+		if ($backslashes -gt 0) {
+			[void]$builder.Append([char]92, $backslashes)
+			$backslashes = 0
+		}
+		[void]$builder.Append($character)
+	}
+	if ($backslashes -gt 0) {
+		[void]$builder.Append([char]92, $backslashes * 2)
+	}
+	[void]$builder.Append([char]34)
+	return $builder.ToString()
+}
+
 function Invoke-LoggedCommand(
 	[string]$Name,
 	[string]$FilePath,
@@ -230,14 +261,45 @@ function Invoke-LoggedCommand(
 	$exitCode = 1
 	$invokeError = $null
 	try {
-		Push-Location $WorkingDirectory
-		try {
-			$global:LASTEXITCODE = 0
-			& $FilePath @Arguments *> $rawPath
-			$exitCode = [int]$LASTEXITCODE
-		} finally {
-			Pop-Location
+		$processArguments = @($Arguments | ForEach-Object {
+			ConvertTo-NativeCommandLineArgument ([string]$_)
+		})
+		$processInfo = New-Object Diagnostics.ProcessStartInfo
+		$extension = [IO.Path]::GetExtension($FilePath)
+		if ($extension -in @('.cmd', '.bat')) {
+			$command = @(
+				ConvertTo-NativeCommandLineArgument $FilePath
+				$processArguments
+			) -join ' '
+			$processInfo.FileName = 'cmd.exe'
+			$processInfo.Arguments = "/d /s /c `"$command`""
+		} else {
+			$processInfo.FileName = $FilePath
+			$processInfo.Arguments = $processArguments -join ' '
 		}
+		$processInfo.WorkingDirectory = $WorkingDirectory
+		$processInfo.UseShellExecute = $false
+		$processInfo.CreateNoWindow = $true
+		$processInfo.RedirectStandardOutput = $true
+		$processInfo.RedirectStandardError = $true
+		$processInfo.StandardOutputEncoding = New-Object Text.UTF8Encoding($false)
+		$processInfo.StandardErrorEncoding = New-Object Text.UTF8Encoding($false)
+		$process = New-Object Diagnostics.Process
+		$process.StartInfo = $processInfo
+		if (-not $process.Start()) {
+			throw "Unable to start $FilePath"
+		}
+		$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+		$stderrTask = $process.StandardError.ReadToEndAsync()
+		$process.WaitForExit()
+		$stdout = $stdoutTask.GetAwaiter().GetResult()
+		$stderr = $stderrTask.GetAwaiter().GetResult()
+		$exitCode = [int]$process.ExitCode
+		[IO.File]::WriteAllText(
+			$rawPath,
+			($stdout + $(if ($stderr) { "`n$stderr" } else { '' })),
+			(New-Object Text.UTF8Encoding($false))
+		)
 	} catch {
 		$invokeError = $_.Exception.Message
 		[IO.File]::AppendAllText($rawPath, "`n$invokeError`n")
