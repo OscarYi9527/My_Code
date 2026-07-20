@@ -3116,3 +3116,25 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 不能由本机伪造的条件继续保留为 `BLOCKED`：云/KMS/PostgreSQL/对象存储采购，
   ICP 和生产批准，真实 macOS 运行机，以及 T138 的 72 小时三网络验收。
 - 详细使用说明：`AI_EDITOR_AUTOMATED_VALIDATION_CLOSURE.md`。
+
+## 99. 2026-07-21 PA Creator 合入 MVP 与分支治理
+
+- 已执行 `git fetch --all --prune --tags` 并审计远端、本地和 `refs/agents`：
+  - `origin/main` 已完全包含在 `codex/account-gateway-mvp`；
+  - PA Creator 分支比 MVP 落后 28 个提交，只有 `465d95c44` 一个独有产品提交；
+  - 4 个 Dependabot 分支只更新 GitHub Actions，不与产品功能混合；
+  - 6 个 `refs/agents/...` 是会话 checkpoint，不是产品版本，禁止合并。
+- 以当前 MVP 为基线创建 `codex/mvp-pa-creator-integration`，使用 merge commit
+  合入 `origin/feature/pa-creator-p1`，没有用旧 PA 分支覆盖新的账号、Proxy、会话和构建修复。
+- PA Creator 合入范围包括：
+  - 本地 Profile 隔离的 PA 广场和个人创作；
+  - 九 AA 连续创建流程与四个强制确认；
+  - SQLite Registry、不可变版本、发布补偿、导入导出和回滚；
+  - PA Runtime、CA 门禁、checkpoint 恢复和幂等；
+  - 原生 Publication IPC 与管理服务分层修复。
+- 集成后的开发版 `npm run compile` 通过，PA/Registry/Runtime/Publication 定向测试
+  `36 passing`；新增 CDP 自动验收已实际打开 PA 广场、创建九 AA 会话并从 AA-01
+  前进到下一强制确认，同时保持共享 `47892` 不变。
+- `verify-ai-editor-preproduction-closure.ps1` 现已把 PA 定向测试、开发版 PA UI 和
+  Windows 成品 PA UI 纳入强制门禁。最终 PR 只允许在报告 `FAIL=0` 后创建。
+- 分支审计和以后固定合并流程记录于 `AI_EDITOR_MVP_BRANCH_INTEGRATION.md`。

@@ -86,6 +86,7 @@
     "verify-ai-editor-account-mock-ui": "node --experimental-strip-types scripts/verify-ai-editor-account-mock-ui.ts",
     "verify-ai-editor-account-real-model-sse": "node --experimental-strip-types scripts/verify-ai-editor-account-real-model-sse.ts",
     "verify-ai-editor-account-real-ui": "node --experimental-strip-types scripts/verify-ai-editor-account-real-ui.ts",
+    "verify-ai-editor-pa-creator-ui": "node --experimental-strip-types scripts/verify-ai-editor-pa-creator-ui.ts",
     "verify-ai-editor-preproduction-closure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-ai-editor-preproduction-closure.ps1",
     "test-ai-editor-windows-final-edge-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-verify-ai-editor-windows-final-edge.ps1",
     "compile-extensions-build": "npm run gulp compile-extensions-build",
