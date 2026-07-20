@@ -12,7 +12,7 @@ import { AI_EDITOR_ACCOUNT_ENDPOINTS, parseAiEditorSafeStatus } from '../common/
 
 const GATEWAY_API_BASE_PATH = '/api/v1';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
-const REQUEST_TIMEOUT = 3_000;
+const REQUEST_TIMEOUT = 10_000;
 
 export interface IAiEditorPkce {
 	readonly state: string;

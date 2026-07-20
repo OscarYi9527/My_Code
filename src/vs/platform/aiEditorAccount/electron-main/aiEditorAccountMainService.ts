@@ -392,6 +392,7 @@ function createRuntimeDependencies(
 
 const managementPolicies = new WeakMap<Electron.WebContents, AiEditorGatewayOriginPolicy>();
 const managementImportOperations = new WeakSet<Electron.WebContents>();
+const managementBootstrappedViews = new WeakSet<Electron.WebContents>();
 
 export async function prepareAiEditorManagementView(options: {
 	readonly viewId: string;
@@ -485,7 +486,10 @@ export async function prepareAiEditorManagementView(options: {
 
 	const managementUrl = createAiEditorManagementUrl(options.gatewayOrigin, options.route);
 	const currentUrl = view.webContents.getURL();
-	if (decideAiEditorGatewayNavigation(currentUrl, options.gatewayOrigin) === AiEditorGatewayNavigationDecision.AllowInView) {
+	if (
+		managementBootstrappedViews.has(view.webContents) &&
+		decideAiEditorGatewayNavigation(currentUrl, options.gatewayOrigin) === AiEditorGatewayNavigationDecision.AllowInView
+	) {
 		await view.loadURL(managementUrl);
 		return;
 	}
@@ -509,6 +513,7 @@ export async function prepareAiEditorManagementView(options: {
 			1001,
 			[{ code: `window.postMessage(${payload}, ${targetOrigin});` }]
 		);
+		managementBootstrappedViews.add(view.webContents);
 	} finally {
 		ticket = undefined;
 	}
@@ -543,6 +548,7 @@ export async function disposeAiEditorManagementView(
 	} finally {
 		managementPolicies.get(view.webContents)?.dispose();
 		managementPolicies.delete(view.webContents);
+		managementBootstrappedViews.delete(view.webContents);
 	}
 }
 

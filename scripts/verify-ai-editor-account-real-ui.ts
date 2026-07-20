@@ -21,8 +21,10 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const artifactRoot = path.join(repositoryRoot, '.build', 'ai-editor-account-gateway');
 const connectorPath = path.join(repositoryRoot, 'scripts', 'connect-ai-editor-black-dev.ps1');
 const codeLauncherPath = path.join(repositoryRoot, 'scripts', 'code.bat');
-const edgeOrigin = 'http://127.0.0.1:47921';
-const gatewayOrigin = 'http://127.0.0.1:47920';
+const localEdgeOrigin = 'http://127.0.0.1:47921';
+const localGatewayOrigin = 'http://127.0.0.1:47920';
+const edgeOrigin = process.env['AI_EDITOR_VERIFY_EDGE_ORIGIN'] || localEdgeOrigin;
+const gatewayOrigin = process.env['AI_EDITOR_VERIFY_GATEWAY_ORIGIN'] || localGatewayOrigin;
 const sharedProxyOrigin = 'http://127.0.0.1:47892';
 const codeRemoteDebuggingPort = 49232;
 
@@ -50,15 +52,22 @@ interface IReport {
 	readonly cleanup: {
 		readonly codeDebugPortReleased: boolean;
 		readonly isolatedStackReused: boolean;
+		readonly externalEdgeOnly: boolean;
 	};
 	readonly error: string | undefined;
 }
 
 async function main(): Promise<void> {
 	await assertPortAvailable(codeRemoteDebuggingPort, 'Code remote debugging');
-	const isolatedStackWasRunning = isPortListening(47920) || isPortListening(47921);
-	if (isolatedStackWasRunning && !(isPortListening(47920) && isPortListening(47921))) {
-		throw new Error('Only one isolated Gateway/Edge listener is running; the verifier will not modify it.');
+	const localGatewayWasRunning = isPortListening(47920);
+	const localEdgeWasRunning = isPortListening(47921);
+	if (localGatewayWasRunning && !localEdgeWasRunning) {
+		throw new Error('The local Gateway is running without its Edge; the verifier will not modify it.');
+	}
+	const externalEdgeOnly = localEdgeWasRunning && !localGatewayWasRunning;
+	const isolatedStackWasRunning = localGatewayWasRunning || localEdgeWasRunning;
+	if (externalEdgeOnly && gatewayOrigin === localGatewayOrigin) {
+		throw new Error('A pre-started Edge requires AI_EDITOR_VERIFY_GATEWAY_ORIGIN when the local Gateway is not running.');
 	}
 
 	const runDirectory = path.join(artifactRoot, `real-ui-${randomId()}`);
@@ -80,11 +89,17 @@ async function main(): Promise<void> {
 	let startedIsolatedStack = false;
 
 	try {
-		const connector = runConnector(['-AuthenticationMode', 'real']);
-		startedIsolatedStack = !isolatedStackWasRunning;
-		const nonceFile = parseConnectorValue(connector, 'Code main-process nonce file');
+		let nonceFile: string | undefined;
+		if (externalEdgeOnly) {
+			nonceFile = process.env['AI_EDITOR_VERIFY_EDGE_NONCE_FILE'];
+			checks.push(pass('external-edge-reuse', `Reused the pre-started Edge with Gateway ${new URL(gatewayOrigin).origin}.`));
+		} else {
+			const connector = runConnector(['-AuthenticationMode', 'real']);
+			startedIsolatedStack = !isolatedStackWasRunning;
+			nonceFile = parseConnectorValue(connector, 'Code main-process nonce file');
+		}
 		if (!nonceFile || !fs.existsSync(nonceFile)) {
-			throw new Error('The isolated Edge nonce file was not created.');
+			throw new Error('The isolated Edge nonce file is unavailable; set AI_EDITOR_VERIFY_EDGE_NONCE_FILE for a pre-started Edge.');
 		}
 		await waitFor(
 			() => fetchJson(`${edgeOrigin}/live`),
@@ -114,7 +129,7 @@ async function main(): Promise<void> {
 		if (statusText.includes('需要登录')) {
 			checks.push(pass('prelogin-chat-visible', 'The real pre-login Edge opened Codex Chat and exposed the login-required status.'));
 		} else if (statusText.includes('AI 服务正常')) {
-			const statusAction = page.getByRole('button', { name: /AI Editor.*账号|AI 服务正常/ }).first();
+			const statusAction = page.locator('.chat-input-status-container').getByText(/AI 服务正常/).first();
 			await statusAction.click();
 			await waitFor(
 				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
@@ -122,6 +137,15 @@ async function main(): Promise<void> {
 				'AI Editor management BrowserView'
 			);
 			checks.push(pass('ready-management-route', 'The ready account status opened the fixed-origin management BrowserView.'));
+		} else if (statusText.includes('需要修改密码')) {
+			const statusAction = page.locator('.chat-input-status-container').getByText(/需要修改密码/).first();
+			await statusAction.click();
+			await waitFor(
+				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
+				value => Array.isArray(value) && value.some((target: { url?: unknown }) => target.url === `${gatewayOrigin}/admin#security`),
+				'AI Editor password-change management BrowserView'
+			);
+			checks.push(pass('password-change-management-route', 'The password-change-required status opened the fixed-origin security BrowserView.'));
 		} else {
 			throw new Error('The real Edge did not expose a supported safe Chat account status.');
 		}
@@ -171,7 +195,8 @@ async function main(): Promise<void> {
 		},
 		cleanup: {
 			codeDebugPortReleased,
-			isolatedStackReused: isolatedStackWasRunning
+			isolatedStackReused: isolatedStackWasRunning,
+			externalEdgeOnly
 		},
 		error: failure ? 'Real Edge pre-login UI verification failed. Inspect only the isolated local run logs.' : undefined
 	};
@@ -343,6 +368,7 @@ function writeReports(jsonPath: string, markdownPath: string, report: IReport): 
 		`- Shared Proxy PID unchanged: ${report.sharedProxy.unchanged}`,
 		`- Code debug port released: ${report.cleanup.codeDebugPortReleased}`,
 		`- Isolated Gateway/Edge reused: ${report.cleanup.isolatedStackReused}`,
+		`- External Edge-only topology: ${report.cleanup.externalEdgeOnly}`,
 		'',
 		'## Checks',
 		'',

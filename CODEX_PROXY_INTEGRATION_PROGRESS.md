@@ -2962,3 +2962,40 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 共享 `47892` 始终保持 PID `32260`、`/live=ok`，未停止或重启。
 - 详细 Proxy 交接：
   `docs/AI_EDITOR_PUBLIC_MVP_CAPACITY_T139_HANDOFF.md`。
+
+## 94. 2026-07-21 Code 生命周期、修改密码入口与预发布 Edge 自动验收
+
+- 修复新 Code 窗口打开 `AI Editor 账户 → 修改密码` 时管理 Webview 可能复用
+  未完成 bootstrap 的 Gateway 文档：
+  - 只有已经成功注入过一次性 Webview ticket 的 BrowserView 才允许直接切换管理路由；
+  - 首次 bootstrap 失败后重试会重新申请 ticket，不复用已消费或未注入的 ticket；
+  - Gateway 公网延迟下账号 HTTP 超时由 3 秒调整为 10 秒。
+- 开发版与成品版 Proxy 生命周期边界已收口：
+  - 开发版在 `external-local-proxy` 模式下监控 `47921`，不误启动 bundled Proxy；
+  - 成品版忽略从开发终端泄漏的 external Edge 环境变量，仍以产品配置和成品
+    auto-start 为准；
+  - Windows 成品干净启动验证为 bundled Proxy 设置隔离的 `USERPROFILE`/`HOME`，
+    不再与共享 `47892` 的用户级单实例锁冲突；
+  - 验证器清除继承的开发 Edge/Gateway 环境变量，并确认全新 bundled Proxy 只暴露
+    内置 `auto*` 虚拟模型，不继承任何已配置 Provider 模型。
+- 扩展真实 UI 自动验收：
+  - `verify-ai-editor-account-real-ui` 现在支持“本机 Edge `47921` → 公网 Gateway”
+    的预发布拓扑；
+  - 通过环境变量显式传入公网 Gateway origin 和本机 nonce 文件路径，不把 nonce
+    内容写入报告；
+  - 新增 `password_change_required → /admin#security` 的 CDP 自动验收；
+  - 本轮实际复用现有 Quick Tunnel 与 Edge PID `37496`，验证修改密码安全页成功打开。
+- 自动验证结果：
+  - AI Editor Account Electron：`11/11`；
+  - AI Editor Proxy Electron：`6/6`；
+  - `npm run compile`：通过；
+  - `npm run core-ci`：通过；
+  - `vscode-win32-x64-min-ci`：通过（使用本机 Windows SDK x64 `signtool.exe`）；
+  - Windows 成品：Workbench checksum `10/10`、clean start `PASS`、bundled Proxy
+    在 Code 退出后继续运行；
+  - 开发版公网 Gateway UI：`5/5`，修改密码安全页、Code 清理和共享 Proxy 不变量
+    全部通过。
+- 运行不变量：
+  - 共享 `47892` 前后均为 PID `32260`、`/live=ok`，未停止或重启；
+  - 预发布 Edge `47921` 前后均为 PID `37496`、`/live=ok`；
+  - 人工验收按用户要求暂时跳过。

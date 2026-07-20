@@ -14,6 +14,10 @@ import { IConfigurationService } from '../../configuration/common/configuration.
 import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
 import { ILogService } from '../../log/common/log.js';
 import { IProductService } from '../../product/common/productService.js';
+import {
+	AgentHostCodexProxyBaseUrlEnvVar,
+	AgentHostCodexProxyModeEnvVar
+} from '../../agentHost/common/agentService.js';
 import { normalizeAiEditorAccountGatewayUrl } from '../../aiEditorAccount/common/aiEditorAccount.js';
 import { IAiEditorEdgeRuntimeService } from './aiEditorEdgeRuntimeService.js';
 import {
@@ -24,8 +28,8 @@ import {
 	IAiEditorProxyHealthResponse,
 	IAiEditorProxyService,
 	IAiEditorProxyStatus,
-	normalizeAiEditorProxyBaseUrl,
-	parseAiEditorProxyProviderStatus
+	parseAiEditorProxyProviderStatus,
+	resolveAiEditorAgentHostProxyBaseUrl
 } from '../common/aiEditorProxy.js';
 
 const HEALTH_POLL_INTERVAL = 15_000;
@@ -72,6 +76,31 @@ export function parseAiEditorBundledProxyRuntimeManifest(raw: string): Omit<IAiE
 		throw new Error(`The installed AI Proxy ${target} entry point is invalid.`);
 	}
 	return { target, entryPoint: expectedEntryPoint };
+}
+
+export function resolveAiEditorProxyMainBaseUrl(
+	configuredBaseUrl: string | undefined,
+	isBuilt: boolean,
+	env: NodeJS.ProcessEnv = process.env
+): string {
+	return resolveAiEditorAgentHostProxyBaseUrl(
+		configuredBaseUrl,
+		!isBuilt && isExternalLocalAiEditorProxyMode(env)
+			? env[AgentHostCodexProxyBaseUrlEnvVar]
+			: undefined
+	);
+}
+
+export function shouldAutoStartAiEditorProxy(
+	configuredAutoStart: boolean | undefined,
+	isBuilt: boolean,
+	env: NodeJS.ProcessEnv = process.env
+): boolean {
+	return (isBuilt || !isExternalLocalAiEditorProxyMode(env)) && configuredAutoStart !== false;
+}
+
+function isExternalLocalAiEditorProxyMode(env: NodeJS.ProcessEnv): boolean {
+	return env[AgentHostCodexProxyModeEnvVar] === 'external-local-proxy';
 }
 
 export class AiEditorProxyMainService extends Disposable implements IAiEditorProxyService {
@@ -373,7 +402,10 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	}
 
 	private readBaseUrl(): string {
-		return normalizeAiEditorProxyBaseUrl(this.configurationService.getValue<string>(AI_EDITOR_PROXY_BASE_URL_SETTING_ID));
+		return resolveAiEditorProxyMainBaseUrl(
+			this.configurationService.getValue<string>(AI_EDITOR_PROXY_BASE_URL_SETTING_ID),
+			this.environmentMainService.isBuilt
+		);
 	}
 
 	private readBaseUrlSafely(): string {
@@ -385,7 +417,10 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	}
 
 	private isAutoStartEnabled(): boolean {
-		return this.configurationService.getValue<boolean>(AI_EDITOR_PROXY_AUTO_START_SETTING_ID) !== false;
+		return shouldAutoStartAiEditorProxy(
+			this.configurationService.getValue<boolean>(AI_EDITOR_PROXY_AUTO_START_SETTING_ID),
+			this.environmentMainService.isBuilt
+		);
 	}
 
 	private errorMessage(error: unknown): string {

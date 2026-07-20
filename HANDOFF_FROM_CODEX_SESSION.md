@@ -524,3 +524,58 @@ Remaining human gates are T136b (cloud/KMS/PostgreSQL/object storage choice),
 T137 (approved production deployment) and T138 (72-hour multi-network
 acceptance). Detailed server handoff:
 `docs/AI_EDITOR_PUBLIC_MVP_CAPACITY_T139_HANDOFF.md`.
+
+## 2026-07-21 Code lifecycle and password-management pre-run checkpoint
+
+Human verification remained intentionally skipped. The previous
+`AI Editor account -> Change password` failure and the next fully automatable
+Code pre-run checks are complete in the working tree.
+
+Implemented:
+
+- account HTTP requests now allow 10 seconds for the public preview Gateway;
+- a management BrowserView is considered reusable only after a one-time
+  Webview ticket was successfully injected;
+- retry after an initial management bootstrap failure requests a fresh ticket;
+- development `external-local-proxy` mode monitors the existing Edge on
+  `47921` without auto-starting the bundled Proxy;
+- a built product ignores inherited development-only Edge environment
+  variables and continues to use product configuration;
+- the Windows clean-start verifier isolates `USERPROFILE` and `HOME`, avoiding
+  the real user's shared Proxy single-instance lock;
+- the verifier clears all inherited development Edge/Gateway variables and
+  rejects any configured Provider model leaked into a clean bundled Proxy;
+- the real UI verifier now supports a pre-started local Edge connected to an
+  explicit public Gateway and verifies
+  `password_change_required -> /admin#security`.
+
+Automated evidence:
+
+- Account Electron tests: `11/11`;
+- Proxy Electron tests: `6/6`;
+- `npm run compile`: passed;
+- `npm run core-ci`: passed;
+- `npm run gulp vscode-win32-x64-min-ci`: passed after adding the installed
+  Windows SDK x64 `signtool.exe` directory to that command's process PATH;
+- Windows product verification:
+  - result `PASS`;
+  - Workbench checksums `10/10`;
+  - clean bundled Proxy startup passed;
+  - the bundled test Proxy survived Code exit;
+- development Code/public-Gateway CDP verification: `5/5`, including opening
+  the password security page and cleaning the isolated Code process.
+
+Runtime invariants:
+
+- shared `47892` remains PID `32260`, `/live=ok`, and was not restarted;
+- preview Edge `47921` remains PID `37496`, `/live=ok`;
+- the current public Quick Tunnel `/live` remains HTTP 200.
+
+Generated evidence is under
+`.build/ai-editor-account-gateway/pre-run-code-lifecycle-20260721-v6.*` and
+`.build/ai-editor-account-gateway/real-ui-prelogin-acceptance.*`; these build
+artifacts must not be committed.
+
+The next human gates remain T136b, T137 and T138. Do not weaken VMware SSH or
+replace the temporary Quick Tunnel with a production claim while no operator
+is available.

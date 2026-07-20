@@ -9,7 +9,9 @@ import { AiEditorProxyLifecycleState, type IAiEditorProxyStatus } from '../../co
 import {
 	AiEditorProxyMainService,
 	createAiEditorStandaloneProxyEnvironment,
-	parseAiEditorBundledProxyRuntimeManifest
+	parseAiEditorBundledProxyRuntimeManifest,
+	resolveAiEditorProxyMainBaseUrl,
+	shouldAutoStartAiEditorProxy
 } from '../../electron-main/aiEditorProxyMainService.js';
 
 interface IRestartHarness {
@@ -87,6 +89,27 @@ suite('AiEditorProxyMainService restart safety', () => {
 				CODEX_PROXY_PORT: '48765'
 			}
 		);
+	});
+
+	test('monitors but never auto-starts a development external Edge', () => {
+		const externalEdgeEnvironment = {
+			VSCODE_AGENT_HOST_CODEX_PROXY_MODE: 'external-local-proxy',
+			VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL: 'http://127.0.0.1:47921'
+		};
+
+		assert.strictEqual(
+			resolveAiEditorProxyMainBaseUrl('http://127.0.0.1:47892', false, externalEdgeEnvironment),
+			'http://127.0.0.1:47921'
+		);
+		assert.strictEqual(shouldAutoStartAiEditorProxy(true, false, externalEdgeEnvironment), false);
+		assert.strictEqual(shouldAutoStartAiEditorProxy(undefined, false, externalEdgeEnvironment), false);
+		assert.strictEqual(shouldAutoStartAiEditorProxy(true, false, {}), true);
+
+		assert.strictEqual(
+			resolveAiEditorProxyMainBaseUrl('http://127.0.0.1:47892', true, externalEdgeEnvironment),
+			'http://127.0.0.1:47892'
+		);
+		assert.strictEqual(shouldAutoStartAiEditorProxy(true, true, externalEdgeEnvironment), true);
 	});
 
 	test('reuses a healthy shared Proxy instead of invoking a forced restart', async () => {

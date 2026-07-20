@@ -196,6 +196,31 @@ shared Proxy, and it must not run while the real Black Edge occupies `47921`.
 If either required port is occupied, the verifier fails safely and does not stop or modify the
 existing process.
 
+### Automated real Edge UI smoke
+
+When the isolated local Gateway and Edge are both available on `47920/47921`, run:
+
+```powershell
+Set-Location D:\AI_prejoct\My_code
+npm run verify-ai-editor-account-real-ui
+```
+
+For the pre-release topology where only the local Edge runs and forwards to an explicit public
+Gateway, pass the public origin and the existing Edge nonce **file path**:
+
+```powershell
+$env:AI_EDITOR_VERIFY_GATEWAY_ORIGIN = 'https://replace-with-current-preview-origin'
+$env:AI_EDITOR_VERIFY_EDGE_NONCE_FILE = 'D:\path\to\edge-local-nonce.secret'
+npm run verify-ai-editor-account-real-ui
+```
+
+The verifier never writes nonce contents, Tokens or account identity into its report. It reuses
+the pre-started Edge, launches `scripts\code.bat` with an isolated profile, and accepts the safe
+`login_required`, `ready` and `password_change_required` states. For a ready account it verifies
+the fixed `/admin#account` management route; for forced password change it verifies
+`/admin#security`. It then closes only its own Code processes and confirms that the shared
+`47892` PID and `/live` state are unchanged.
+
 ## 8. Validate Account Menu and Management Editor
 
 1. Click the lower-left `AI Editor 账户`.

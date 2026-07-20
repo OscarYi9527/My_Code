@@ -607,7 +607,18 @@ function Test-CleanProductStart(
 	try {
 		Set-ProcessEnvironment $originalEnvironment 'VSCODE_AI_EDITOR_PROXY_DATA_DIR' $proxyData
 		Set-ProcessEnvironment $originalEnvironment 'CODEX_HOME' (Join-Path $cleanRoot 'codex-home')
+		# The bundled Proxy stores its single-instance lock under os.homedir().
+		# Isolate the product test from the real user's shared 47892 instance
+		# without touching that instance or its lock.
+		Set-ProcessEnvironment $originalEnvironment 'USERPROFILE' $cleanRoot
+		Set-ProcessEnvironment $originalEnvironment 'HOME' $cleanRoot
 		foreach ($name in @(
+			'VSCODE_AGENT_HOST_CODEX_PROXY_MODE',
+			'VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL',
+			'VSCODE_AI_EDITOR_PROXY_ROOT',
+			'VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN',
+			'VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN',
+			'VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE',
 			'DEEPSEEK_API_KEY',
 			'OPENAI_API_KEY',
 			'OPENAI_ORG_ID',
@@ -682,8 +693,11 @@ function Test-CleanProductStart(
 		$modelsResponse = Invoke-Http "$baseUrl/v1/models"
 		Assert-HttpSuccess $modelsResponse 'Clean bundled Proxy /v1/models'
 		$models = Convert-HttpJson $modelsResponse 'Clean bundled Proxy /v1/models'
-		if (@($models.data).Count -ne 0) {
-			throw 'Clean bundled Proxy unexpectedly inherited a configured model catalog.'
+		$modelIds = @($models.data | ForEach-Object { [string]$_.id })
+		$builtInVirtualModels = @('auto', 'auto-fast', 'auto-cheap', 'auto-reliable')
+		$unexpectedModels = @($modelIds | Where-Object { $_ -notin $builtInVirtualModels })
+		if ($unexpectedModels.Count -gt 0) {
+			throw "Clean bundled Proxy unexpectedly inherited configured provider models: $($unexpectedModels -join ', ')."
 		}
 
 		$adminResponse = Invoke-Http "$baseUrl/admin"
@@ -722,7 +736,8 @@ function Test-CleanProductStart(
 			cdpTargetCount = @($cdpTargets).Count
 			readyStatusCode = $readyResponse.statusCode
 			readyStatus = $ready.status
-			modelCount = @($models.data).Count
+			modelCount = $modelIds.Count
+			modelIds = $modelIds
 			adminStatusCode = $adminResponse.statusCode
 			proxySurvivedCodeExit = $true
 			artifactDirectory = if ($KeepArtifacts) { $cleanRoot } else { $null }

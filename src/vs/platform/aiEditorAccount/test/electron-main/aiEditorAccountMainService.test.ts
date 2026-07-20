@@ -272,6 +272,68 @@ suite('AI Editor Account main service', () => {
 		destroyedListener?.();
 	});
 
+	test('requests a fresh management ticket after the initial bootstrap fails', async () => {
+		let currentUrl = 'about:blank';
+		let ticketCalls = 0;
+		let injectedCode = '';
+		const webContents = {
+			isDestroyed: () => false,
+			getURL: () => currentUrl,
+			executeJavaScriptInIsolatedWorld: async (_worldId: number, scripts: readonly { readonly code: string }[]) => {
+				injectedCode = scripts[0].code;
+			},
+			on: () => undefined,
+			once: () => undefined,
+			removeListener: () => undefined,
+			removeAllListeners: () => undefined,
+			setWindowOpenHandler: () => undefined,
+			session: {
+				on: () => undefined,
+				removeListener: () => undefined
+			}
+		} as unknown as Electron.WebContents;
+		const view = {
+			webContents,
+			loadURL: async (url: string) => { currentUrl = url; }
+		};
+		const options = {
+			viewId: AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			route: AiEditorManagementRoute.Security,
+			gatewayOrigin: 'https://gateway.example.com',
+			client: {
+				requestWebviewTicket: async () => {
+					ticketCalls++;
+					if (ticketCalls === 1) {
+						throw new AiEditorAccountHttpError('account_edge_unreachable');
+					}
+					return { ticket: 'retry-ticket', expiresIn: 60 };
+				}
+			},
+			browserViewMainService: {
+				tryGetBrowserView: () => view
+			},
+			openExternal: async () => undefined
+		};
+
+		await assert.rejects(
+			prepareAiEditorManagementView(options),
+			(error: unknown) => error instanceof AiEditorAccountHttpError &&
+				error.errorId === 'account_edge_unreachable'
+		);
+		assert.strictEqual(new URL(currentUrl).origin, 'https://gateway.example.com');
+
+		await prepareAiEditorManagementView(options);
+		assert.strictEqual(ticketCalls, 2);
+		assert.ok(injectedCode.includes('retry-ticket'));
+		assert.ok(injectedCode.includes('ai-editor-management-bootstrap'));
+
+		await disposeAiEditorManagementView(
+			AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
+			'https://gateway.example.com',
+			{ tryGetBrowserView: () => view }
+		);
+	});
+
 	test('validates the minimum Codex auth.json shape before native import', () => {
 		const valid = validateAiEditorCurrentCodexAuthJson(JSON.stringify({
 			tokens: {
