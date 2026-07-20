@@ -405,3 +405,66 @@ Preserve these unrelated local files in the shared Proxy worktree:
 - untracked `codex-proxy-requests.log.1`.
 
 Do not stage or discard them as part of the upload fix.
+
+## 2026-07-21 forced-password management bootstrap fix
+
+Symptom:
+
+- a new Code window opened `AI Editor 账户 → 修改密码`;
+- the dedicated management Webview showed
+  `管理会话建立失败，请关闭标签页后重试`.
+
+The repeated-failure audit disproved Edge reachability and ticket issuance as
+the root cause:
+
+- isolated Edge `47921` was live and ready;
+- the local nonce was valid;
+- authenticated status returned `password_change_required` in `0.6–2 s`;
+- Webview ticket issuance completed in about `0.5 s`;
+- a fresh isolated Code profile reproduced the failure;
+- Webview console evidence showed privileged Provider and diagnostics requests
+  returning HTTP `409 password_change_required` after ticket exchange.
+
+Root cause:
+
+- the management session was already established successfully;
+- the Level 1 management app still preloaded all organization, credit,
+  Provider, model and diagnostics data while forced password change was active;
+- the protected endpoints correctly rejected those calls with `409`;
+- the React bootstrap treated any preload failure as management-session
+  failure, preventing access to the password form.
+
+Fix:
+
+- repository: `D:\AI_prejoct\codex_proxy-provider-worker`;
+- branch: `codex/provider-worker-mvp`;
+- pushed commit:
+  `1d0f212c2efe4e09b6682e214548d7bc4390acb0`;
+- `mustChangePassword=true` now opens the security/password page directly;
+- only account, device and self-usage data is loaded before the password is
+  changed;
+- organization, credit, audit, Provider, model and diagnostics navigation and
+  requests stay disabled until the password lifecycle is complete.
+
+Validation:
+
+- Admin Web: `29/29`;
+- root Proxy/Edge/Worker: `166/166`;
+- Gateway: `130/130`;
+- `npm run release:check`: passed;
+- My_Code compile: passed;
+- My_Code account and management focused tests: `25/25`;
+- fresh Code/Edge/public-Gateway E2E passed twice, including close and reopen.
+
+Deployment:
+
+- VMware repository and Gateway container run `1d0f212`;
+- Provider Worker and the Cloudflare Quick Tunnel were not recreated;
+- the preview URL did not change and public `/live=200`;
+- local Edge was restored after the release gate and is PID `25028`,
+  `/live=200`, `/ready=200`;
+- shared `47892` remained PID `32260` and was not restarted.
+
+The five pre-existing uncommitted My_Code account/Proxy lifecycle files remain
+pending their separate Windows product-build checkpoint; do not mix them into
+this server-side fix.

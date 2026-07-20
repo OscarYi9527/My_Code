@@ -2712,6 +2712,51 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - `codex-proxy-requests.log.1` 为未跟踪运行日志；
   - 两者均未纳入本次提交，也未被丢弃或覆盖。
 
+## 94. 2026-07-21 强制修改密码管理页初始化修复
+
+- 用户复现：新窗口点击“AI Editor 账户 → 修改密码”后，专用管理 Webview 显示
+  “管理会话建立失败，请关闭标签页后重试”。
+- 本轮按重复故障重新建立证据，没有继续按旧假设猜改：
+  - 开发 Code 确认指向隔离 Edge `47921` 和 VMware 公网 Gateway；
+  - Edge `/live`、`/ready` 正常，本机 nonce 文件存在；
+  - 带本机 nonce 的 `/ai-editor/status` 在 `0.6–2` 秒内返回
+    `password_change_required`；
+  - `/ai-editor/webview-ticket` 在约 `0.5` 秒内成功签发一次性 ticket；
+  - 全新隔离 Code 窗口仍稳定复现；
+  - Webview 控制台显示 ticket 交换后继续请求 Provider/诊断接口，并收到 HTTP
+    `409 password_change_required`。
+- 最终根因：
+  - 管理会话和一次性 ticket 实际已经建立成功；
+  - 管理 Web 在一级管理员处于强制改密状态时，仍并行预加载组织、额度、Provider、
+    模型和诊断等完整管理员数据；
+  - 受强制改密门禁保护的接口正确返回 `409`，但前端把任一初始化请求失败都误显示为
+    “管理会话建立失败”，导致用户无法进入修改密码表单。
+- 修复：
+  - Server 仓库分支 `codex/provider-worker-mvp`；
+  - 提交 `1d0f212c2efe4e09b6682e214548d7bc4390acb0`；
+  - 管理 Web 先读取安全账号状态；
+  - `mustChangePassword=true` 时固定打开“设备与安全/修改密码”，只加载账号、设备和
+    自身使用情况；
+  - 强制改密完成前隐藏组织、额度、审计、Provider、模型和诊断导航，不再调用这些
+    特权接口；
+  - 改密成功后仍按既定安全设计提示关闭管理页、重启 Code 并重新登录。
+- 自动验证：
+  - Admin Web `29/29`；
+  - Proxy/Edge/Worker 根测试 `166/166`；
+  - Gateway `130/130`；
+  - `npm run release:check` 完整通过；
+  - My_Code `npm run compile` 通过，账号/管理专项 `25/25`。
+- 公网预发布：
+  - VMware 仓库与 Gateway 容器已部署 `1d0f212`；
+  - Provider Worker 和 Cloudflare Tunnel 未重建，临时公网地址未变化；
+  - 公网 `/live=200`；
+  - 全新隔离 Code 窗口完成两轮“打开修改密码 → 关闭标签页 → 再次打开”验收，
+    两次都直接显示修改密码表单和当前设备，不再出现会话建立失败。
+- 运行不变量：
+  - 共享 Proxy `47892` 始终为 PID `32260`，本轮未停止或重启；
+  - 隔离 Edge 为完成 release check 使用项目脚本临时停止并恢复，当前 PID `25028`，
+    `/live=200`、`/ready=200`。
+
 ## 90. 2026-07-20 ChatGPT 订阅账号熔断恢复 P0 修复
 
 - 用户实际遇到：
