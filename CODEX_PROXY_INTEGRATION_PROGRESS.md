@@ -3091,3 +3091,28 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 共享 `47892` 保持 PID `32260`、`/live=ok`；预发布 Edge 已通过项目脚本恢复为
   PID `35172`、`/live=ok`，仍连接原 Quick Tunnel。
 - 真实 PostgreSQL 端仍需在选型后执行角色授权 SQL、启动自检、迁移/回滚和恢复演练。
+
+## 98. 2026-07-21 预发布自动验证闭环（T140）
+
+- 新增 `scripts\verify-ai-editor-preproduction-closure.ps1`，统一输出 `PASS`、`BLOCKED`
+  或 `FAIL`，退出码分别为 `0`、`2`、`1`。
+- 自动门禁覆盖：
+  - 两个仓库 clean/upstream 同步；
+  - 高置信度密钥扫描；
+  - Server `release:check`；
+  - Code 开发构建、Account/Proxy Electron 定向测试和合同测试；
+  - `core-ci`、Windows 产品打包与成品验证；
+  - 真实预发布 Edge 的 Code UI/CDP 管理路由；
+  - 账号为 `ready` 时的真实模型 SSE；
+  - 生产 readiness overlay；
+  - 共享 `47892` PID、健康状态、程序和选定数据哈希不变量；
+  - 预发布 Edge 通过仓库脚本安全释放和恢复。
+- `verify-ai-editor-account-real-model-sse.ts` 已支持“本机 Edge `47921` → 外部
+  HTTPS Gateway”拓扑；账号是 `password_change_required` 等非 ready 状态时返回
+  `BLOCKED` 且不发送 Turn。
+- 证据写入 `.build\ai-editor-preproduction-closure\<UTC 时间>\`，包含脱敏
+  JSON、Markdown、步骤日志和子报告；nonce、Token、账号、Prompt、回复和 Provider
+  凭据不会写入报告。
+- 不能由本机伪造的条件继续保留为 `BLOCKED`：云/KMS/PostgreSQL/对象存储采购，
+  ICP 和生产批准，真实 macOS 运行机，以及 T138 的 72 小时三网络验收。
+- 详细使用说明：`AI_EDITOR_AUTOMATED_VALIDATION_CLOSURE.md`。

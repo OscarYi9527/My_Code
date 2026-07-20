@@ -18,8 +18,14 @@ const blackRepository = resolveBlackRepository(getOption('--black-repository'));
 const dataRoot = getOption('--data-root') ?? path.join(blackRepository, '.ai-editor-dev', 'oscar-login-verify');
 const expectedModel = getOption('--model');
 const prompt = getOption('--prompt') ?? 'Reply only with: AI_EDITOR_SSE_OK';
+const responseTimeoutMs = getIntegerOption('--timeout-ms', 180_000, 1_000, 600_000);
 const reportRoot = path.join(repositoryRoot, '.build', 'ai-editor-account-gateway');
-const edgeOrigin = 'http://127.0.0.1:47921';
+const edgeOrigin = normalizeOrigin(
+	getOption('--edge-origin') ??
+	process.env['AI_EDITOR_VERIFY_EDGE_ORIGIN'] ??
+	'http://127.0.0.1:47921'
+);
+const configuredNonceFile = getOption('--edge-nonce-file') ?? process.env['AI_EDITOR_VERIFY_EDGE_NONCE_FILE'];
 const sharedProxyOrigin = 'http://127.0.0.1:47892';
 
 interface ICheck {
@@ -38,9 +44,31 @@ async function main(): Promise<void> {
 	let error: string | undefined;
 
 	try {
-		assertIsolatedService(47920, resolvedDataRoot, 'Gateway');
+		const edgeUrl = new URL(edgeOrigin);
+		if (!isLocalEdge(edgeUrl)) {
+			throw new Error('Real model/SSE verification only trusts the isolated loopback Edge on port 47921.');
+		}
 		assertIsolatedService(47921, resolvedDataRoot, 'Edge');
-		const noncePath = path.join(resolvedDataRoot, 'edge-local-nonce.secret');
+		const gatewayRunning = listenerProcessId(47920) !== undefined;
+		if (gatewayRunning) {
+			assertIsolatedService(47920, resolvedDataRoot, 'Gateway');
+		}
+		const live = await fetchJson(`${edgeOrigin}/live`) as { status?: unknown; mode?: unknown };
+		if (live.status !== 'ok' || live.mode !== 'edge') {
+			throw new Error('The isolated Edge /live response is invalid.');
+		}
+		checks.push({
+			name: 'isolated-edge-topology',
+			result: 'PASS',
+			detail: gatewayRunning
+				? 'Verified the repository-owned local Gateway and Edge.'
+				: 'Verified the repository-owned local Edge with an external Gateway.'
+		});
+
+		const noncePath = path.resolve(configuredNonceFile ?? path.join(resolvedDataRoot, 'edge-local-nonce.secret'));
+		if (!noncePath.startsWith(`${resolvedDataRoot}${path.sep}`)) {
+			throw new Error('The Edge nonce file must stay under the isolated data root.');
+		}
 		const nonce = fs.readFileSync(noncePath, 'utf8').trim();
 		if (Buffer.byteLength(nonce, 'utf8') < 32) {
 			throw new Error('The isolated Edge nonce is malformed.');
@@ -74,7 +102,8 @@ async function main(): Promise<void> {
 		const response = await fetch(`${edgeOrigin}/v1/responses`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-			body: JSON.stringify({ model, input: prompt, stream: true })
+			body: JSON.stringify({ model, input: prompt, stream: true }),
+			signal: AbortSignal.timeout(responseTimeoutMs)
 		});
 		if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream') || !response.body) {
 			checks.push({
@@ -149,7 +178,9 @@ async function main(): Promise<void> {
 		...(error ? ['', '> Acceptance did not complete; inspect only isolated local logs.'] : [])
 	].join('\n').concat('\n'), 'utf8');
 	console.log(JSON.stringify({ result, report: reportPath, markdown: markdownPath, checks: checks.length, sharedProxyPid: sharedAfter.processId }, undefined, 2));
-	if (result !== 'PASS') {
+	if (result === 'BLOCKED') {
+		process.exitCode = 2;
+	} else if (result === 'FAIL') {
 		process.exitCode = 1;
 	}
 }
@@ -159,6 +190,42 @@ function getOption(name: string): string | undefined {
 	return index >= 0 ? process.argv[index + 1]?.trim() || undefined : undefined;
 }
 
+function getIntegerOption(name: string, defaultValue: number, minimum: number, maximum: number): number {
+	const value = getOption(name);
+	if (value === undefined) {
+		return defaultValue;
+	}
+	if (!/^\d+$/.test(value)) {
+		throw new Error(`${name} must be an integer.`);
+	}
+	const parsed = Number(value);
+	if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+		throw new Error(`${name} must be between ${minimum} and ${maximum}.`);
+	}
+	return parsed;
+}
+
+function normalizeOrigin(value: string): string {
+	const url = new URL(value);
+	if (
+		(url.protocol !== 'http:' && url.protocol !== 'https:') ||
+		url.username ||
+		url.password ||
+		url.pathname !== '/' ||
+		url.search ||
+		url.hash
+	) {
+		throw new Error('The Edge origin must be an HTTP(S) origin without credentials, path, query, or fragment.');
+	}
+	return url.origin;
+}
+
+function isLocalEdge(url: URL): boolean {
+	return url.protocol === 'http:' &&
+		(url.hostname === '127.0.0.1' || url.hostname === 'localhost') &&
+		url.port === '47921';
+}
+
 function resolveBlackRepository(option: string | undefined): string {
 	if (option) {
 		return path.resolve(option);
@@ -166,6 +233,7 @@ function resolveBlackRepository(option: string | undefined): string {
 
 	const candidates = [
 		process.env['AI_EDITOR_BLACK_REPOSITORY'],
+		path.resolve(repositoryRoot, '..', 'codex_proxy-provider-worker'),
 		path.resolve(repositoryRoot, '..', 'codex_proxy-oscar'),
 		path.resolve(repositoryRoot, '..', 'codex_proxy-gateway-dev'),
 		path.resolve(repositoryRoot, '..', 'codex_proxy-dev')

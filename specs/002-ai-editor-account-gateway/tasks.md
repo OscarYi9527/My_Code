@@ -416,6 +416,9 @@ Turn 可结算为负积分。
   - `COMPLETE 2026-07-21` — database-atomic 30-account admission gate, bootstrap/admin counting,
     invitation rollback, stable `public_mvp_capacity_reached`, Level-1 read-only capacity UI and
     no environment or management-API bypass.
+- [x] T140 [PW4] Add a fail-safe automated preproduction closure runner with `PASS`/`BLOCKED`/`FAIL`,
+  sanitized evidence, repository/build/product/UI/SSE gates, shared Proxy invariants and explicit
+  non-automatable production blockers in `D:\AI_prejoct\My_code\scripts\verify-ai-editor-preproduction-closure.ps1`
 
 **Checkpoint**: T121–T132 can be completed without purchasing a domain, cloud host, Provider quota
 or production certificate. T133 may use only dedicated test credentials after explicit confirmation.
@@ -505,7 +508,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 
 ## Task Summary
 
-- Total tasks: **139**
+- Total tasks: **140**
 - Setup/Foundation: **22**
 - US1: **15**
 - US2: **11**
@@ -516,7 +519,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 - US7: **9**
 - US8: **9**
 - Polish/validation: **12**
-- Provider Worker/public evolution: **19**
+- Provider Worker/public evolution: **20**
 
 All tasks use the required checkbox, sequential ID, optional `[P]`, user-story label and explicit
 file path format.

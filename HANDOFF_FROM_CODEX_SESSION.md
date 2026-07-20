@@ -689,3 +689,22 @@ PID `35172`, `/live=ok`, against the unchanged Quick Tunnel/data root.
 
 The real cloud database role grants and the live startup check still wait for
 the PostgreSQL provider selection.
+
+## 2026-07-21 automated validation closure checkpoint
+
+Manual preview verification is now replaced where technically possible by:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  D:\AI_prejoct\My_code\scripts\verify-ai-editor-preproduction-closure.ps1 `
+  -GatewayOrigin <current-preview-https-origin>
+```
+
+The runner builds and validates both Code surfaces, runs server release checks,
+real UI/CDP checks and a real SSE Turn when the safe account state is `ready`,
+then writes sanitized JSON/Markdown evidence. Its result is `PASS`, `BLOCKED`
+or `FAIL`; external cloud purchases, ICP, production approval, a real macOS
+runner, and T138 three-network acceptance remain truthful `BLOCKED` gates.
+See `AI_EDITOR_AUTOMATED_VALIDATION_CLOSURE.md`. The runner never restarts the
+shared `47892` Proxy and manages only the isolated preview Edge through the
+Proxy repository lifecycle scripts.
