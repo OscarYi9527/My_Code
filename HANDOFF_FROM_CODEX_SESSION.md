@@ -729,3 +729,32 @@ Publication tests, a development PA Plaza/Creator CDP smoke and a packaged
 Windows PA Plaza/Creator CDP smoke. See
 `AI_EDITOR_MVP_BRANCH_INTEGRATION.md`. A branch is eligible for the MVP PR only
 when the closure report has `FAIL=0`.
+
+## 2026-07-21 PA Creator MVP merge completed
+
+The PA Creator integration was closed through
+[My_Code PR #5](https://github.com/OscarYi9527/My_Code/pull/5) and merged into
+`codex/account-gateway-mvp` as `52c772966c35b51e4b80497455592a2b44dbba3e`.
+
+Final local preproduction closure:
+
+- report:
+  `.build/ai-editor-preproduction-closure/20260720T214621Z/closure-report.md`;
+- `24 PASS / 3 external BLOCKED / 0 FAIL`;
+- development compile, account/Proxy contracts, PA focused tests and PA
+  development UI passed;
+- `core-ci`, Windows packaging/release verification and packaged PA UI passed;
+- server release check and real account UI passed;
+- shared `47892` stayed at PID `32260` with selected hashes unchanged;
+- the isolated preview Edge was restored.
+
+All five PR checks passed, including Windows/macOS/Linux chat-lib tests. The
+fork-only CI failure was fixed by checking engineering-system permissions in
+`${{ github.repository }}` instead of the hard-coded upstream
+`microsoft/vscode`.
+
+The three remaining blockers are truthful external gates: the preview account
+requires a password change before a real SSE Turn, no real macOS runner is
+available, and 19 production infrastructure/approval prerequisites remain.
+`origin/main`, `origin/feature/pa-creator-p1`, and
+`origin/codex/mvp-pa-creator-integration` are all contained by the MVP.
