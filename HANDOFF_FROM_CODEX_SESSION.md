@@ -468,3 +468,58 @@ Deployment:
 The five pre-existing uncommitted My_Code account/Proxy lifecycle files remain
 pending their separate Windows product-build checkpoint; do not mix them into
 this server-side fix.
+
+## 2026-07-21 public MVP 30-account capacity gate (T139)
+
+Human operators were offline, so manual UI acceptance and production
+infrastructure decisions were skipped. The next fully automatable pre-run item,
+T139, was completed in:
+
+- repository: `D:\AI_prejoct\codex_proxy-provider-worker`;
+- branch: `codex/provider-worker-mvp`;
+- capacity commit: `6e73100`;
+- isolated-login cleanup commit: `131467b`.
+
+Implemented behavior:
+
+- the short-term public MVP admits at most 30 product accounts total;
+- bootstrap Level 1, all other administrators and ordinary users count;
+- disabling an account does not silently free a slot;
+- migration `004_public_mvp_capacity` initializes existing deployments safely;
+- capacity reservation, invitation consumption and account creation are one
+  transaction;
+- concurrent final registrations cannot create account 31;
+- a rejected registration does not consume invitation use or capacity;
+- HTTP `409 public_mvp_capacity_reached` is stable and non-retryable;
+- at capacity, new invitation creation is also blocked;
+- Level 1 gets a read-only capacity API and in-product admitted/limit/remaining
+  display; Level 2 does not receive deployment-capacity data;
+- no environment or management API bypass exists.
+
+The release gate exposed and fixed a separate pre-existing Windows cleanup
+race: terminal ChatGPT official-login paths now wait for the owned isolated
+Codex app-server process to exit before deleting its temporary `CODEX_HOME`.
+The focused lifecycle test passed five consecutive runs.
+
+Automated results:
+
+- root Proxy/Edge/Worker: `166/166`;
+- Gateway: `136/136`;
+- Admin Web: `31/31`;
+- full `npm run release:check`: passed;
+- Gateway/Admin production builds and Provider Worker release boundary: passed.
+
+Deployment state:
+
+- shared `47892` remains PID `32260`, `/live=ok`; it was not restarted;
+- the isolated Edge on `47921` was stopped with the repository safe script so
+  release script lifecycle tests could own the port;
+- VMware deployment is deferred because the guest does not accept the Windows
+  SSH key and no human is available to authorize it;
+- do not weaken SSH or script a plaintext guest password;
+- the public Quick Tunnel still serves the prior VMware build.
+
+Remaining human gates are T136b (cloud/KMS/PostgreSQL/object storage choice),
+T137 (approved production deployment) and T138 (72-hour multi-network
+acceptance). Detailed server handoff:
+`docs/AI_EDITOR_PUBLIC_MVP_CAPACITY_T139_HANDOFF.md`.

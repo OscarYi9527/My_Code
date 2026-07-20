@@ -63,6 +63,7 @@ Rules:
 
 ## 4. Invitations
 
+- `GET /capacity` (Level 1 only)
 - `GET /invitations`
 - `POST /invitations`
 - `POST /invitations/{invitationId}/revoke`
@@ -81,6 +82,27 @@ Level 2 cannot choose an organization other than its own. Plain invitation code 
 successful creation response and is not returned by list APIs. `expiresAt` is the AI access
 deadline, not only a code-display or registration expiry: registration must complete before it, and
 the created account receives the same value as `account.expiresAt`.
+
+`GET /capacity` returns the read-only public-MVP admission gate:
+
+```json
+{
+  "phase": "public_mvp",
+  "hardLimit": 30,
+  "admittedAccountCount": 12,
+  "remainingAccountCount": 18,
+  "longTermCoreReady": false,
+  "account31Blocked": true,
+  "includesAdministrators": true,
+  "updatedAt": "2026-07-21T00:00:00.000Z"
+}
+```
+
+The short-term limit has no environment-variable or management-API bypass. At capacity, creating a
+new invitation and registering the 31st account both fail with
+`409 public_mvp_capacity_reached`. Existing valid accounts continue to work. Unlocking account 31
+requires a later, explicit and audited long-term-core readiness gate after the HA architecture has
+passed acceptance.
 
 ## 5. Credits and Usage
 

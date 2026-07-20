@@ -2910,3 +2910,54 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 最迟完成时间：T136b 编码冻结前。
 - 未完成时被阻断的任务：生产密钥适配、T137 远程部署和公网邀请码测试。
 - 当前是否需要付款：否。
+
+## 93. 2026-07-21 公网 MVP 30 账号硬上限 T139
+
+- Proxy 仓库：
+  - 工作树：`D:\AI_prejoct\codex_proxy-provider-worker`
+  - 分支：`codex/provider-worker-mvp`
+  - 容量实现提交：`6e73100`
+  - 隔离登录清理修复：`131467b`
+- T139 已完成并冻结以下口径：
+  - 公网短期架构最多准入 30 个产品账号；
+  - 初始化一级管理员、其他一级/二级管理员和普通用户均占用一个名额；
+  - 禁用账号不静默释放名额；
+  - 不提供环境变量或管理 API 绕过开关；
+  - 第 31 个账号必须等待长期高可用核心架构完成并验收。
+- 数据库门禁：
+  - 新增 `004_public_mvp_capacity` 迁移；
+  - 升级已有数据库时按全部已有账号初始化已准入计数；
+  - 新数据库的 bootstrap 管理员原子预留第一个名额；
+  - 注册使用条件 `UPDATE` 原子预留名额，PostgreSQL/SQLite 均使用同一仓储语义；
+  - 容量预留、邀请码消费、账号/凭据/授权码创建位于同一事务；
+  - 并发争抢最后一个名额时只有一个请求成功，失败请求不消耗邀请码或容量。
+- 产品行为：
+  - 第 31 个账号返回 HTTP `409`、
+    `public_mvp_capacity_reached`、`retryable=false`；
+  - 达到容量后，服务器停止生成新邀请码；
+  - 一级管理员可通过 `GET /api/v1/admin/capacity` 和内置管理页查看
+    “已准入 / 30 / 剩余名额”；
+  - 二级管理员不能读取部署容量；
+  - 管理页容量请求失败时不会再次拖垮整个管理会话。
+- release gate 额外发现并修复了 Windows 官方 ChatGPT 登录临时目录竞态：
+  - 错误、取消和超时路径现在先等待自有 Codex app-server 子进程退出，再清理隔离
+    `CODEX_HOME`；
+  - Windows 进程树强制结束仍为有界兜底；
+  - 清理失败不再静默吞掉，而是返回安全错误；
+  - 定向生命周期测试连续 `5/5` 通过。
+- 自动验证：
+  - Proxy/Edge/Worker 根测试 `166/166`；
+  - Gateway `136/136`；
+  - Admin Web `31/31`；
+  - `npm run release:check` 通过；
+  - Gateway 和 Admin 生产构建通过；
+  - Provider Worker `29` 文件制品边界通过。
+- 部署：
+  - 本地自动验证完成；
+  - VMware SSH 尚未授权 Windows 开发密钥，人工离线期间没有降低 SSH 安全或把密码
+    写入脚本，因此 VMware 仍运行上一版；
+  - Quick Tunnel 继续仅作预览，不能视为生产 T137；
+  - 隔离 Edge 为 release gate 使用项目脚本停止；共享 `47892` 始终保持 PID
+    `32260`、`/live=ok`，未停止或重启。
+- 详细 Proxy 交接：
+  `docs/AI_EDITOR_PUBLIC_MVP_CAPACITY_T139_HANDOFF.md`。

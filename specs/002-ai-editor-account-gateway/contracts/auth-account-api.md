@@ -125,6 +125,13 @@ errors:
 - `invitation_exhausted`
 - `email_already_registered`
 - `password_policy_failed`
+- `public_mvp_capacity_reached` (`409`, non-retryable)
+
+The public MVP admits at most 30 product accounts in total. Level 1, Level 2, ordinary users and the
+bootstrap Level-1 administrator all consume one slot; disabling an admitted account does not
+silently create a new slot. Capacity reservation, invitation consumption and account creation share
+one database transaction. A rejected 31st registration therefore consumes neither an invitation use
+nor a capacity slot.
 
 ## 3. Current Account and Status
 
