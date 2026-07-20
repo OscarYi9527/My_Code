@@ -3138,3 +3138,34 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `verify-ai-editor-preproduction-closure.ps1` 现已把 PA 定向测试、开发版 PA UI 和
   Windows 成品 PA UI 纳入强制门禁。最终 PR 只允许在报告 `FAIL=0` 后创建。
 - 分支审计和以后固定合并流程记录于 `AI_EDITOR_MVP_BRANCH_INTEGRATION.md`。
+
+## 100. 2026-07-21 PA Creator MVP 合并与双层闭环完成
+
+- 集成 PR：
+  [My_Code #5](https://github.com/OscarYi9527/My_Code/pull/5)。
+- MVP 合并提交：
+  `52c772966c35b51e4b80497455592a2b44dbba3e`，
+  目标分支 `codex/account-gateway-mvp`。
+- 本地完整闭环报告：
+  `.build\ai-editor-preproduction-closure\20260720T214621Z\closure-report.md`：
+  - `24 PASS`；
+  - `3 BLOCKED`；
+  - `0 FAIL`。
+- GitHub PR 五项检查全部通过：
+  - 工程系统权限门禁；
+  - PR 元数据；
+  - Windows、macOS、Linux 三平台 chat-lib。
+- 修复了 fork 仓库的 CI 误判：工程系统工作流原先固定查询
+  `microsoft/vscode` 权限，现改为查询 `${{ github.repository }}`；当前仓库所有者
+  的 `admin` 权限已由 API 验证，门禁随后成功。
+- 三个 `BLOCKED` 均为外部条件：
+  - 预览账号仍是 `password_change_required`，因此未发送真实 SSE Turn；
+  - 缺少真实 macOS 运行机；
+  - 生产采购、备案、KMS/PostgreSQL/备份监控和审批仍有 19 项未完成。
+- 最终包含关系已验证：
+  - `origin/main` 已进入 MVP；
+  - `origin/feature/pa-creator-p1` 已进入 MVP；
+  - `origin/codex/mvp-pa-creator-integration` 已进入 MVP；
+  - 仅四个 Dependabot 工作流依赖分支保持独立，禁止批量混入产品功能。
+- 共享 Proxy 全程保持 PID `32260`、`/live=ok` 且选定程序/数据哈希不变；
+  隔离预发布 Edge 已由仓库生命周期脚本恢复。
