@@ -419,10 +419,20 @@ function Get-GitValue([string]$Repository, [string[]]$Arguments) {
 function Test-RepositoryState([string]$Id, [string]$Repository) {
 	$fetchPassed = $true
 	if (-not $NoFetch) {
-		$fetch = Invoke-LoggedCommand "$Id-fetch" 'git' @('-C', $Repository, 'fetch', '--quiet', 'origin') $repositoryRoot
-		$fetchPassed = $fetch.exitCode -eq 0
+		$fetchPassed = $false
+		$fetch = $null
+		for ($attempt = 1; $attempt -le 3; $attempt++) {
+			$fetch = Invoke-LoggedCommand "$Id-fetch" 'git' @('-C', $Repository, 'fetch', '--quiet', 'origin') $repositoryRoot
+			if ($fetch.exitCode -eq 0) {
+				$fetchPassed = $true
+				break
+			}
+			if ($attempt -lt 3) {
+				Start-Sleep -Seconds ([Math]::Pow(2, $attempt - 1))
+			}
+		}
 		if (-not $fetchPassed) {
-			Add-Check "$Id-fetch" 'source' 'FAIL' "Unable to fetch origin (exit $($fetch.exitCode))." $fetch.log
+			Add-Check "$Id-fetch" 'source' 'FAIL' "Unable to fetch origin after three attempts (last exit $($fetch.exitCode))." $fetch.log
 		}
 	}
 	$branch = Get-GitValue $Repository @('rev-parse', '--abbrev-ref', 'HEAD')
@@ -739,10 +749,20 @@ try {
 		$edgeRestored = $edgeBefore.running
 	}
 
+	$paCreatorSource = Join-Path $repositoryRoot 'src\vs\workbench\contrib\paCreator\browser\paCreator.contribution.ts'
+	$paFeaturePresent = Test-Path -LiteralPath $paCreatorSource -PathType Leaf
+	if ($paFeaturePresent) {
+		Add-Check 'pa-creator-source' 'pa-creator' 'PASS' 'PA Creator and its local registry are present in the MVP source tree.'
+	} else {
+		Add-Check 'pa-creator-source' 'pa-creator' 'FAIL' 'PA Creator is missing from the MVP source tree.'
+	}
+
 	if ($SkipBuild) {
 		Add-Check 'code-development-build' 'code' 'BLOCKED' 'Development compile was explicitly skipped.'
 		Add-Check 'code-core-build' 'code' 'BLOCKED' 'Product core build was explicitly skipped.'
 		Add-Check 'windows-product-package' 'product' 'BLOCKED' 'Windows product packaging was explicitly skipped.'
+		Add-Check 'pa-creator-focused-tests' 'pa-creator' 'BLOCKED' 'PA Creator focused tests require the synchronized development build.'
+		Add-Check 'pa-creator-development-ui' 'pa-creator' 'BLOCKED' 'PA Creator development UI verification was explicitly skipped with the build.'
 	} else {
 		$compileResult = Invoke-Step 'code-development-build' 'code' 'npm.cmd' @('run', 'compile') $repositoryRoot
 		if ($compileResult.exitCode -eq 0) {
@@ -753,8 +773,25 @@ try {
 				'--runGlob', '**/aiEditorProxy/test/electron-main/**/*.test.js'
 			) $repositoryRoot | Out-Null
 			Invoke-Step 'code-contract-tests' 'code' 'npm.cmd' @('run', 'test-ai-editor-account-contracts') $repositoryRoot | Out-Null
+			if ($paFeaturePresent) {
+				Invoke-Step 'pa-creator-focused-tests' 'pa-creator' (Join-Path $repositoryRoot 'scripts\test.bat') @(
+					'--grep',
+					'PA Creator bootstrap acceptance|PA Creator workflow|PA package publisher|PaRegistryService|PA Plaza editor input|PA runtime|PA registry database|PA manifest contracts|AI Editor management input'
+				) $repositoryRoot | Out-Null
+				Invoke-Step 'pa-creator-development-ui' 'pa-creator' 'node.exe' @(
+					'--experimental-strip-types',
+					(Join-Path $repositoryRoot 'scripts\verify-ai-editor-pa-creator-ui.ts'),
+					'--surface', 'development',
+					'--remote-debugging-port', '49234'
+				) $repositoryRoot | Out-Null
+				Copy-IfPresent (Join-Path $repositoryRoot '.build\ai-editor-pa-creator\pa-creator-development-ui.json') 'pa-creator-development-ui.json' | Out-Null
+				Copy-IfPresent (Join-Path $repositoryRoot '.build\ai-editor-pa-creator\pa-creator-development-ui.md') 'pa-creator-development-ui.md' | Out-Null
+				Copy-IfPresent (Join-Path $repositoryRoot '.build\ai-editor-pa-creator\pa-creator-development-ui.png') 'pa-creator-development-ui.png' | Out-Null
+			}
 		} else {
 			Add-Check 'code-focused-tests' 'code' 'FAIL' 'Focused tests were not run because the development compile failed.'
+			Add-Check 'pa-creator-focused-tests' 'pa-creator' 'FAIL' 'PA Creator focused tests were not run because the development compile failed.'
+			Add-Check 'pa-creator-development-ui' 'pa-creator' 'FAIL' 'PA Creator development UI verification was not run because the development compile failed.'
 		}
 		$coreResult = Invoke-Step 'code-core-build' 'code' 'npm.cmd' @('run', 'core-ci') $repositoryRoot
 		if ($coreResult.exitCode -eq 0) {
@@ -792,8 +829,25 @@ try {
 		}
 		$windowsResult = Invoke-Step 'windows-release-verification' 'product' 'powershell.exe' $windowsArguments $repositoryRoot
 		$windowsReleasePassed = $windowsResult.exitCode -eq 0
+		if ($windowsReleasePassed -and $paFeaturePresent) {
+			Invoke-Step 'pa-creator-product-ui' 'pa-creator' 'node.exe' @(
+				'--experimental-strip-types',
+				(Join-Path $repositoryRoot 'scripts\verify-ai-editor-pa-creator-ui.ts'),
+				'--surface', 'product',
+				'--product-root', $ProductRoot,
+				'--remote-debugging-port', '49235'
+			) $repositoryRoot | Out-Null
+			Copy-IfPresent (Join-Path $repositoryRoot '.build\ai-editor-pa-creator\pa-creator-product-ui.json') 'pa-creator-product-ui.json' | Out-Null
+			Copy-IfPresent (Join-Path $repositoryRoot '.build\ai-editor-pa-creator\pa-creator-product-ui.md') 'pa-creator-product-ui.md' | Out-Null
+			Copy-IfPresent (Join-Path $repositoryRoot '.build\ai-editor-pa-creator\pa-creator-product-ui.png') 'pa-creator-product-ui.png' | Out-Null
+		} elseif ($paFeaturePresent) {
+			Add-Check 'pa-creator-product-ui' 'pa-creator' 'BLOCKED' 'PA Creator product UI verification requires a passing Windows release.'
+		}
 	} else {
 		Add-Check 'windows-release-verification' 'product' 'BLOCKED' 'Windows release verification requires a successful synchronized product package.'
+		if ($paFeaturePresent) {
+			Add-Check 'pa-creator-product-ui' 'pa-creator' 'BLOCKED' 'PA Creator product UI verification requires a synchronized Windows package.'
+		}
 	}
 
 	$edgeReadyForUi = $false

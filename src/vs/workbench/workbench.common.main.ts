@@ -84,6 +84,8 @@ import './services/aiSettingsSearch/common/aiSettingsSearchService.js';
 import './services/history/browser/historyService.js';
 import './services/activity/browser/activityService.js';
 import './services/aiEditorMode/browser/aiEditorModeService.js';
+import './services/paRegistry/browser/paRegistryService.js';
+import './services/paCreator/browser/paCreatorService.js';
 import './services/keybinding/browser/keybindingService.js';
 import './services/untitled/common/untitledTextEditorService.js';
 import './services/textresourceProperties/common/textResourcePropertiesService.js';
@@ -230,6 +232,8 @@ import './contrib/inlineChat/browser/inlineChat.contribution.js';
 
 // AI Editor Mode
 import './contrib/aiEditorMode/browser/aiEditorMode.contribution.js';
+import './contrib/paPlaza/browser/paPlaza.contribution.js';
+import './contrib/paCreator/browser/paCreator.contribution.js';
 
 // Copilot Voice
 import './contrib/agentsVoice/browser/agentsVoice.contribution.js';

@@ -708,3 +708,24 @@ runner, and T138 three-network acceptance remain truthful `BLOCKED` gates.
 See `AI_EDITOR_AUTOMATED_VALIDATION_CLOSURE.md`. The runner never restarts the
 shared `47892` Proxy and manages only the isolated preview Edge through the
 Proxy repository lifecycle scripts.
+
+## 2026-07-21 PA Creator MVP integration checkpoint
+
+PA Creator source `origin/feature/pa-creator-p1@465d95c44` is intentionally
+merged on top of the newer account/Gateway MVP instead of replacing it:
+
+```text
+base:        origin/codex/account-gateway-mvp
+integration: codex/mvp-pa-creator-integration
+```
+
+The PA branch was 28 commits behind the MVP and had one unique product commit.
+`origin/main` is already contained by the MVP. Dependabot branches are
+workflow-only updates and `refs/agents/...` are Codex session checkpoints, so
+neither class is bulk-merged into the product.
+
+The automated closure now requires PA source, focused Registry/Runtime/
+Publication tests, a development PA Plaza/Creator CDP smoke and a packaged
+Windows PA Plaza/Creator CDP smoke. See
+`AI_EDITOR_MVP_BRANCH_INTEGRATION.md`. A branch is eligible for the MVP PR only
+when the closure report has `FAIL=0`.

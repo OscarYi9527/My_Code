@@ -1,0 +1,181 @@
+.pa-plaza-editor {
+	height: 100%;
+	overflow: auto;
+	color: var(--vscode-foreground);
+	background: var(--vscode-editor-background);
+}
+
+.pa-plaza-shell {
+	box-sizing: border-box;
+	max-width: 1120px;
+	min-height: 100%;
+	margin: 0 auto;
+	padding: 36px 40px 48px;
+}
+
+.pa-plaza-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 24px;
+	margin-bottom: 28px;
+}
+
+.pa-plaza-title {
+	margin: 0 0 8px;
+	font-size: 28px;
+	font-weight: 600;
+}
+
+.pa-plaza-subtitle {
+	margin: 0;
+	max-width: 720px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.5;
+}
+
+.pa-plaza-tabs,
+.pa-plaza-toolbar,
+.pa-card-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.pa-plaza-tabs {
+	margin-bottom: 20px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.pa-plaza-tab {
+	padding: 9px 2px;
+	margin-right: 18px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	cursor: pointer;
+}
+
+.pa-plaza-tab.active {
+	border-bottom-color: var(--vscode-focusBorder);
+	color: var(--vscode-foreground);
+}
+
+.pa-plaza-toolbar {
+	flex-wrap: wrap;
+	margin-bottom: 20px;
+}
+
+.pa-plaza-toolbar input,
+.pa-plaza-toolbar select {
+	box-sizing: border-box;
+	height: 30px;
+	padding: 4px 8px;
+	border: 1px solid var(--vscode-input-border, transparent);
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+}
+
+.pa-plaza-toolbar input {
+	min-width: 260px;
+}
+
+.pa-plaza-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+	gap: 16px;
+}
+
+.pa-card {
+	display: flex;
+	flex-direction: column;
+	min-height: 220px;
+	padding: 18px;
+	border: 1px solid var(--vscode-widget-border);
+	border-radius: 8px;
+	background: var(--vscode-sideBar-background);
+}
+
+.pa-card.featured {
+	border-color: var(--vscode-focusBorder);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 35%, transparent);
+}
+
+.pa-card-heading {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.pa-card-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	font-size: 20px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+}
+
+.pa-card-name {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.pa-card-description {
+	flex: 1;
+	margin: 16px 0;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.5;
+}
+
+.pa-card-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	margin-bottom: 16px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.pa-card-actions {
+	flex-wrap: wrap;
+}
+
+.pa-card-actions button,
+.pa-plaza-header button {
+	min-height: 28px;
+	padding: 4px 10px;
+	border: 1px solid var(--vscode-button-border, transparent);
+	color: var(--vscode-button-secondaryForeground);
+	background: var(--vscode-button-secondaryBackground);
+	cursor: pointer;
+}
+
+.pa-card-actions button.primary,
+.pa-plaza-header button.primary {
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
+}
+
+.pa-empty {
+	padding: 56px 24px;
+	border: 1px dashed var(--vscode-widget-border);
+	border-radius: 8px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+@media (max-width: 700px) {
+	.pa-plaza-shell {
+		padding: 24px 18px 36px;
+	}
+
+	.pa-plaza-header {
+		flex-direction: column;
+	}
+}
