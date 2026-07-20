@@ -2666,3 +2666,59 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - 最迟完成时间：真实 ChatGPT 联合验收前。
 - 未完成时被阻断的任务：真实上游回应验收；不阻断 T135 自动化开发。
 - 当前是否需要付款：否。
+
+## 90. 2026-07-20 ChatGPT 订阅账号熔断恢复 P0 修复
+
+- 用户实际遇到：
+
+  ```text
+  unexpected status 502 Bad Gateway:
+  Upstream circuit "chatgpt-sub:account:acct_mrrx0g4li6ye6afs" is probing recovery
+  ```
+
+- 本次按重复故障重建证据后确认：
+  - 原始故障是 `getaddrinfo ENOTFOUND chatgpt.com`，连续三次 DNS 失败后触发账号级熔断；
+  - 随后半开恢复探测未及时回报结果，旧运行版会持续拒绝其他请求并显示
+    `is probing recovery`；
+  - 旧运行版把 `CIRCUIT_OPEN` 统一包装成 HTTP `502`，客户端无法获得正确恢复时间；
+  - 其他订阅账号当时部分禁用、部分达到安全余量线，账号池无法切换备用账号。
+- “以前修过但再次出现”的原因已确认：
+  - 旧修复提交 `3a1cd54` 确实实现了过期半开探测接管；
+  - 该提交只存在于 `feature/ai-editor-account-gateway` 和
+    `feature/custom-api-urls` 等分支；
+  - 当前共享 Proxy 实际运行
+    `C:\Users\Oscar\.claude\proxy` 的
+    `codex/fix-cross-provider-tool-ids@f56093a`，没有包含该修复；
+  - 因此属于修复漏发到当前共享运行分支/制品，不是旧算法再次失效。
+- 共享 standalone 修复分支已创建并推送：
+  - 分支：`codex/fix-chatgpt-circuit-recovery`；
+  - `1bdccb0`：迁移过期半开探测接管，同时保留账号级熔断隔离；
+  - `b4928eb`：增加恢复探测独立超时、标准恢复错误和 HTTP 映射。
+- 新行为：
+  - 半开探测锁超过 60 秒后允许新请求接管，不再永久卡死；
+  - 半开恢复探测最长 30 秒，超时后重新打开熔断并释放探测锁；
+  - 普通长请求继续使用调用方原超时，不受 30 秒探测上限影响；
+  - 熔断打开或正在恢复时返回 HTTP `503`、`Retry-After`、
+    `error.type=upstream_recovering` 和 `retryable=true`，不再伪装成 `502`。
+- 同等修复已同步并推送到公网长期架构分支：
+  - `codex/provider-worker-mvp@a43887f`；
+  - standalone、Provider Worker 和中央 Gateway 均保留 `503`、`Retry-After`
+    与安全可重试状态；
+  - Worker 内部错误正文继续隐藏，不向 Gateway 或普通客户端泄露上游敏感信息。
+- 自动化验证：
+  - 共享修复分支：根测试 `74/74`，语法检查通过；
+  - Provider Worker 分支：根测试 `153/153`；
+  - Gateway：`114/114`；
+  - Admin Web：`28/28`；
+  - `npm run release:check`：通过；
+  - `npm audit --audit-level=high`：`0 vulnerabilities`；
+  - 新增回归覆盖半开锁过期接管、短探测超时、普通长请求、standalone HTTP
+    映射、Worker 安全错误和 Worker → Gateway 恢复时间传播。
+- 当前共享 Proxy 尚未部署新修复：
+  - PID `26404`；
+  - `/live=ok`、`/ready=ok`；
+  - 仍运行 `codex/fix-cross-provider-tool-ids@f56093a`；
+  - 本轮只读检查，没有停止、重启、迁移或修改共享 `47892`。
+- 部署门禁：再次获得用户明确授权后，只能通过
+  `D:\AI_prejoct\My_code\scripts\restart-ai-proxy.ps1` 安全切换和重启，
+  随后验证 `/live`、`/ready`、运行提交及真实 ChatGPT 订阅请求。

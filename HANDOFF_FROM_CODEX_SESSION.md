@@ -174,3 +174,79 @@ Current sources of truth:
 ```text
 Please read D:\AI_prejoct\My_code\HANDOFF_FROM_CODEX_SESSION.md and continue the AI Editor layout task. First inspect git status, git diff, and the target file. Do not dump full build logs; only show concise summaries or the last 80 lines of logs.
 ```
+
+## 2026-07-20 current P0 circuit-recovery checkpoint
+
+The layout prompt above is historical. The latest active P0 is a repeated ChatGPT
+subscription circuit-recovery failure:
+
+```text
+unexpected status 502 Bad Gateway:
+Upstream circuit "chatgpt-sub:account:acct_mrrx0g4li6ye6afs" is probing recovery
+```
+
+Confirmed root cause and release gap:
+
+- The original upstream failures were `getaddrinfo ENOTFOUND chatgpt.com`.
+- Three DNS failures opened the account circuit.
+- The old runtime could leave a half-open probe occupied and returned every
+  `CIRCUIT_OPEN` as HTTP `502`.
+- The earlier fix `3a1cd54` existed on other branches but was absent from the
+  actual shared runtime branch `codex/fix-cross-provider-tool-ids@f56093a`.
+- This was a missed release/cherry-pick, not evidence that the old fix itself
+  stopped working.
+
+Completed and pushed fixes:
+
+- Shared standalone branch:
+  `codex/fix-chatgpt-circuit-recovery`
+  - `1bdccb0 fix: recover abandoned half-open probes`
+  - `b4928eb fix(proxy): bound ChatGPT circuit recovery probes`
+- Provider Worker/Gateway branch:
+  `codex/provider-worker-mvp@a43887f`
+
+New behavior:
+
+- stale half-open probes can be replaced after 60 seconds;
+- recovery probes have an independent 30-second timeout;
+- ordinary requests retain their configured longer timeout;
+- recovery rejection is HTTP `503` with `Retry-After`,
+  `upstream_recovering`, and `retryable=true`;
+- the same semantics propagate safely through Provider Worker and Gateway.
+
+Validation:
+
+- shared branch root tests: `74/74`;
+- Provider Worker branch root tests: `153/153`;
+- Gateway: `114/114`;
+- Admin Web: `28/28`;
+- `npm run release:check`: passed;
+- `npm audit --audit-level=high`: `0 vulnerabilities`.
+
+Deployment state:
+
+- Shared Proxy is still PID `26404`, `/live=ok`, `/ready=ok`.
+- It still runs
+  `C:\Users\Oscar\.claude\proxy`,
+  branch `codex/fix-cross-provider-tool-ids`,
+  SHA `f56093a756160a288a7a4b7a66cfd3d6bd71764c`.
+- The fixed code has not yet been installed or restarted.
+- A new explicit user approval is required before restarting shared `47892`.
+- After approval, use only:
+
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File `
+    D:\AI_prejoct\My_code\scripts\restart-ai-proxy.ps1
+  ```
+
+- Never use `Stop-Process`, `taskkill`, the stop script alone, or
+  `/admin/api/proxy/restart`.
+
+Current continuation prompt:
+
+```text
+Read D:\AI_prejoct\My_code\HANDOFF_FROM_CODEX_SESSION.md. Continue from the
+2026-07-20 P0 circuit-recovery checkpoint. Inspect both Proxy branches and the
+shared runtime before acting. Do not restart shared 47892 without a new explicit
+approval, and then use only scripts\restart-ai-proxy.ps1.
+```
