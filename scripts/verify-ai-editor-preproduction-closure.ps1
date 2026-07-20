@@ -285,6 +285,64 @@ function Invoke-Step(
 	return $result
 }
 
+function Invoke-DetachedLifecycleCommand(
+	[string]$Name,
+	[string]$ScriptPath,
+	[string[]]$Arguments
+) {
+	$started = Get-Date
+	$logPath = Join-Path $logsDirectory "$Name.log"
+	$processArguments = @(
+		'-NoProfile',
+		'-ExecutionPolicy', 'Bypass',
+		'-File', "`"$ScriptPath`""
+	)
+	foreach ($argument in $Arguments) {
+		$processArguments += if ($argument -match '[\s"]') {
+			"`"$($argument.Replace('"', '\"'))`""
+		} else {
+			$argument
+		}
+	}
+	$exitCode = 1
+	$invokeError = $null
+	try {
+		# Start-Process deliberately avoids PowerShell's native stdout pipeline.
+		# A detached Edge inherits that pipeline handle even when its own stdout
+		# is redirected, which otherwise prevents the parent invocation from
+		# observing EOF and completing.
+		$process = Start-Process -FilePath 'powershell.exe' `
+			-ArgumentList $processArguments `
+			-WorkingDirectory $ProxyRepository `
+			-WindowStyle Hidden `
+			-Wait `
+			-PassThru
+		$exitCode = [int]$process.ExitCode
+	} catch {
+		$invokeError = Protect-Text $_.Exception.Message $script:knownSecrets.ToArray()
+	}
+	$duration = [Math]::Round(((Get-Date) - $started).TotalSeconds, 2)
+	$lines = @(
+		"Lifecycle command: $Name",
+		"Exit code: $exitCode",
+		"Duration seconds: $duration"
+	)
+	if ($invokeError) {
+		$lines += "Error: $invokeError"
+	}
+	[IO.File]::WriteAllText(
+		$logPath,
+		(($lines -join "`n") + "`n"),
+		(New-Object Text.UTF8Encoding($false))
+	)
+	return [ordered]@{
+		exitCode = $exitCode
+		durationSeconds = $duration
+		log = $logPath
+		error = $invokeError
+	}
+}
+
 function Get-GitValue([string]$Repository, [string[]]$Arguments) {
 	$output = (& git -C $Repository @Arguments 2>&1 | Out-String).Trim()
 	if ($LASTEXITCODE -ne 0) {
@@ -397,25 +455,25 @@ function Invoke-HighConfidenceSecretScan([string]$Id, [string]$Repository, [stri
 }
 
 function Stop-PreviewEdge {
-	return Invoke-LoggedCommand 'preview-edge-stop' 'powershell.exe' @(
-		'-NoProfile',
-		'-ExecutionPolicy', 'Bypass',
-		'-File', (Join-Path $ProxyRepository 'tools\stop-ai-editor-dev.ps1'),
+	return Invoke-DetachedLifecycleCommand `
+		'preview-edge-stop' `
+		(Join-Path $ProxyRepository 'tools\stop-ai-editor-dev.ps1') `
+		@(
 		'-Mode', 'edge',
 		'-DataRoot', $EdgeDataRoot
-	) $ProxyRepository
+	)
 }
 
 function Start-PreviewEdge {
-	return Invoke-LoggedCommand 'preview-edge-start' 'powershell.exe' @(
-		'-NoProfile',
-		'-ExecutionPolicy', 'Bypass',
-		'-File', (Join-Path $ProxyRepository 'tools\start-ai-editor-dev.ps1'),
+	return Invoke-DetachedLifecycleCommand `
+		'preview-edge-start' `
+		(Join-Path $ProxyRepository 'tools\start-ai-editor-dev.ps1') `
+		@(
 		'-Mode', 'edge',
 		'-AuthenticationMode', 'real',
 		'-GatewayOrigin', $GatewayOrigin,
 		'-DataRoot', $EdgeDataRoot
-	) $ProxyRepository
+	)
 }
 
 function Test-GatewayOrigin([string]$Origin) {
