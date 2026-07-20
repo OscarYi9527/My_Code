@@ -2957,7 +2957,8 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - VMware SSH 尚未授权 Windows 开发密钥，人工离线期间没有降低 SSH 安全或把密码
     写入脚本，因此 VMware 仍运行上一版；
   - Quick Tunnel 继续仅作预览，不能视为生产 T137；
-  - 隔离 Edge 为 release gate 使用项目脚本停止；共享 `47892` 始终保持 PID
-    `32260`、`/live=ok`，未停止或重启。
+  - 隔离 Edge 为 release gate 使用项目脚本停止，完成后已恢复为 PID `37496`，
+    `127.0.0.1:47921/live=ok`，仍指向现有 Quick Tunnel；
+  - 共享 `47892` 始终保持 PID `32260`、`/live=ok`，未停止或重启。
 - 详细 Proxy 交接：
   `docs/AI_EDITOR_PUBLIC_MVP_CAPACITY_T139_HANDOFF.md`。

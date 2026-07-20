@@ -513,7 +513,8 @@ Deployment state:
 
 - shared `47892` remains PID `32260`, `/live=ok`; it was not restarted;
 - the isolated Edge on `47921` was stopped with the repository safe script so
-  release script lifecycle tests could own the port;
+  release script lifecycle tests could own the port, then restored as PID
+  `37496` with `/live=ok`;
 - VMware deployment is deferred because the guest does not accept the Windows
   SSH key and no human is available to authorize it;
 - do not weaken SSH or script a plaintext guest password;
