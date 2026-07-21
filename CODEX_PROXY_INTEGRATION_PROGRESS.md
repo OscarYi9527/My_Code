@@ -3235,3 +3235,8 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `password_change_required`; the real model/SSE acceptance correctly remains
   `BLOCKED` until the level-1 account completes the forced password change.
 - Shared Proxy invariants remain unchanged: PID `50904` and `/live=ok`.
+- Regression results after synchronization: Provider Worker root tests `170/170`,
+  Gateway tests `153/153`, and Admin tests `31/31` passed. The aggregate
+  `release:check` was not marked passed only because its isolated lifecycle test
+  intentionally requires port `47921` to be unused while the active preview Edge
+  is running; no product or server test failed.
