@@ -3211,3 +3211,27 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - `launch-ai-editor-preview.ps1` now checks the public Gateway `/live` before reusing or starting Edge, uses the configured loopback Clash proxy for this check, and emits a direct remediation message for expired Quick Tunnels.
 - Edge runtime metadata records the normalized Gateway origin and outbound proxy in the isolated data root. The launcher restarts only the repository-owned Edge when the requested origin/proxy differs, preventing reuse of an Edge bound to an old tunnel.
 - Script syntax and isolated lifecycle tests passed. The shared `47892` process was not modified.
+
+## 104. 2026-07-21 VMware preview network and Quick Tunnel origin recovery
+
+- Root cause evidence for the Linux Mihomo failure was collected without modifying the
+  shared Proxy: VMware NAT traffic exits through the Windows FlClash TUN, while the
+  Linux preview also attempted to open the subscription node through Mihomo. The
+  resulting nested path reached the node TCP port but the TLS/VLESS handshake ended
+  with `EOF` on all tested nodes.
+- The preview was switched to the safe current-machine fallback (`--executor
+  chatgpt-sub` without `--with-clash`): Gateway and Worker use the VM's normal HTTPS
+  egress, which is transparently routed by the already-running Windows FlClash.
+  `verify-preview.sh` returned `PASS`; this is a VMware preview workaround, not the
+  final Linux production network design.
+- Fixed `codex_proxy` preview deployment commit `56e9fc2` on
+  `codex/stabilize-request-body-test`, then synchronized it to the Ubuntu
+  `codex/provider-worker-mvp` branch as `61cf64c`. The fix keeps Mihomo's hardened
+  container path/UID settings and prevents `api.trycloudflare.com` (the Quick Tunnel
+  API host) from being mistaken for the public Gateway origin when the API request
+  transiently fails.
+- Current public preview passed Gateway/Worker liveness with a newly generated
+  Quick Tunnel. Isolated Edge was rebound to that origin and reports the safe state
+  `password_change_required`; the real model/SSE acceptance correctly remains
+  `BLOCKED` until the level-1 account completes the forced password change.
+- Shared Proxy invariants remain unchanged: PID `50904` and `/live=ok`.
