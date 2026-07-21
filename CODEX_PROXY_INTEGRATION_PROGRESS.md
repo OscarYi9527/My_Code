@@ -3289,6 +3289,11 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   Gateway shortcut API and the management UI. Level-1 administrators retain the
   explicit opt-out switch, account cooling, quota protection and experimental
   channel labeling.
+- Delivery commits:
+  - Code: `1263be3c0` on `codex/fix-codex-model-picker`;
+  - Proxy/Gateway: `4de7949` on `codex/fix-provider-model-catalog`;
+  - Ubuntu preview cherry-pick: `1f7301c` on the local
+    `codex/provider-worker-mvp` deployment branch.
 - Automated validation:
   - Code client typecheck and development compile: PASS;
   - model-picker focused tests: `78/78`;
