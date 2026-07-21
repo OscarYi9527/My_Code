@@ -243,6 +243,7 @@ suite('AI Editor Account main service', () => {
 		assert.ok(!currentUrl.includes('one-time-secret'));
 		assert.ok(injectedCode.includes('one-time-secret'));
 		assert.ok(injectedCode.includes('ai-editor-management-bootstrap'));
+		assert.ok(injectedCode.includes('"surface":"embedded"'));
 
 		await prepareAiEditorManagementView({
 			viewId: AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
@@ -363,6 +364,8 @@ suite('AI Editor Account main service', () => {
 		let navigate: ((event: { preventDefault(): void }, url: string) => void) | undefined;
 		const injectedCode: string[] = [];
 		let importCalls = 0;
+		let ticketCalls = 0;
+		const externalUrls: string[] = [];
 		const webContents = {
 			isDestroyed: () => false,
 			getURL: () => currentUrl,
@@ -393,14 +396,14 @@ suite('AI Editor Account main service', () => {
 			gatewayOrigin: 'http://127.0.0.1:47920',
 			client: {
 				requestWebviewTicket: async () => ({
-					ticket: 'one-time-management-ticket',
+					ticket: `one-time-management-ticket-${++ticketCalls}`,
 					expiresIn: 60
 				})
 			},
 			browserViewMainService: {
 				tryGetBrowserView: () => view
 			},
-			openExternal: async () => undefined,
+			openExternal: async url => { externalUrls.push(url); },
 			importCurrentCodexAccount: async () => {
 				importCalls++;
 				return {
@@ -424,10 +427,26 @@ suite('AI Editor Account main service', () => {
 		assert.ok(injectedCode.at(-1)?.includes('native-access-secret'));
 		assert.ok(!currentUrl.includes('native-access-secret'));
 
+		navigate?.(
+			{ preventDefault: () => { prevented = true; } },
+			'ai-editor-code://open-full-management?route=providers'
+		);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		assert.strictEqual(ticketCalls, 2);
+		assert.strictEqual(externalUrls.length, 1);
+		const external = new URL(externalUrls[0]);
+		assert.strictEqual(external.origin, 'http://127.0.0.1:47920');
+		assert.strictEqual(external.pathname, '/admin');
+		assert.strictEqual(external.search, '');
+		assert.ok(external.hash.includes('one-time-management-ticket-2'));
+		assert.ok(external.hash.includes('route=providers'));
+
 		currentUrl = 'about:blank';
 		navigate?.({ preventDefault: () => undefined }, AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL);
+		navigate?.({ preventDefault: () => undefined }, 'ai-editor-code://open-full-management?route=providers');
 		await new Promise(resolve => setTimeout(resolve, 0));
 		assert.strictEqual(importCalls, 1);
+		assert.strictEqual(ticketCalls, 2);
 
 		await disposeAiEditorManagementView(
 			AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,

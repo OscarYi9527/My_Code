@@ -8,11 +8,13 @@ import { Disposable } from '../../../base/common/lifecycle.js';
 export const enum AiEditorGatewayNavigationDecision {
 	AllowInView = 'allowInView',
 	OpenExternal = 'openExternal',
+	OpenFullManagement = 'openFullManagement',
 	ImportCurrentCodexAccount = 'importCurrentCodexAccount',
 	Block = 'block'
 }
 
 export const AI_EDITOR_IMPORT_CURRENT_CODEX_ACCOUNT_URL = 'ai-editor-code://import-current-codex-account';
+export const AI_EDITOR_OPEN_FULL_MANAGEMENT_URL = 'ai-editor-code://open-full-management';
 
 export function decideAiEditorGatewayNavigation(
 	rawUrl: string,
@@ -41,6 +43,10 @@ export function decideAiEditorGatewayNavigation(
 		return AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount;
 	}
 
+	if (isOpenFullManagementUrl(url)) {
+		return AiEditorGatewayNavigationDecision.OpenFullManagement;
+	}
+
 	if (url.origin === origin.origin) {
 		if (options.isNewWindow) {
 			return AiEditorGatewayNavigationDecision.Block;
@@ -60,6 +66,32 @@ export function createAiEditorManagementUrl(gatewayOrigin: string, route: string
 	const url = new URL('/admin', gatewayOrigin);
 	url.hash = route;
 	return url.toString();
+}
+
+export function createAiEditorBrowserManagementUrl(gatewayOrigin: string, route: string, ticket: string): string {
+	const url = new URL('/admin', gatewayOrigin);
+	url.hash = `browser?ticket=${encodeURIComponent(ticket)}&route=${encodeURIComponent(route)}`;
+	return url.toString();
+}
+
+function isOpenFullManagementUrl(url: URL): boolean {
+	if (
+		url.protocol !== 'ai-editor-code:' ||
+		url.hostname !== 'open-full-management' ||
+		(url.pathname !== '' && url.pathname !== '/') ||
+		url.username ||
+		url.password ||
+		url.port ||
+		url.hash
+	) {
+		return false;
+	}
+	const keys = [...url.searchParams.keys()];
+	const route = url.searchParams.get('route');
+	return keys.length === 1 &&
+		keys[0] === 'route' &&
+		typeof route === 'string' &&
+		/^(?:account|security|organization|invitations|credits|usage|audit|providers|diagnostics)$/.test(route);
 }
 
 function isManagementPath(pathname: string): boolean {
@@ -90,7 +122,8 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 		webContents: IAiEditorGatewayWebContents,
 		gatewayOrigin: string,
 		openExternal: (url: string) => Promise<void>,
-		importCurrentCodexAccount?: () => Promise<void>
+		importCurrentCodexAccount?: () => Promise<void>,
+		openFullManagement?: (route: string) => Promise<void>
 	) {
 		super();
 
@@ -107,6 +140,11 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 			event.preventDefault();
 			if (decision === AiEditorGatewayNavigationDecision.OpenExternal) {
 				void openExternal(url);
+			} else if (
+				decision === AiEditorGatewayNavigationDecision.OpenFullManagement &&
+				isTrustedManagementDocument(webContents.getURL(), gatewayOrigin)
+			) {
+				void openFullManagement?.(new URL(url).searchParams.get('route')!);
 			} else if (
 				decision === AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount &&
 				isTrustedManagementDocument(webContents.getURL(), gatewayOrigin)
@@ -127,6 +165,11 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 			const decision = decideAiEditorGatewayNavigation(details.url, gatewayOrigin, { isNewWindow: true });
 			if (decision === AiEditorGatewayNavigationDecision.OpenExternal) {
 				void openExternal(details.url);
+			} else if (
+				decision === AiEditorGatewayNavigationDecision.OpenFullManagement &&
+				isTrustedManagementDocument(webContents.getURL(), gatewayOrigin)
+			) {
+				void openFullManagement?.(new URL(details.url).searchParams.get('route')!);
 			} else if (
 				decision === AiEditorGatewayNavigationDecision.ImportCurrentCodexAccount &&
 				isTrustedManagementDocument(webContents.getURL(), gatewayOrigin)

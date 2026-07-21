@@ -156,17 +156,36 @@ Bootstrap:
    {
      "type": "ai-editor-management-bootstrap",
      "version": 1,
+     "surface": "embedded",
      "route": "account",
      "ticket": "one-time-ticket",
      "expiresIn": 60
    }
    ```
 
+   `surface` is `embedded` for the compact in-Code quick-management panel and `browser` for the
+   full management page opened in the system browser. For backward compatibility, a bootstrap
+   message that omits `surface` is interpreted as `browser` by the management page.
    The page MUST accept this message only when `event.source === window`, `event.origin` equals its
    configured Gateway origin, `type` and `version` match, and the route is in the fixed route enum.
 4. Page POSTs ticket to Gateway and receives HttpOnly Cookie.
 5. Page acknowledges role and initial route; Code never receives page data beyond safe lifecycle
    events.
+
+Embedded management behavior:
+
+- The Code panel is intentionally limited to the signed-in product account summary, available
+  credits, ChatGPT subscription credential routing switches, and quota refresh.
+- Provider secrets, diagnostics, organization administration, invitations, audit records and other
+  full-management operations are not rendered in the embedded surface.
+- The panel provides the exact custom action
+  `ai-editor-code://open-full-management?route=<route>`. Code accepts only this action, with an
+  allow-listed route value, from the configured same-origin management document. Code then requests
+  a fresh one-time browser ticket and opens the full management page in the system browser.
+- The browser URL carries the ticket only in the URL fragment:
+  `/admin#browser?ticket=<ticket>&route=<route>`. The page exchanges the ticket immediately and
+  removes the fragment with `history.replaceState`; the ticket MUST NOT be sent in a query string,
+  request body other than the exchange request, logs, or persistent browser storage.
 
 The management view uses a dedicated ephemeral BrowserView session and is excluded from integrated
 browser discovery, browser tools, extension browser APIs, chat attachments and agent context.

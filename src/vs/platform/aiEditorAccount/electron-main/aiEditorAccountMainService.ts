@@ -48,6 +48,7 @@ import {
 	AiEditorGatewayOriginPolicy,
 	AiEditorGatewayNavigationDecision,
 	decideAiEditorGatewayNavigation,
+	createAiEditorBrowserManagementUrl,
 	createAiEditorManagementUrl
 } from './gatewayOriginPolicy.js';
 
@@ -421,6 +422,18 @@ export async function prepareAiEditorManagementView(options: {
 	}
 
 	if (!managementPolicies.has(view.webContents)) {
+		const openFullManagement = async (route: string) => {
+			let ticket: IAiEditorWebviewTicket | undefined = await options.client.requestWebviewTicket();
+			try {
+				await options.openExternal(createAiEditorBrowserManagementUrl(
+					options.gatewayOrigin!,
+					route,
+					ticket.ticket
+				));
+			} finally {
+				ticket = undefined;
+			}
+		};
 		const importCurrentCodexAccount = async () => {
 			if (!options.importCurrentCodexAccount || managementImportOperations.has(view.webContents)) {
 				return;
@@ -479,7 +492,8 @@ export async function prepareAiEditorManagementView(options: {
 				view.webContents,
 				options.gatewayOrigin,
 				options.openExternal,
-				importCurrentCodexAccount
+				importCurrentCodexAccount,
+				openFullManagement
 			)
 		);
 	}
@@ -504,6 +518,7 @@ export async function prepareAiEditorManagementView(options: {
 		const payload = JSON.stringify({
 			type: 'ai-editor-management-bootstrap',
 			version: 1,
+			surface: 'embedded',
 			route: options.route,
 			ticket: ticket.ticket,
 			expiresIn: ticket.expiresIn
