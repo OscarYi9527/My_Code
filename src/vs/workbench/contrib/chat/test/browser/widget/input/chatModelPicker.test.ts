@@ -11,7 +11,7 @@ import { MarkdownString } from '../../../../../../../base/common/htmlContent.js'
 import { ActionListItemKind, IActionListItem } from '../../../../../../../platform/actionWidget/browser/actionList.js';
 import { IActionWidgetDropdownAction } from '../../../../../../../platform/actionWidget/browser/actionWidgetDropdown.js';
 import { StateType } from '../../../../../../../platform/update/common/update.js';
-import { buildModelPickerItems, getControlModelsForEntitlement, getModelPickerAccessibilityProvider } from '../../../../browser/widget/input/chatModelPicker.js';
+import { buildModelPickerItems, getControlModelsForEntitlement, getModelPickerAccessibilityProvider, shouldRequireCopilotSetupInModelPicker } from '../../../../browser/widget/input/chatModelPicker.js';
 import { filterModelsForSession } from '../../../../browser/widget/input/chatModelSelectionLogic.js';
 import { ChatAgentLocation, ChatModeKind } from '../../../../common/constants.js';
 import { ILanguageModelChatMetadata, ILanguageModelChatMetadataAndIdentifier, ILanguageModelsService, IModelControlEntry, IModelsControlManifest } from '../../../../common/languageModels.js';
@@ -314,6 +314,13 @@ suite('buildModelPickerItems', () => {
 		assert.strictEqual(actions[0].item?.enabled, true);
 		assert.strictEqual(actions.some(a => a.label === 'Auto'), false);
 		assert.strictEqual(actions.some(a => a.item?.id === 'manageModels'), false);
+	});
+
+	test('agent host sessions never fall back to Copilot setup', () => {
+		assert.strictEqual(shouldRequireCopilotSetupInModelPicker(true, true), false);
+		assert.strictEqual(shouldRequireCopilotSetupInModelPicker(true, false), false);
+		assert.strictEqual(shouldRequireCopilotSetupInModelPicker(false, true), true);
+		assert.strictEqual(shouldRequireCopilotSetupInModelPicker(false, false), false);
 	});
 
 	test('setupRequired Sign In action is disabled without a setup callback', () => {

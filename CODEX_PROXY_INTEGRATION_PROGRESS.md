@@ -3269,3 +3269,36 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - Remaining acceptance is one manual account-bound check: save local files,
   select the restart action, then sign in with `admin` and the new password and
   confirm the Edge status returns to `ready`.
+
+## 106. 2026-07-21 Empty model catalog and Copilot fallback diagnosis
+
+- The account login/password flow was healthy (`Edge state=ready`), but the
+  local Edge returned HTTP 200 with an empty `/v1/models` catalog.
+- Gateway evidence separated routing configuration from UI/cache behavior:
+  - one active ChatGPT Provider and one encrypted credential existed;
+  - six model routes were enabled in the Gateway database;
+  - the Provider Worker account pool reported the credential as active but
+    `routingEnabled=false`;
+  - enabling that credential through the authenticated management API changed
+    the Edge catalog from 0 to 6 models without changing credentials or routes.
+- The generic Chat model picker treated the empty Codex Agent Host catalog as a
+  missing Copilot entitlement and displayed `Sign in to use Copilot`. Code now
+  suppresses Copilot setup for all Agent Host sessions; an actually empty
+  external catalog displays the normal no-model state instead.
+- New ChatGPT account imports now participate in routing by default in both the
+  Gateway shortcut API and the management UI. Level-1 administrators retain the
+  explicit opt-out switch, account cooling, quota protection and experimental
+  channel labeling.
+- Automated validation:
+  - Code client typecheck and development compile: PASS;
+  - model-picker focused tests: `78/78`;
+  - `core-ci`: PASS;
+  - Windows x64 package and clean-start release acceptance: PASS;
+  - Windows workbench checksums: `10/10`;
+  - Proxy/Edge/Worker root tests: `186/186`;
+  - Gateway tests: `155/155`;
+  - Admin Web tests: `31/31`.
+- Runtime verification: current preview Edge publishes
+  `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`,
+  `gpt-5.4` and `gpt-5.4-mini`. Shared Proxy `47892` remains PID
+  `50904` with `/live=ok` and was not restarted.

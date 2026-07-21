@@ -27,6 +27,7 @@ import { ActionListItemKind, IActionListItem } from '../../../../../../platform/
 import { IActionWidgetService } from '../../../../../../platform/actionWidget/browser/actionWidget.js';
 import { IActionWidgetDropdownAction } from '../../../../../../platform/actionWidget/browser/actionWidgetDropdown.js';
 import { ICommandService } from '../../../../../../platform/commands/common/commands.js';
+import { IContextKeyService } from '../../../../../../platform/contextkey/common/contextkey.js';
 import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
 import { IProductService } from '../../../../../../platform/product/common/productService.js';
 import { ITelemetryService } from '../../../../../../platform/telemetry/common/telemetry.js';
@@ -38,6 +39,7 @@ import * as semver from '../../../../../../base/common/semver/semver.js';
 import { IModelConfigurationAccess, IModelPickerDelegate } from './modelPickerActionItem.js';
 import { getModelPickerUnavailableReason, ModelPickerUnavailableReason } from './chatModelSelectionLogic.js';
 import { CHAT_SETUP_ACTION_ID } from '../../actions/chatActions.js';
+import { ChatContextKeys } from '../../../common/actions/chatContextKeys.js';
 import { IUriIdentityService } from '../../../../../../platform/uriIdentity/common/uriIdentity.js';
 import { GitHubPaths, IDefaultAccountService } from '../../../../../../platform/defaultAccount/common/defaultAccount.js';
 import { IUpdateService, StateType } from '../../../../../../platform/update/common/update.js';
@@ -70,6 +72,10 @@ function getUpdateHoverContent(updateState: StateType): MarkdownString {
 
 export function getControlModelsForEntitlement(manifest: IModelsControlManifest, entitlement: ChatEntitlement): IStringDictionary<IModelControlEntry> {
 	return isProUser(entitlement) && entitlement !== ChatEntitlement.EDU ? manifest.paid : manifest.free;
+}
+
+export function shouldRequireCopilotSetupInModelPicker(isAgentHostSession: boolean, chatRequiresSetup: boolean): boolean {
+	return !isAgentHostSession && chatRequiresSetup;
 }
 
 /**
@@ -1046,6 +1052,7 @@ export class ModelPickerWidget extends Disposable {
 		@IUpdateService private readonly _updateService: IUpdateService,
 		@IUriIdentityService private readonly _uriIdentityService: IUriIdentityService,
 		@IDefaultAccountService private readonly _defaultAccountService: IDefaultAccountService,
+		@IContextKeyService private readonly _contextKeyService: IContextKeyService,
 		@IWorkspaceTrustManagementService private readonly _workspaceTrustManagementService: IWorkspaceTrustManagementService,
 		@IWorkspaceTrustRequestService private readonly _workspaceTrustRequestService: IWorkspaceTrustRequestService,
 	) {
@@ -1149,7 +1156,7 @@ export class ModelPickerWidget extends Disposable {
 
 	private _requiresSetup(): boolean {
 		const sentiment = this._entitlementService.sentiment;
-		return chatRequiresSetup({
+		const requiresSetup = chatRequiresSetup({
 			completed: !!sentiment.completed,
 			disabled: !!sentiment.disabled,
 			// Don't derive `untrusted` from sentiment (it lags after a Trust grant): trust is handled
@@ -1159,6 +1166,10 @@ export class ModelPickerWidget extends Disposable {
 			anonymous: this._entitlementService.anonymous,
 			hasByokModels: this._entitlementService.hasByokModels,
 		});
+		return shouldRequireCopilotSetupInModelPicker(
+			this._contextKeyService.getContextKeyValue<boolean>(ChatContextKeys.chatIsAgentHostSession.key) === true,
+			requiresSetup
+		);
 	}
 
 	/**
