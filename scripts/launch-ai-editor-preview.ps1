@@ -8,7 +8,8 @@ param(
 	[string]$UserDataDir,
 	[string]$ExtensionsDir,
 	[string]$SharedDataDir,
-	[string]$Workspace
+	[string]$Workspace,
+	[switch]$RestartEdge
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,6 +41,22 @@ foreach ($name in @('ProxyRepository', 'EdgeDataRoot', 'UserDataDir', 'Extension
 if ([string]::IsNullOrWhiteSpace($GatewayOrigin)) {
 	throw 'GatewayOrigin is required. Set AI_EDITOR_VERIFY_GATEWAY_ORIGIN or pass -GatewayOrigin.'
 }
+try {
+	$gatewayUri = [Uri]::new($GatewayOrigin, [UriKind]::Absolute)
+} catch {
+	throw 'GatewayOrigin must be an absolute HTTPS origin.'
+}
+if (
+	$gatewayUri.Scheme -ne 'https' -or
+	[string]::IsNullOrWhiteSpace($gatewayUri.Host) -or
+	-not [string]::IsNullOrEmpty($gatewayUri.UserInfo) -or
+	-not [string]::IsNullOrEmpty($gatewayUri.Query) -or
+	-not [string]::IsNullOrEmpty($gatewayUri.Fragment) -or
+	$gatewayUri.AbsolutePath -ne '/'
+) {
+	throw 'GatewayOrigin must be an HTTPS origin without credentials, path, query, or fragment.'
+}
+$GatewayOrigin = $gatewayUri.GetLeftPart([UriPartial]::Authority)
 
 $startScript = Join-Path $ProxyRepository 'tools\start-ai-editor-dev.ps1'
 $stopScript = Join-Path $ProxyRepository 'tools\stop-ai-editor-dev.ps1'
@@ -70,11 +87,71 @@ function Assert-ExistingEdgeBelongsToRepository([int]$ProcessId) {
 	}
 }
 
+function Test-PublicGateway {
+	$parameters = @{
+		UseBasicParsing = $true
+		Uri = "$GatewayOrigin/live"
+		TimeoutSec = 15
+	}
+	if (-not [string]::IsNullOrWhiteSpace($EdgeOutboundProxy)) {
+		$parameters.Proxy = $EdgeOutboundProxy
+		$parameters.ProxyUseDefaultCredentials = $false
+	}
+	try {
+		$response = Invoke-WebRequest @parameters
+		if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
+			throw "HTTP $($response.StatusCode)"
+		}
+		$body = $response.Content | ConvertFrom-Json
+		if ($body.status -ne 'ok' -or $body.mode -ne 'gateway') {
+			throw 'The endpoint did not identify itself as a healthy Gateway.'
+		}
+	} catch {
+		$statusCode = $null
+		if ($_.Exception.Response) {
+			$statusCode = $_.Exception.Response.StatusCode.value__
+		}
+		if ($statusCode -eq 530) {
+			throw "GatewayOrigin returned Cloudflare HTTP 530 (Error 1016). The Quick Tunnel has expired or cloudflared is offline; start a new tunnel and rerun this script with its new HTTPS origin."
+		}
+		if ($statusCode) {
+			throw "GatewayOrigin is unavailable (HTTP $statusCode). Start or repair the Gateway and rerun this script."
+		}
+		throw "GatewayOrigin is unreachable: $($_.Exception.Message)"
+	}
+}
+
+Test-PublicGateway
+
 $edgeProcessId = Get-ListenerProcessId 47921
 if ($edgeProcessId) {
 	Assert-ExistingEdgeBelongsToRepository $edgeProcessId
-	Write-Host "[ai-editor-preview] Reusing repository-owned Edge PID $edgeProcessId."
-} else {
+	$runtimeConfigPath = Join-Path $EdgeDataRoot 'edge-runtime-config.json'
+	$needsRestart = $RestartEdge
+	if (-not $needsRestart -and (Test-Path -LiteralPath $runtimeConfigPath -PathType Leaf)) {
+		try {
+			$runtimeConfig = Get-Content -LiteralPath $runtimeConfigPath -Raw -Encoding utf8 | ConvertFrom-Json
+			$needsRestart =
+				$runtimeConfig.gatewayOrigin -ne $GatewayOrigin -or
+				$runtimeConfig.edgeOutboundProxy -ne $EdgeOutboundProxy
+		} catch {
+			$needsRestart = $true
+		}
+	} elseif (-not $needsRestart) {
+		$needsRestart = $true
+	}
+	if ($needsRestart) {
+		Write-Host "[ai-editor-preview] Restarting repository-owned Edge PID $edgeProcessId to apply the current Gateway/proxy configuration."
+		& powershell -NoProfile -ExecutionPolicy Bypass -File $stopScript -Mode edge -DataRoot $EdgeDataRoot
+		if ($LASTEXITCODE -ne 0) {
+			throw "Preview Edge stop failed with exit code $LASTEXITCODE."
+		}
+		$edgeProcessId = $null
+	} else {
+		Write-Host "[ai-editor-preview] Reusing repository-owned Edge PID $edgeProcessId."
+	}
+}
+if (-not $edgeProcessId) {
 	$startArguments = @(
 		'-Mode', 'edge',
 		'-AuthenticationMode', 'real',
@@ -98,6 +175,16 @@ try {
 		-Uri 'http://127.0.0.1:47921/ai-editor/status' `
 		-Headers @{ 'X-AI-Editor-Local-Nonce' = $nonce } `
 		-TimeoutSec 10
+} catch {
+	$statusCode = $null
+	if ($_.Exception.Response) {
+		$statusCode = $_.Exception.Response.StatusCode.value__
+	}
+	if ($statusCode -eq 530) {
+		throw "Edge cannot reach GatewayOrigin (Cloudflare HTTP 530 / Error 1016). Start a new Quick Tunnel and rerun this script."
+	}
+	$statusSuffix = if ($statusCode) { " with HTTP $statusCode" } else { '' }
+	throw "Edge account status check failed$statusSuffix`: $($_.Exception.Message)"
 } finally {
 	$nonce = $null
 }
