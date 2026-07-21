@@ -3240,3 +3240,32 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `release:check` was not marked passed only because its isolated lifecycle test
   intentionally requires port `47921` to be unused while the active preview Edge
   is running; no product or server test failed.
+
+## 105. 2026-07-21 Password-change session invalidation restart recovery
+
+- Gateway database evidence confirmed that the password change was committed:
+  the level-1 account and password versions advanced to `2`,
+  `must_change_password=0`, and the device session password version also became
+  `2`. The old Edge session becoming `login_required` is therefore the intended
+  security invalidation, not a failed password write.
+- Code now detects the specific account transition
+  `password_change_required -> login_required` and shows a native warning that
+  the current AI Editor session is invalid. The warning offers
+  `立即重启 AI Editor`, implemented through the workbench host restart service.
+- The prompt is not shown for normal `ready -> login_required` logout flows and
+  is shown at most once per Code process. Code does not silently force-close,
+  preserving unsaved local editor work.
+- After restart, the fixed bootstrap account name is `admin` (or its registered
+  email) and only the new password is valid. The VMware operating-system user
+  name is not an AI Editor product account.
+- Validation completed:
+  - client typecheck, development compile, and `core-ci`: PASS;
+  - focused account-status tests: `6/6`;
+  - development `scripts\code.bat` isolated CDP startup: PASS;
+  - Windows x64 product package: PASS;
+  - Windows release integrity and clean-start acceptance: PASS;
+  - workbench checksums: `10/10`;
+  - shared Proxy remained PID `50904` with `/live=ok` and was not restarted.
+- Remaining acceptance is one manual account-bound check: save local files,
+  select the restart action, then sign in with `admin` and the new password and
+  confirm the Edge status returns to `ready`.

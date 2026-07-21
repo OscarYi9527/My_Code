@@ -12,6 +12,7 @@ import {
 } from '../../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import {
 	getAiEditorAccountStatusPresentation,
+	shouldPromptAiEditorRestartAfterPasswordChange,
 	shouldRefreshCodexModels
 } from '../../browser/aiEditorStatusContribution.js';
 
@@ -90,6 +91,30 @@ suite('AI Editor account status contribution', () => {
 
 		assert.notStrictEqual(login.label, unavailable.label);
 		assert.notStrictEqual(unavailable.label, password.label);
+	});
+
+	test('prompts for restart when a forced password change invalidates the Edge session', () => {
+		assert.strictEqual(
+			shouldPromptAiEditorRestartAfterPasswordChange(
+				status(AiEditorAccountState.PasswordChangeRequired),
+				status(AiEditorAccountState.LoginRequired)
+			),
+			true
+		);
+		assert.strictEqual(
+			shouldPromptAiEditorRestartAfterPasswordChange(
+				status(AiEditorAccountState.Ready),
+				status(AiEditorAccountState.LoginRequired)
+			),
+			false
+		);
+		assert.strictEqual(
+			shouldPromptAiEditorRestartAfterPasswordChange(
+				status(AiEditorAccountState.PasswordChangeRequired),
+				status(AiEditorAccountState.Ready)
+			),
+			false
+		);
 	});
 });
 

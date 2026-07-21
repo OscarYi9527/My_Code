@@ -16,9 +16,11 @@ import {
 	IAiEditorSafeStatus
 } from '../../../../platform/aiEditorAccount/common/aiEditorAccount.js';
 import { IAgentHostService } from '../../../../platform/agentHost/common/agentService.js';
+import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
+import { IHostService } from '../../../services/host/browser/host.js';
 import { resolveAiEditorProductAccountService } from './aiEditorAccountMenu.js';
 
 export const AI_EDITOR_ACCOUNT_STATUS_COMMAND_ID = 'aiEditor.account.runStatusAction';
@@ -90,6 +92,14 @@ export function shouldRefreshCodexModels(
 	return next.state === AiEditorAccountState.Ready && previous?.state !== AiEditorAccountState.Ready;
 }
 
+export function shouldPromptAiEditorRestartAfterPasswordChange(
+	previous: IAiEditorSafeStatus | undefined,
+	next: IAiEditorSafeStatus
+): boolean {
+	return previous?.state === AiEditorAccountState.PasswordChangeRequired
+		&& next.state === AiEditorAccountState.LoginRequired;
+}
+
 export class AiEditorStatusContribution extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.aiEditorAccountStatus';
 
@@ -97,12 +107,15 @@ export class AiEditorStatusContribution extends Disposable implements IWorkbench
 	private accountService: IAiEditorAccountService | undefined;
 	private status: IAiEditorSafeStatus | undefined;
 	private modelCatalogRefreshPending = true;
+	private restartPromptShown = false;
 
 	constructor(
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IWorkbenchEnvironmentService environmentService: IWorkbenchEnvironmentService,
 		@IProductService productService: IProductService,
-		@IAgentHostService private readonly agentHostService: IAgentHostService
+		@IAgentHostService private readonly agentHostService: IAgentHostService,
+		@INotificationService private readonly notificationService: INotificationService,
+		@IHostService private readonly hostService: IHostService
 	) {
 		super();
 
@@ -122,6 +135,23 @@ export class AiEditorStatusContribution extends Disposable implements IWorkbench
 	}
 
 	private updateStatus(status: IAiEditorSafeStatus): void {
+		if (
+			!this.restartPromptShown &&
+			shouldPromptAiEditorRestartAfterPasswordChange(this.status, status)
+		) {
+			this.restartPromptShown = true;
+			this.notificationService.prompt(
+				Severity.Warning,
+				localize(
+					'aiEditor.account.passwordChangedRestart',
+					'密码已修改，当前 AI Editor 会话已失效。请重启 AI Editor 后使用新密码登录。'
+				),
+				[{
+					label: localize('aiEditor.account.restartNow', '立即重启 AI Editor'),
+					run: () => this.hostService.restart()
+				}]
+			);
+		}
 		if (status.state !== AiEditorAccountState.Ready) {
 			this.modelCatalogRefreshPending = true;
 		}
