@@ -198,7 +198,10 @@ async function openPaPlazaFromCommandPalette(page: import('@playwright/test').Pa
 	await page.keyboard.press('Control+Shift+P');
 	const input = page.locator('.quick-input-widget input:visible').last();
 	await input.waitFor({ state: 'visible', timeout: 10_000 });
-	const rows = page.locator('.quick-input-list .monaco-list-row');
+	// Quick input keeps old list rows mounted while replacing its result set.
+	// Restrict both label inspection and the click target to the currently
+	// visible rows so a stale hidden command cannot win the index lookup.
+	const rows = page.locator('.quick-input-list .monaco-list-row:visible');
 	const queries = ['>打开 PA 广场', '>Open PA Plaza', '>PA 广场'];
 	const observedResults: string[] = [];
 	for (const query of queries) {
