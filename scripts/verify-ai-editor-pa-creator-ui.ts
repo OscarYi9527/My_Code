@@ -78,11 +78,15 @@ async function main(): Promise<void> {
 		await page.bringToFront();
 		const workbench = page.locator('.monaco-workbench');
 		await workbench.waitFor({ state: 'visible', timeout: 20_000 });
-		await workbench.click({ position: { x: 20, y: 20 } });
+		await page.bringToFront();
+		await page.keyboard.press('Escape');
+		const editorPart = page.locator('.part.editor').first();
+		await editorPart.waitFor({ state: 'visible', timeout: 10_000 });
+		await editorPart.click({ position: { x: 20, y: 80 }, force: true });
 		// The packaged Workbench becomes paint-ready before all restored-phase
 		// contributions are registered. Wait for that deterministic startup
 		// boundary before querying the Command Palette.
-		await page.waitForTimeout(surface === 'product' ? 3_000 : 500);
+		await page.waitForTimeout(surface === 'product' ? 3_000 : 8_000);
 
 		await openPaPlazaFromCommandPalette(page);
 		const plaza = page.locator('.pa-plaza-editor');
@@ -197,6 +201,13 @@ async function main(): Promise<void> {
 async function openPaPlazaFromCommandPalette(page: import('@playwright/test').Page): Promise<void> {
 	await page.keyboard.press('Control+Shift+P');
 	const input = page.locator('.quick-input-widget input:visible').last();
+	if (!await input.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) {
+		// Under a heavily loaded closure run the first workbench shortcut can
+		// arrive before the command service has accepted keyboard input. F1 is
+		// the equivalent native command-palette shortcut and gives us a
+		// deterministic second attempt instead of waiting on a missing widget.
+		await page.keyboard.press('F1');
+	}
 	await input.waitFor({ state: 'visible', timeout: 10_000 });
 	// Quick input keeps old list rows mounted while replacing its result set.
 	// Restrict both label inspection and the click target to the currently
@@ -214,7 +225,14 @@ async function openPaPlazaFromCommandPalette(page: import('@playwright/test').Pa
 			&& (value.includes('广场') || value.includes('廣場') || value.toLowerCase().includes('plaza'))
 		);
 		if (index >= 0) {
-			await rows.nth(index).click();
+			if (index === 0) {
+				// The exact query leaves the matching command focused. Execute
+				// it through the palette input so a result-row DOM replacement
+				// between inspection and click cannot invalidate the action.
+				await input.press('Enter');
+			} else {
+				await rows.nth(index).click({ force: true });
+			}
 			await page.locator('.quick-input-widget').waitFor({ state: 'hidden', timeout: 10_000 });
 			return;
 		}

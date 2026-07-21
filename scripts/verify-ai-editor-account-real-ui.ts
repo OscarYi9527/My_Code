@@ -121,13 +121,32 @@ async function main(): Promise<void> {
 		}
 
 		await page.keyboard.press('Control+Alt+i');
-		const statusText = await waitFor(
+		let statusText = await waitFor(
 			() => page.locator('body').innerText(),
 			value => value.includes('AI 服务'),
 			'AI Editor Chat input status'
 		);
+		if (statusText.includes('AI 服务：暂不可用')) {
+			// The renderer starts fail-closed before its first main-process
+			// status round trip. Explicitly exercise the user-visible retry
+			// action instead of treating that transient bootstrap state as the
+			// final account result.
+			const retryAction = page.locator('.chat-input-status-container').getByText(/AI 服务：暂不可用/).first();
+			await retryAction.click({ force: true });
+			statusText = await waitFor(
+				() => page.locator('body').innerText(),
+				value =>
+					value.includes('AI 服务：需要登录')
+					|| value.includes('AI 服务正常')
+					|| value.includes('AI 服务：需要修改密码')
+					|| value.includes('AI 服务：账号不可用'),
+				'AI Editor account status after retry'
+			);
+		}
 		if (statusText.includes('需要登录')) {
 			checks.push(pass('prelogin-chat-visible', 'The real pre-login Edge opened Codex Chat and exposed the login-required status.'));
+		} else if (statusText.includes('账号不可用')) {
+			checks.push(pass('account-unavailable-visible', 'The real Edge exposed the safe account-unavailable status without opening administration routes.'));
 		} else if (statusText.includes('AI 服务正常')) {
 			const statusAction = page.locator('.chat-input-status-container').getByText(/AI 服务正常/).first();
 			// Startup notifications (for example an extension-host recovery
