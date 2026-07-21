@@ -3195,3 +3195,12 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 共享 Proxy 保持 PID `32260`、`/live=ok`。
 - 当前迁移成品仍未写入固定正式 `aiEditorAccountGatewayOrigin`，因此预发布人工账号
   验收继续使用开发构建和当前外部 Gateway；正式域名冻结后再启用最终成品账号入口。
+
+## 102. 2026-07-21 Preview Edge outbound proxy and interactive launch recovery
+
+- Root cause confirmed: the public HTTPS Gateway was healthy, but the interactive Edge on `127.0.0.1:47921` was not running; direct Node `fetch` to the Quick Tunnel returned `ECONNRESET` while the same request through Clash `127.0.0.1:7890` returned HTTP 200.
+- Proxy development lifecycle now accepts `-EdgeOutboundProxy` only for `Mode=edge`, and only as a loopback HTTP origin without credentials, path, query, or fragment. It injects `NODE_USE_ENV_PROXY=1`, `HTTP_PROXY`, `HTTPS_PROXY`, and a loopback `NO_PROXY` into Edge only.
+- Preproduction closure now forwards the explicit Edge outbound proxy option.
+- Added `scripts\launch-ai-editor-preview.ps1` for interactive Windows development validation. It starts/reuses only the repository-owned `47921` Edge, launches Code with the external Edge/Gateway environment, and leaves the isolated Edge running after Code exits. It does not touch shared `47892`.
+- Validation: Proxy development script contract tests passed; PowerShell parse checks passed; public Gateway `/live` HTTP 200; Edge `/live` HTTP 200 and authenticated status `password_change_required`; real Code UI smoke passed 5/5; shared Proxy PID remained `50904` and `/live` remained HTTP 200.
+- The installed Windows product remains intentionally blocked until a fixed HTTPS production Gateway origin is written into `product.json` and the final Edge release is packaged. The interactive preview launcher uses the development build by design and must not be used as the final product configuration.

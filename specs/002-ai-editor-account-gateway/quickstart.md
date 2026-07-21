@@ -198,6 +198,22 @@ existing process.
 
 ### Automated real Edge UI smoke
 
+For an interactive Windows preview against a public Gateway, first ensure Clash
+is listening on `127.0.0.1:7890`, then run:
+
+```powershell
+Set-Location D:\AI_prejoct\My_code
+$env:AI_EDITOR_VERIFY_GATEWAY_ORIGIN = 'https://replace-with-current-preview-origin'
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\scripts\launch-ai-editor-preview.ps1
+```
+
+This starts or reuses only the repository-owned Edge on `47921`, passes the
+loopback Clash proxy to Edge, and launches the development Code build with the
+Edge/Gateway environment. It never stops or changes the shared Proxy on
+`47892`. The preview Edge is intentionally left running after Code exits; stop
+it only with the isolated Proxy lifecycle script.
+
 When the isolated local Gateway and Edge are both available on `47920/47921`, run:
 
 ```powershell

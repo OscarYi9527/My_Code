@@ -55,6 +55,7 @@ dist
 .github/skills/.local/
 
 # Local Code OSS test profiles
+.manual-preview-*/
 .tmp-codeoss-user-data/
 .tmp-codeoss-extensions/
 .tmp-codeoss-*/

@@ -3,6 +3,7 @@ param(
 	[string]$ProxyRepository,
 	[string]$ProductRoot,
 	[string]$GatewayOrigin,
+	[string]$EdgeOutboundProxy,
 	[string]$EdgeOrigin = 'http://127.0.0.1:47921',
 	[string]$EdgeDataRoot,
 	[string]$EdgeNonceFile,
@@ -540,15 +541,19 @@ function Stop-PreviewEdge {
 }
 
 function Start-PreviewEdge {
-	return Invoke-DetachedLifecycleCommand `
-		'preview-edge-start' `
-		(Join-Path $ProxyRepository 'tools\start-ai-editor-dev.ps1') `
-		@(
+	$arguments = @(
 		'-Mode', 'edge',
 		'-AuthenticationMode', 'real',
 		'-GatewayOrigin', $GatewayOrigin,
 		'-DataRoot', $EdgeDataRoot
 	)
+	if (-not [string]::IsNullOrWhiteSpace($EdgeOutboundProxy)) {
+		$arguments += @('-EdgeOutboundProxy', $EdgeOutboundProxy)
+	}
+	return Invoke-DetachedLifecycleCommand `
+		'preview-edge-start' `
+		(Join-Path $ProxyRepository 'tools\start-ai-editor-dev.ps1') `
+		$arguments
 }
 
 function Test-GatewayOrigin([string]$Origin) {
