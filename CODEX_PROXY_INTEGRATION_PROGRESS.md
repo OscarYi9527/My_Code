@@ -3391,8 +3391,13 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 ## 2026-07-21 isolated OpenVPN egress validation
 
 - Proxy source branch `codex/vpn-egress-openvpn` is synchronized at
-  `b4f471a`; Ubuntu preview deployment branch `codex/provider-worker-mvp`
+  `e550261`; Ubuntu preview deployment branch `codex/provider-worker-mvp`
   contains the equivalent deployment commit `d398faa`.
+- `e550261` also restores the validated Edge-only `-EdgeOutboundProxy`
+  contract on top of the VPN branch while preserving forced TLS certificate
+  verification. This resolves the branch-integration failure where
+  `launch-ai-editor-preview.ps1` passed an option missing from the selected
+  Proxy worktree.
 - The new `vpn-egress` container runs OpenVPN and Tinyproxy in an isolated
   Docker network namespace. The OpenVPN profile's `redirect-gateway` changes
   only that container. Ubuntu SSH, Gateway, Cloudflare Tunnel and the host
@@ -3422,5 +3427,9 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   but that credential returned `TOKEN_REFRESH_RELOGIN_REQUIRED`. The network
   blocker is resolved; a Level-1 administrator must complete official
   ChatGPT device login before quota data and a real Turn can be accepted.
+- Post-integration validation: development script contract tests and the full
+  Proxy `npm run release:check` passed (root `188/188`, Gateway `156/156`,
+  Admin `34/34`). The Windows preview Edge started successfully against the
+  public Gateway and reported product account state `ready`.
 - The supplied free/shared OpenVPN profile is approved only for temporary
   preview acceptance. It is not a production egress for the 30-user MVP.

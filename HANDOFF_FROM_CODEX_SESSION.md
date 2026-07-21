@@ -877,9 +877,14 @@ verification after the follow-up commits.
 
 Implemented and pushed in the Proxy repository:
 
-- source branch: `codex/vpn-egress-openvpn@b4f471a`;
+- source branch: `codex/vpn-egress-openvpn@e550261`;
 - Ubuntu preview deployment: `codex/provider-worker-mvp@d398faa`;
 - runtime HTTP egress: `http://127.0.0.1:7891`.
+
+`e550261` restores the Edge-only `-EdgeOutboundProxy` startup contract on the
+VPN branch and preserves `NODE_TLS_REJECT_UNAUTHORIZED=1`. This fixes the
+integration failure where the Code preview launcher passed a valid option that
+the selected Proxy branch did not expose.
 
 The OpenVPN client runs together with Tinyproxy in a dedicated Docker network
 namespace. The profile's `redirect-gateway` cannot alter the Ubuntu host
@@ -895,6 +900,8 @@ Validation:
 - preview Gateway/Worker/Cloudflare services: healthy;
 - `verify-preview.sh`: PASS;
 - release gate: root `188/188`, Gateway `156/156`, Admin `34/34`, PASS.
+- Windows preview Edge startup against the public Gateway: PASS; product
+  account state is `ready`.
 
 The existing ChatGPT subscription credential now fails with
 `TOKEN_REFRESH_RELOGIN_REQUIRED`, not a network timeout. Final acceptance
