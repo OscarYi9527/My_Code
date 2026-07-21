@@ -758,3 +758,36 @@ requires a password change before a real SSE Turn, no real macOS runner is
 available, and 19 production infrastructure/approval prerequisites remain.
 `origin/main`, `origin/feature/pa-creator-p1`, and
 `origin/codex/mvp-pa-creator-integration` are all contained by the MVP.
+
+## 2026-07-21 account management retry regression
+
+The real Edge and Gateway remained healthy, and direct status/ticket checks
+returned `password_change_required` and HTTP 200. The visible failure was a
+Code-side singleton-editor retry defect: after one transient management-view
+preparation failure, reopening the same security route did not emit a route
+event, so the existing editor stayed permanently on its unavailable message.
+
+Branch `codex/fix-account-management-retry` now:
+
+- forces preparation when the singleton management editor is reopened on the
+  same route;
+- keeps the route-change behavior unchanged for normal state updates;
+- avoids calling `setWindowOpenHandler` after the management WebContents has
+  already been destroyed;
+- makes the real UI verifier dispatch the account status action even when an
+  unrelated startup notification overlaps it.
+
+Validation completed:
+
+- development compile: passed with zero errors;
+- focused management/navigation tests: `9/9`;
+- account Electron main tests: `26/26`;
+- real `password_change_required -> #security` BrowserView: passed;
+- management close no longer logs `Object has been destroyed`;
+- `core-ci`: passed;
+- Windows package/release verification: passed, checksums `10/10`;
+- shared `47892` remained healthy at PID `32260`.
+
+The migration product still intentionally lacks a fixed
+`aiEditorAccountGatewayOrigin`; use the development preview launch with the
+current external Gateway until the formal production origin is frozen.

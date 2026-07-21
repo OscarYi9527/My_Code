@@ -186,7 +186,11 @@ class AiEditorManagementContribution extends DisposableStore implements IWorkben
 				this.inputDisposeListener.clear();
 			});
 		}
-		this.input.setRoute(route);
+		// The management editor is a singleton. Reopening the same route must
+		// also retry preparation after a transient Edge, ticket, or navigation
+		// failure; otherwise the existing editor remains permanently stuck on
+		// its unavailable message.
+		this.input.setRoute(route, true);
 		await this.editorService.openEditor(this.input, { pinned: true });
 	}
 }

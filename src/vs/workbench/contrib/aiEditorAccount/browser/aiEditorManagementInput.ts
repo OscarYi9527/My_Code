@@ -40,8 +40,8 @@ export class AiEditorManagementInput extends EditorInput {
 		return this._route;
 	}
 
-	setRoute(route: AiEditorManagementRoute): void {
-		if (this._route === route) {
+	setRoute(route: AiEditorManagementRoute, forcePrepare = false): void {
+		if (this._route === route && !forcePrepare) {
 			return;
 		}
 		this._route = route;

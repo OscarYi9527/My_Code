@@ -76,6 +76,7 @@ export interface IAiEditorGatewayWebContents {
 		removeListener(event: 'will-download', listener: (event: { preventDefault(): void }, item: unknown, webContents: IAiEditorGatewayWebContents) => void): void;
 	};
 	getURL(): string;
+	isDestroyed(): boolean;
 	on(event: 'will-navigate' | 'will-redirect', listener: (event: { preventDefault(): void }, url: string) => void): void;
 	removeListener(event: 'will-navigate' | 'will-redirect', listener: (event: { preventDefault(): void }, url: string) => void): void;
 	once(event: 'destroyed', listener: () => void): void;
@@ -134,7 +135,13 @@ export class AiEditorGatewayOriginPolicy extends Disposable {
 			}
 			return { action: 'deny' };
 		});
-		this._register({ dispose: () => webContents.setWindowOpenHandler(() => ({ action: 'deny' })) });
+		this._register({
+			dispose: () => {
+				if (!webContents.isDestroyed()) {
+					webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+				}
+			}
+		});
 
 		const handleDownload = (event: { preventDefault(): void }, _item: unknown, source: IAiEditorGatewayWebContents) => {
 			if (source === webContents) {

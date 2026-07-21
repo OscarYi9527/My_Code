@@ -3169,3 +3169,29 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - 仅四个 Dependabot 工作流依赖分支保持独立，禁止批量混入产品功能。
 - 共享 Proxy 全程保持 PID `32260`、`/live=ok` 且选定程序/数据哈希不变；
   隔离预发布 Edge 已由仓库生命周期脚本恢复。
+
+## 101. 2026-07-21 修改密码管理页瞬时失败后无法重试
+
+- 现场证据：
+  - Edge `/ai-editor/status` 返回 `password_change_required`；
+  - Edge `/ai-editor/webview-ticket` 返回 HTTP 200；
+  - 外部 Gateway `/live` 正常；
+  - 同一拓扑的隔离 Code 可以打开 `/admin#security`。
+- 根因是 Code 管理编辑器为单例：首次准备管理 BrowserView 瞬时失败后，再次点击
+  相同“修改密码”路由不会触发 route event，页面永久停留在“管理暂不可用”。
+- Code 修复：
+  - 账户菜单再次打开同一路由时强制重新准备管理页面；
+  - 正常路由更新行为不变；
+  - BrowserView WebContents 已销毁后不再调用 `setWindowOpenHandler`，消除窗口关闭时
+    的 `Object has been destroyed` 主进程异常；
+  - 真实 UI 验证允许绕过与账号无关的启动通知遮挡，仍严格核对最终固定源 URL。
+- 验证：
+  - `npm run compile`：通过；
+  - 管理输入和导航策略：`9/9`；
+  - Account Electron main：`26/26`；
+  - 真实 `password_change_required -> #security`：PASS；
+  - `npm run core-ci`：通过；
+  - Windows 成品打包和发布校验：PASS，checksum `10/10`；
+  - 共享 Proxy 保持 PID `32260`、`/live=ok`。
+- 当前迁移成品仍未写入固定正式 `aiEditorAccountGatewayOrigin`，因此预发布人工账号
+  验收继续使用开发构建和当前外部 Gateway；正式域名冻结后再启用最终成品账号入口。

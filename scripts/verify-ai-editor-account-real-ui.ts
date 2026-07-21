@@ -130,7 +130,11 @@ async function main(): Promise<void> {
 			checks.push(pass('prelogin-chat-visible', 'The real pre-login Edge opened Codex Chat and exposed the login-required status.'));
 		} else if (statusText.includes('AI 服务正常')) {
 			const statusAction = page.locator('.chat-input-status-container').getByText(/AI 服务正常/).first();
-			await statusAction.click();
+			// Startup notifications (for example an extension-host recovery
+			// toast) can overlap the lower-right status action without changing
+			// the account state under test. Dispatch the action directly so the
+			// verification remains scoped to the account-management contract.
+			await statusAction.click({ force: true });
 			await waitFor(
 				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
 				value => Array.isArray(value) && value.some((target: { url?: unknown }) => target.url === `${gatewayOrigin}/admin#account`),
@@ -139,7 +143,7 @@ async function main(): Promise<void> {
 			checks.push(pass('ready-management-route', 'The ready account status opened the fixed-origin management BrowserView.'));
 		} else if (statusText.includes('需要修改密码')) {
 			const statusAction = page.locator('.chat-input-status-container').getByText(/需要修改密码/).first();
-			await statusAction.click();
+			await statusAction.click({ force: true });
 			await waitFor(
 				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
 				value => Array.isArray(value) && value.some((target: { url?: unknown }) => target.url === `${gatewayOrigin}/admin#security`),

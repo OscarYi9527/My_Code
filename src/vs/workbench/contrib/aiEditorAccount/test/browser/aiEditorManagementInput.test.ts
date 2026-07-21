@@ -45,6 +45,21 @@ suite('AI Editor management input', () => {
 		}
 	});
 
+	test('can request preparation again when reopening the same route', () => {
+		const input = createInput();
+		try {
+			let requests = 0;
+			const listener = input.onDidChangeRoute(() => requests++);
+			input.setRoute(AiEditorManagementRoute.Account);
+			input.setRoute(AiEditorManagementRoute.Account, true);
+			listener.dispose();
+
+			assert.strictEqual(requests, 1);
+		} finally {
+			input.dispose();
+		}
+	});
+
 	test('prepares the selected route through the browser-safe management service', async () => {
 		const preparedRoutes: AiEditorManagementRoute[] = [];
 		const input = createInput(preparedRoutes);
