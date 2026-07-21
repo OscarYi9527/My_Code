@@ -3347,3 +3347,42 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - A real SSE reply remains an intentional human gate: a Level-1 administrator
   must complete OpenAI official login for the subscription account, then start
   a new simple Turn.
+
+## 2026-07-21 compact account management and device-auth handoff
+
+- Code branch `codex/compact-account-management` is synchronized at
+  `1fa954312` and Proxy/Gateway branch `codex/fix-gateway-official-login` is
+  synchronized at `cf5d08f`.
+- Code now sends `surface=embedded` to the management shell. The embedded
+  page is intentionally compact: product account status, credits, ChatGPT
+  subscription routing switches and quota refresh only.
+- The embedded page exposes the allow-listed
+  `ai-editor-code://open-full-management?route=...` action. Code requests a
+  fresh one-time ticket and opens the full management page in the system
+  browser. The browser ticket is fragment-only and is removed immediately
+  after exchange.
+- Stored labels containing `???` or replacement characters now fall back to
+  the localized Provider name, including the full Provider page.
+- Gateway official ChatGPT login now uses Codex `login --device-auth`, returns
+  the official verification URL and one-time code, and does not depend on an
+  app-server localhost callback.
+- Validation:
+  - Code focused Electron-main tests: `18/18`;
+  - Code `npm run compile`: PASS;
+  - Code `npm run core-ci`: PASS;
+  - Code development and Windows product acceptance: PASS, Workbench
+    checksums `10/10`;
+  - Proxy/Gateway `npm run release:check`: PASS; root `188/188`, Gateway
+    `156/156`, Admin `34/34`;
+  - Ubuntu preview deployment commit: `f71d184`, Gateway/Worker containers
+    rebuilt and `verify-preview.sh`: PASS;
+  - shared Proxy `47892` remains PID `4028` with `/live=ok`; it was not
+    restarted.
+- The automated real UI smoke reached Code but could not find the management
+  BrowserView in the external-edge run (`real-ui-prelogin-acceptance.json`).
+  This is a verifier/UI-state issue still requiring a manual check; it did not
+  alter the shared Proxy or the preview Edge. The isolated Edge was restored
+  at PID `49124`.
+- Remaining human gate: complete Level-1 OpenAI device-auth login from the
+  compact page, confirm the subscription account becomes active, then send a
+  new Turn and verify the full-management browser link.
