@@ -3391,8 +3391,8 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 ## 2026-07-21 isolated OpenVPN egress validation
 
 - Proxy source branch `codex/vpn-egress-openvpn` is synchronized at
-  `e550261`; Ubuntu preview deployment branch `codex/provider-worker-mvp`
-  contains the equivalent deployment commit `d398faa`.
+  `ba0bc0b`; Ubuntu preview deployment branch `codex/provider-worker-mvp`
+  contains the equivalent work through local commit `cb77481`.
 - `e550261` also restores the validated Edge-only `-EdgeOutboundProxy`
   contract on top of the VPN branch while preserving forced TLS certificate
   verification. This resolves the branch-integration failure where
@@ -3433,3 +3433,43 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   public Gateway and reported product account state `ready`.
 - The supplied free/shared OpenVPN profile is approved only for temporary
   preview acceptance. It is not a production egress for the 30-user MVP.
+
+## 2026-07-21 repeated quota-refresh diagnosis and fix
+
+- The visible "refresh quota failed" symptom contained three independent
+  failures. Evidence was collected from the real public Gateway and a signed
+  direct Provider Worker request before changing code:
+  1. bodyless management `POST` requests crossed Cloudflare with an unsupported
+     media type and Fastify returned `FST_ERR_CTP_INVALID_MEDIA_TYPE`;
+  2. the Gateway converted the Worker relogin condition into a generic
+     `provider_usage_refresh_failed` `502`;
+  3. the Worker manual refresh path leaked
+     `TOKEN_REFRESH_RELOGIN_REQUIRED` instead of normalizing it like the Turn
+     path.
+- Source fixes:
+  - `485928c` sends explicit JSON for bodyless management writes, preserves
+    safe Gateway errors, maps Fastify media-type failures to `415`, and shows
+    actionable errors in compact/full Provider pages;
+  - `637dc98` normalizes manual quota refresh failures to
+    `provider_relogin_required` `409` and persists the changed account state;
+  - `e6695f6` clears an ambiguous locally cached product Refresh Token and
+    returns `login_required` after a lost token-rotation response;
+  - `ba0bc0b` restores the runtime-binding marker used by the preview launcher.
+- Real signed Worker acceptance now returns:
+  `provider_relogin_required`, HTTP `409`, retryable `false`, with the safe
+  instruction to complete Level-1 ChatGPT login.
+- Validation: root `190/190`, Gateway `157/157`, Admin `36/36`, development
+  script tests PASS, and `npm run release:check` PASS.
+- Current temporary origin:
+  `https://portfolio-independently-michigan-bush.trycloudflare.com`.
+- A Quick Tunnel interruption caused an ambiguous AI Editor product-token
+  rotation. The corrected Edge safely cleared that stale local binding and
+  now reports `login_required`; it did not bypass reuse protection.
+- Remaining human sequence:
+  1. sign in to the AI Editor product account again;
+  2. open full Provider management and complete official ChatGPT device login
+     for the existing subscription account;
+  3. refresh quota and send a new subscription Turn.
+- The Ubuntu deployment branch has diverged from its remote branch, so no
+  force push or rewrite was attempted. The authoritative source fixes are
+  pushed on `origin/codex/vpn-egress-openvpn`.

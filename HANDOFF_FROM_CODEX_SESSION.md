@@ -877,8 +877,8 @@ verification after the follow-up commits.
 
 Implemented and pushed in the Proxy repository:
 
-- source branch: `codex/vpn-egress-openvpn@e550261`;
-- Ubuntu preview deployment: `codex/provider-worker-mvp@d398faa`;
+- source branch: `codex/vpn-egress-openvpn@ba0bc0b`;
+- Ubuntu preview deployment worktree: `codex/provider-worker-mvp@cb77481`;
 - runtime HTTP egress: `http://127.0.0.1:7891`.
 
 `e550261` restores the Edge-only `-EdgeOutboundProxy` startup contract on the
@@ -909,3 +909,37 @@ requires a Level-1 administrator to complete official device login, refresh
 quota, and send a new Turn. Keep the free/shared VPN profile limited to
 temporary preview acceptance; replace it with a dedicated compliant egress
 before the 30-user MVP.
+
+## 2026-07-21 quota-refresh failure closure
+
+The repeated quota-refresh failure was reproduced against the public Gateway.
+It was not a single network problem:
+
+1. empty management POSTs were rejected by Fastify before reaching Worker;
+2. Gateway hid the safe relogin error behind a generic 502;
+3. Worker did not normalize the manual-refresh token error.
+
+Pushed source commits:
+
+- `485928c`: explicit JSON management POSTs and safe UI errors;
+- `637dc98`: manual refresh relogin normalization and persistence;
+- `e6695f6`: safe Edge recovery from an ambiguous Refresh Token rotation;
+- `ba0bc0b`: preview runtime binding marker.
+
+The signed real Worker request now returns
+`provider_relogin_required` with HTTP `409` and a Level-1 relogin action.
+Validation is root `190/190`, Gateway `157/157`, Admin `36/36`, script tests
+PASS and full release gate PASS.
+
+Current temporary public origin:
+
+`https://portfolio-independently-michigan-bush.trycloudflare.com`
+
+The AI Editor product binding was safely cleared after a Quick Tunnel outage
+caused a lost Refresh Token rotation response. The next operator action is to
+sign in to the product account, then perform official ChatGPT device login for
+the existing subscription credential, refresh quota, and send a new Turn.
+
+Do not push the Ubuntu `codex/provider-worker-mvp` worktree with force: it is
+ahead of and diverged from its remote branch. The source branch
+`origin/codex/vpn-egress-openvpn@ba0bc0b` is the authoritative pushed history.
