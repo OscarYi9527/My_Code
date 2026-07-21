@@ -791,3 +791,31 @@ Validation completed:
 The migration product still intentionally lacks a fixed
 `aiEditorAccountGatewayOrigin`; use the development preview launch with the
 current external Gateway until the formal production origin is frozen.
+
+## 2026-07-21 subscription Provider relogin remediation
+
+The model catalog is healthy, but the active ChatGPT subscription Refresh
+Token was rejected permanently and the Worker marked the account
+`auth_error`. This is not a Tunnel, network, product-login, model-routing or
+credits failure.
+
+The generic HTTP 503 was replaced with an actionable safe error:
+
+```text
+409 provider_relogin_required
+ChatGPT 订阅账号登录已失效，请一级管理员在“Provider 与模型”中重新登录。
+```
+
+Delivery and deployment:
+
+- Proxy branch: `codex/fix-provider-relogin-error`;
+- source commit: `5617d69`;
+- Ubuntu preview cherry-pick: `e5df91d`;
+- preview Gateway/Worker and Windows Edge verification: PASS;
+- full release gate: root `188/188`, Gateway `156/156`, Admin `31/31`.
+
+The real Edge returned the expected new error. To finish the acceptance, a
+Level-1 administrator must open `AI Editor 账户 → AI Editor 管理 → Provider 与模型`,
+complete OpenAI official login for the subscription account, keep automatic
+routing enabled, and test a new `gpt-5.6-terra` Turn. Do not copy or import
+credentials without explicit operator approval.

@@ -3307,3 +3307,43 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`,
   `gpt-5.4` and `gpt-5.4-mini`. Shared Proxy `47892` remains PID
   `50904` with `/live=ok` and was not restarted.
+
+## 107. 2026-07-21 Subscription relogin diagnosis and actionable error
+
+- The `gpt-5.6-terra` Turn failure with request ID
+  `req_f07ad32a1f3740e58562c931850bed1f` was traced through Gateway and
+  Provider Worker logs. The selected ChatGPT subscription account could no
+  longer rotate its Refresh Token and was persisted as `auth_error` with
+  `TOKEN_REFRESH_RELOGIN_REQUIRED`. Network access, Quick Tunnel, product
+  login, model routing and product credits were healthy.
+- Provider Worker now distinguishes an account pool in which every enabled
+  account requires reauthentication from temporary network, cooldown and
+  quota exhaustion. It returns the non-retryable internal error
+  `409 worker_provider_relogin_required`.
+- Gateway translates that internal code to the safe product error
+  `409 provider_relogin_required` with the actionable message:
+  `ChatGPT 订阅账号登录已失效，请一级管理员在“Provider 与模型”中重新登录。`
+  Worker response details and credentials are never forwarded.
+- Both initial Refresh Token rejection and later requests against the already
+  marked `auth_error` pool are covered. The failed-header path now persists
+  credential runtime state and releases its abort listener.
+- Delivery:
+  - Proxy source branch: `codex/fix-provider-relogin-error`;
+  - Proxy source commit: `5617d69`;
+  - Ubuntu preview deployment commit: `e5df91d`;
+  - contract additions:
+    `worker_provider_relogin_required` and
+    `provider_relogin_required`.
+- Automated validation:
+  - root Proxy/Edge/Worker tests: `188/188`;
+  - Gateway tests: `156/156`;
+  - Admin Web tests: `31/31`;
+  - full `npm run release:check`: PASS;
+  - deployed preview verification: PASS;
+  - real Edge request: HTTP `409`, code `provider_relogin_required`, expected
+    safe Chinese remediation message.
+- The isolated Edge was restored as PID `46196`. Shared Proxy `47892` remains
+  PID `50904` with `/live=ok` and was not restarted.
+- A real SSE reply remains an intentional human gate: a Level-1 administrator
+  must complete OpenAI official login for the subscription account, then start
+  a new simple Turn.

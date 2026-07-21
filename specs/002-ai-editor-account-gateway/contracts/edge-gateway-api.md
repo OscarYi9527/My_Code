@@ -192,6 +192,7 @@ Safe errors:
 | 409 | `credits_risk_limit` | Per-Turn or cumulative risk rejected |
 | 409 | `password_change_required` | Bootstrap/reset password must be replaced |
 | 409 | `provider_unavailable` | No route can safely serve the model |
+| 409 | `provider_relogin_required` | Every eligible subscription account requires Level 1 administrator reauthentication |
 | 503 | `account_service_unavailable` | Fail closed; retry may succeed |
 
 No response exposes internal rates or risk thresholds to user/Level 2 roles.

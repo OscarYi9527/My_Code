@@ -372,6 +372,7 @@ Gateway 在本地结算事务成功后发送签名确认，`x-ai-editor-turn-id`
 - `worker_runtime_configuration_invalid`
 - `worker_provider_account_not_found`
 - `worker_provider_authentication_failed`
+- `worker_provider_relogin_required`
 - `worker_provider_rate_limited`
 - `worker_provider_pool_unavailable`
 - `worker_provider_upstream_failed`
