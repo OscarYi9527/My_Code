@@ -3348,15 +3348,16 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   must complete OpenAI official login for the subscription account, then start
   a new simple Turn.
 
-## 2026-07-21 compact account management and device-auth handoff
+## 2026-07-21 Provider page simplification and device-auth handoff
 
 - Code branch `codex/compact-account-management` is synchronized at
-  `1fa954312` and Proxy/Gateway branch `codex/fix-gateway-official-login` is
-  synchronized at `cf5d08f`.
-- Code now sends `surface=embedded` to the management shell. The embedded
-  page is intentionally compact: product account status, credits, ChatGPT
-  subscription routing switches and quota refresh only.
-- The embedded page exposes the allow-listed
+  `1fa954312`, and Proxy/Gateway branch
+  `codex/fix-gateway-official-login` contains the Provider-page correction
+  `84d5884`.
+- The Code management shell and its existing role-authorized navigation remain
+  unchanged. Only the embedded `Provider 与模型` submodule is compact:
+  ChatGPT subscription routing switches and quota refresh/status only.
+- The compact Provider submodule exposes the allow-listed
   `ai-editor-code://open-full-management?route=...` action. Code requests a
   fresh one-time ticket and opens the full management page in the system
   browser. The browser ticket is fragment-only and is removed immediately
@@ -3379,10 +3380,47 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - shared Proxy `47892` remains PID `4028` with `/live=ok`; it was not
     restarted.
 - The automated real UI smoke reached Code but could not find the management
-  BrowserView in the external-edge run (`real-ui-prelogin-acceptance.json`).
-  This is a verifier/UI-state issue still requiring a manual check; it did not
-  alter the shared Proxy or the preview Edge. The isolated Edge was restored
-  at PID `49124`.
+  BrowserView in the external-edge run (`real-ui-prelogin-acceptance.json`);
+  this run was against the previous embedded-shell behavior. The corrected
+  submodule behavior still requires a manual Code check; no shared Proxy or
+  preview service was altered by the verifier.
 - Remaining human gate: complete Level-1 OpenAI device-auth login from the
   compact page, confirm the subscription account becomes active, then send a
   new Turn and verify the full-management browser link.
+
+## 2026-07-21 isolated OpenVPN egress validation
+
+- Proxy source branch `codex/vpn-egress-openvpn` is synchronized at
+  `b4f471a`; Ubuntu preview deployment branch `codex/provider-worker-mvp`
+  contains the equivalent deployment commit `d398faa`.
+- The new `vpn-egress` container runs OpenVPN and Tinyproxy in an isolated
+  Docker network namespace. The OpenVPN profile's `redirect-gateway` changes
+  only that container. Ubuntu SSH, Gateway, Cloudflare Tunnel and the host
+  default route remain unchanged.
+- The only published listener is
+  `127.0.0.1:7891`. Provider Worker now uses
+  `HTTP_PROXY/HTTPS_PROXY=http://127.0.0.1:7891`; the failed Mihomo container
+  was stopped and is no longer in the Worker path.
+- Security boundaries:
+  - the `.ovpn` profile and auth file remain under the Git-ignored
+    `deploy/preview/secrets/openvpn/` directory with mode `0600`;
+  - the image contains no credentials;
+  - server-certificate EKU validation and `auth-nocache` are forced;
+  - the container is read-only, publishes loopback only and retains only
+    `NET_ADMIN`, `DAC_OVERRIDE` and `SETGID`.
+- Real Ubuntu verification:
+  - OpenVPN TLS and data-channel initialization: PASS;
+  - `api.openai.com/v1/models` through `127.0.0.1:7891`: HTTP `401`
+    without an API Key, proving endpoint reachability;
+  - `chatgpt.com/backend-api/wham/usage` through `127.0.0.1:7891`:
+    HTTP `401` without an account Token, proving the quota endpoint is
+    reachable;
+  - `verify-preview.sh`: PASS;
+  - root tests `188/188`, Gateway `156/156`, Admin `34/34`, and
+    `npm run release:check`: PASS.
+- A signed real quota refresh reached the existing subscription credential,
+  but that credential returned `TOKEN_REFRESH_RELOGIN_REQUIRED`. The network
+  blocker is resolved; a Level-1 administrator must complete official
+  ChatGPT device login before quota data and a real Turn can be accepted.
+- The supplied free/shared OpenVPN profile is approved only for temporary
+  preview acceptance. It is not a production egress for the 30-user MVP.

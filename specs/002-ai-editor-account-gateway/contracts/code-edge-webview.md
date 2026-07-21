@@ -174,14 +174,17 @@ Bootstrap:
 
 Embedded management behavior:
 
-- The Code panel is intentionally limited to the signed-in product account summary, available
-  credits, ChatGPT subscription credential routing switches, and quota refresh.
-- Provider secrets, diagnostics, organization administration, invitations, audit records and other
-  full-management operations are not rendered in the embedded surface.
-- The panel provides the exact custom action
-  `ai-editor-code://open-full-management?route=<route>`. Code accepts only this action, with an
-  allow-listed route value, from the configured same-origin management document. Code then requests
-  a fresh one-time browser ticket and opens the full management page in the system browser.
+- The Code management shell keeps its existing framework and role-authorized navigation. Account,
+  security, organization, invitation, credit, audit and diagnostic pages remain in the Code
+  management view.
+- Only the embedded `providers` page is compact. It displays ChatGPT subscription credentials,
+  routing enable/disable controls and quota refresh/status. Provider secrets, diagnostics,
+  organization administration, invitations, audit records and model-routing internals are not
+  rendered in this compact Provider page.
+- The compact Provider page provides the exact custom action
+  `ai-editor-code://open-full-management?route=providers`. Code accepts only this action from the
+  configured same-origin management document, requests a fresh one-time browser ticket and opens
+  the full management page in the system browser.
 - The browser URL carries the ticket only in the URL fragment:
   `/admin#browser?ticket=<ticket>&route=<route>`. The page exchanges the ticket immediately and
   removes the fragment with `history.replaceState`; the ticket MUST NOT be sent in a query string,

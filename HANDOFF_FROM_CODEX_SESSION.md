@@ -820,26 +820,28 @@ complete OpenAI official login for the subscription account, keep automatic
 routing enabled, and test a new `gpt-5.6-terra` Turn. Do not copy or import
 credentials without explicit operator approval.
 
-## 2026-07-21 compact management and remote device-auth update
+## 2026-07-21 Provider submodule simplification and remote device-auth update
 
 Completed and pushed:
 
 - My_Code: `codex/compact-account-management@1fa954312`;
-- codex_proxy: `codex/fix-gateway-official-login@cf5d08f`;
-- Ubuntu preview deployment: `codex/provider-worker-mvp@f71d184`.
+- codex_proxy: `codex/fix-gateway-official-login@84d5884`;
+- Ubuntu preview deployment: `codex/provider-worker-mvp@18f4688`.
 
 Product behavior:
 
-1. The Code-embedded management view is now a small quick-management panel:
-   account status, credits, ChatGPT subscription routing enable/disable and
-   quota refresh.
-2. The top link opens the full management page in the system browser. Code
-   validates the custom action, requests a new one-time ticket, places that
-   ticket only in the browser URL fragment and the page removes it after
-   exchange.
-3. Unreadable saved labels such as `ChatGPT ???` fall back to `ChatGPT 订阅池`
+1. The Code management framework remains unchanged. Account, security,
+   organization, invitation, credit, audit and diagnostic modules remain in
+   the Code management view.
+2. Only the embedded `Provider 与模型` submodule is simplified to account
+   routing enable/disable and quota viewing/refresh.
+3. The Provider submodule link opens the full Provider management page in the
+   system browser. Code validates the custom action, requests a new one-time
+   ticket, places that ticket only in the browser URL fragment and the page
+   removes it after exchange.
+4. Unreadable saved labels such as `ChatGPT ???` fall back to `ChatGPT 订阅池`
    in both compact and full Provider views.
-4. Remote Gateway official login uses `codex login --device-auth`; the page
+5. Remote Gateway official login uses `codex login --device-auth`; the page
    shows the OpenAI verification URL and one-time code instead of relying on
    `localhost:1455`.
 
@@ -865,7 +867,38 @@ Next manual acceptance:
 5. Return to Code, refresh the account status, ensure routing is enabled, and
    send a new simple Turn.
 
-Known automated-smoke limitation: the external-edge real UI verifier reached
-Code but failed to observe the management BrowserView in this run. The report
-is `.build/ai-editor-account-gateway/real-ui-prelogin-acceptance.json`; no
-shared or preview service was modified by the failed verifier.
+Known automated-smoke limitation: the previous external-edge verifier reached
+Code but failed to observe the management BrowserView. The report is
+`.build/ai-editor-account-gateway/real-ui-prelogin-acceptance.json`; no shared
+or preview service was modified by the failed verifier. Re-run manual
+verification after the follow-up commits.
+
+## 2026-07-21 isolated OpenVPN Provider egress
+
+Implemented and pushed in the Proxy repository:
+
+- source branch: `codex/vpn-egress-openvpn@b4f471a`;
+- Ubuntu preview deployment: `codex/provider-worker-mvp@d398faa`;
+- runtime HTTP egress: `http://127.0.0.1:7891`.
+
+The OpenVPN client runs together with Tinyproxy in a dedicated Docker network
+namespace. The profile's `redirect-gateway` cannot alter the Ubuntu host
+default route, and the proxy port is published only on host loopback. Provider
+Worker was recreated with `HTTP_PROXY` and `HTTPS_PROXY` set to the new
+egress. The failed Mihomo service was stopped.
+
+Validation:
+
+- VPN container: healthy;
+- OpenAI model endpoint through the VPN: HTTP `401` without a Key;
+- ChatGPT quota endpoint through the VPN: HTTP `401` without a Token;
+- preview Gateway/Worker/Cloudflare services: healthy;
+- `verify-preview.sh`: PASS;
+- release gate: root `188/188`, Gateway `156/156`, Admin `34/34`, PASS.
+
+The existing ChatGPT subscription credential now fails with
+`TOKEN_REFRESH_RELOGIN_REQUIRED`, not a network timeout. Final acceptance
+requires a Level-1 administrator to complete official device login, refresh
+quota, and send a new Turn. Keep the free/shared VPN profile limited to
+temporary preview acceptance; replace it with a dedicated compliant egress
+before the 30-user MVP.
