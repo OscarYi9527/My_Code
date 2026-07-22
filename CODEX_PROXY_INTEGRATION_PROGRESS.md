@@ -3577,3 +3577,31 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   appends that argument pair only for a non-empty proxy origin. The stopped
   Edge was restored against the public HTTPS Gateway, and both authenticated
   management UI and real model SSE acceptance passed again.
+
+## 2026-07-23 TORVYE detailed-management brand freeze
+
+- The product name for both the standalone full console and the central
+  Gateway detailed-management surface is now fixed as:
+  - `TORVYE AI Gateway`
+  - `统一管理平台`
+- The standalone console title, sidebar mark and subtitle, the Gateway browser
+  title, bootstrap screen, management shell and compact embedded Provider
+  heading now use the same brand.
+- Authoritative Proxy commit:
+  `codex/subscription-account-management@8391e6c`.
+- Regression coverage now checks the brand in both the standalone HTML and the
+  Gateway React management shell.
+- Validation:
+  - standalone admin UI test: `14/14`;
+  - Gateway Admin: `35/35`;
+  - Admin TypeScript check and production build: PASS;
+  - full root tests: `192/192`;
+  - Gateway tests: `164/164`.
+- The aggregate `release:check` reached and passed all source, root, Gateway
+  and Admin checks, then stopped only because the intentionally running preview
+  Gateway already owned development port `47920`. It was not stopped because
+  the active preview environment and shared services must be preserved.
+- This commit freezes branding only. The already-confirmed next implementation
+  remains: serve the same complete console source in standalone and central
+  Gateway modes, with Gateway adapters backed by central data and Level-1
+  authorization. It does not authorize importing local `47892` data.

@@ -1103,3 +1103,35 @@ start after the existing Edge had already stopped. The argument is now omitted
 entirely for an empty proxy setting. Edge `47921` was restored with the public
 HTTPS Gateway origin, management Ticket/bootstrap acceptance passed, and a
 real `gpt-5.4-mini` SSE Turn passed without changing shared Proxy PID `10976`.
+
+## 2026-07-23 TORVYE management-platform brand
+
+The detailed management product brand is frozen as:
+
+```text
+TORVYE AI Gateway
+统一管理平台
+```
+
+Proxy commit `8391e6c` on
+`origin/codex/subscription-account-management` applies the brand to the
+standalone full console and the existing Gateway management shell, including
+the browser title, bootstrap screen and compact embedded Provider heading.
+
+Validation passed:
+
+- standalone admin UI `14/14`;
+- Gateway Admin `35/35`;
+- Admin TypeScript check and production build;
+- root `192/192`;
+- Gateway `164/164`.
+
+The aggregate release script stopped only at its isolated lifecycle test
+because the intentional preview Gateway already owned port `47920`; do not stop
+that preview merely to make the port available.
+
+This is the brand baseline, not completion of the full-console port. Continue
+with the confirmed design: standalone and central Gateway must load one shared
+complete console frontend; central mode uses Level-1 authorization, central
+Gateway/Worker data and write-only masked credentials, and never imports or
+controls the user's local `47892` runtime.
