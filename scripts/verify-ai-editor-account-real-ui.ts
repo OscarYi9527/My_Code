@@ -97,9 +97,9 @@ async function main(): Promise<void> {
 			nonceFile = process.env['AI_EDITOR_VERIFY_EDGE_NONCE_FILE'];
 			checks.push(pass(
 				'external-edge-reuse',
-				localGatewayIsSshForward
+				localGatewayIsSshForward && gatewayOrigin === localGatewayOrigin
 					? `Reused the pre-started Edge with a fail-closed loopback SSH forward to ${new URL(gatewayOrigin).origin}.`
-					: `Reused the pre-started Edge with Gateway ${new URL(gatewayOrigin).origin}.`
+					: `Reused the pre-started Edge with Gateway ${new URL(gatewayOrigin).origin}; any unrelated local forward was left untouched.`
 			));
 		} else {
 			const connector = runConnector(['-AuthenticationMode', 'real']);
@@ -168,7 +168,9 @@ async function main(): Promise<void> {
 				value => Array.isArray(value) && value.some((target: { url?: unknown }) => isManagementTarget(target.url, gatewayOrigin)),
 				'AI Editor management BrowserView'
 			);
+			await waitForManagementBootstrap(browser, gatewayOrigin);
 			checks.push(pass('ready-management-route', 'The ready account status opened the fixed-origin management BrowserView.'));
+			checks.push(pass('ready-management-bootstrap', 'The management BrowserView exchanged its one-time ticket and rendered authenticated account navigation.'));
 		} else if (statusText.includes('需要修改密码')) {
 			const statusAction = page.locator('.chat-input-status-container').getByText(/需要修改密码/).first();
 			await statusAction.click({ force: true });
@@ -177,6 +179,7 @@ async function main(): Promise<void> {
 				value => Array.isArray(value) && value.some((target: { url?: unknown }) => isManagementTarget(target.url, gatewayOrigin)),
 				'AI Editor password-change management BrowserView'
 			);
+			await waitForManagementBootstrap(browser, gatewayOrigin);
 			checks.push(pass('password-change-management-route', 'The password-change-required status opened the fixed-origin security BrowserView.'));
 		} else {
 			throw new Error('The real Edge did not expose a supported safe Chat account status.');
@@ -356,8 +359,13 @@ async function isPortReleased(port: number): Promise<boolean> {
 	return !isPortListening(port);
 }
 
-async function waitFor<T>(operation: () => Promise<T>, predicate: (value: T) => boolean, description: string): Promise<T> {
-	const deadline = Date.now() + 30_000;
+async function waitFor<T>(
+	operation: () => Promise<T>,
+	predicate: (value: T) => boolean,
+	description: string,
+	timeoutMs = 30_000
+): Promise<T> {
+	const deadline = Date.now() + timeoutMs;
 	let lastError: unknown;
 	while (Date.now() < deadline) {
 		try {
@@ -398,6 +406,34 @@ function isManagementTarget(value: unknown, expectedOrigin: string): boolean {
 			(url.pathname === '/admin' || url.pathname.startsWith('/admin/'));
 	} catch {
 		return false;
+	}
+}
+
+async function waitForManagementBootstrap(
+	browser: import('@playwright/test').Browser,
+	expectedOrigin: string
+): Promise<void> {
+	let lastText = '';
+	try {
+		await waitFor(
+			async () => {
+				const page = browser.contexts()
+					.flatMap(context => context.pages())
+					.find(candidate => isManagementTarget(candidate.url(), expectedOrigin));
+				lastText = page ? await page.locator('body').innerText() : '';
+				return lastText;
+			},
+			value => value.includes('AI Editor 管理') && value.includes('我的账号'),
+			'authenticated AI Editor management bootstrap',
+			60_000
+		);
+	} catch {
+		const state = lastText.includes('管理会话建立失败')
+			? 'session_exchange_failed'
+			: (lastText.includes('正在等待 Code 建立安全管理会话')
+				? 'waiting_for_code_bootstrap'
+				: (lastText ? 'unexpected_management_content' : 'management_target_missing'));
+		throw new Error(`Authenticated AI Editor management bootstrap failed (${state}).`);
 	}
 }
 

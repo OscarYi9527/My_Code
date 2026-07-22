@@ -2,7 +2,7 @@
 param(
 	[Parameter(Mandatory = $false)]
 	[string]$GatewayOrigin = $env:AI_EDITOR_VERIFY_GATEWAY_ORIGIN,
-	[string]$EdgeOutboundProxy = 'http://127.0.0.1:7890',
+	[string]$EdgeOutboundProxy = $env:AI_EDITOR_VERIFY_EDGE_OUTBOUND_PROXY,
 	[string]$ProxyRepository,
 	[string]$EdgeDataRoot,
 	[string]$UserDataDir,

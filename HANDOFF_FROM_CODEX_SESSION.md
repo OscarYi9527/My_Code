@@ -1052,3 +1052,47 @@ are met:
 2. `product.json` pins that origin;
 3. the bundled release target is switched from `legacy-standalone` to `edge`
    and the Windows product is rebuilt.
+
+## 2026-07-23 embedded management audience failure and fix
+
+The development Workbench could send real AI requests but initially showed:
+
+```text
+AI Editor 管理暂不可用。请确认账号服务已启动，然后从账户菜单重试。
+```
+
+This was not an account, model or Provider failure. Gateway logs repeatedly
+reported:
+
+```text
+400 invalid_webview_audience
+```
+
+The incorrect manual launch used `http://127.0.0.1:47920` as the Code/Edge
+Gateway origin. That address is only an SSH API transport. The Gateway issues
+and exchanges management Tickets exclusively for its configured public HTTPS
+origin, so AI forwarding worked while management authorization correctly
+failed closed.
+
+The Edge now targets:
+
+```text
+https://merit-house-engaging-must.trycloudflare.com
+```
+
+Verified after the restart:
+
+- account state `ready`;
+- Level-1 Webview Ticket issued;
+- BrowserView loaded the public `/admin` origin;
+- Ticket exchanged successfully;
+- authenticated `我的账号` navigation rendered;
+- shared Proxy PID `10976` unchanged.
+
+The UI verifier no longer counts creation of a BrowserView as success. It now
+requires authenticated management content and classifies bootstrap failures
+without logging Tickets, cookies, prompts or account secrets.
+
+For manual preview, use `scripts\launch-ai-editor-preview.ps1` with the current
+public HTTPS Gateway origin. Do not manually set
+`VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN` to the local SSH forward.

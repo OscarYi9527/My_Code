@@ -3542,3 +3542,32 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `productTarget` is switched to `edge`, manual account verification must use
   `scripts\code.bat`. The packaged product must remain fail-closed rather than
   accepting temporary environment overrides.
+
+## 2026-07-23 management Webview audience correction
+
+- A real user run proved that AI Responses could succeed while the embedded
+  management editor displayed `AI Editor 管理暂不可用`.
+- Gateway evidence isolated the failure to Webview authorization:
+  `400 invalid_webview_audience`. The Edge and Code process had been configured
+  with the loopback SSH transport origin `http://127.0.0.1:47920`, while the
+  Gateway correctly required its public HTTPS origin
+  `https://merit-house-engaging-must.trycloudflare.com`.
+- The model path does not use a Webview audience, which explains why AI
+  communication stayed healthy.
+- The isolated Edge was restarted against the public HTTPS Gateway origin.
+  After the correction:
+  - Edge status: `ready`;
+  - one-time Webview Ticket issuance: PASS;
+  - Ticket exchange and authenticated management navigation: PASS;
+  - real management BrowserView content: PASS;
+  - real model SSE: PASS;
+  - shared Proxy PID `10976`: unchanged.
+- The real UI verifier now waits for authenticated account navigation rather
+  than treating BrowserView creation as success, reports a safe bootstrap
+  failure class, and allows 60 seconds for the public management bootstrap.
+- `launch-ai-editor-preview.ps1` no longer assumes the retired loopback proxy
+  `127.0.0.1:7890`; an Edge outbound proxy is used only when explicitly set
+  through `AI_EDITOR_VERIFY_EDGE_OUTBOUND_PROXY` or `-EdgeOutboundProxy`.
+- Manual preview startup must use `launch-ai-editor-preview.ps1` with the
+  current public HTTPS Gateway origin. Setting the Code Gateway origin to the
+  local SSH forwarding address is no longer a valid management-page test.
