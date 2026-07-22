@@ -77,7 +77,12 @@ async function main(): Promise<void> {
 		}
 		await page.bringToFront();
 		const workbench = page.locator('.monaco-workbench');
-		await workbench.waitFor({ state: 'visible', timeout: 20_000 });
+		// A second development Workbench can spend more than 20 seconds
+		// negotiating the global Electron mutex while another local Code
+		// window is open. The CDP target already proves that this isolated
+		// process started, so allow the renderer to finish painting instead
+		// of reporting a false product regression under load.
+		await workbench.waitFor({ state: 'visible', timeout: 45_000 });
 		await page.bringToFront();
 		await page.keyboard.press('Escape');
 		const editorPart = page.locator('.part.editor').first();

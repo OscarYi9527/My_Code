@@ -1196,3 +1196,85 @@ The fixed-port Proxy lifecycle subtest was not allowed to displace the active
 passed independently, and the active real topology passed both management UI
 and SSE acceptance. Shared Proxy `47892` stayed at PID `10976` and was never
 stopped or restarted.
+
+## 2026-07-23 shared TORVYE full console completion
+
+Authoritative Proxy revision:
+
+```text
+origin/codex/subscription-account-management
+83f0ad8f2d81e0b9592268b1b4e07a1648a8c622
+```
+
+This revision completes T141/T142:
+
+- `/admin` remains the compact React surface for the Code tab.
+- `/admin/full` reuses the exact standalone TORVYE seven-module console.
+- Gateway compatibility APIs are Level-1 and HttpOnly-session protected,
+  credentials are write-only/masked, and standalone-only destructive actions
+  fail closed.
+- Strict CSP remains `script-src 'self'`. Every inline HTML event handler was
+  replaced by an external allowlisted event delegate; no `eval`/`Function` is
+  used.
+- Central usage is aggregated from real `usage_records` by model and
+  Asia/Shanghai natural day; zero-request models are not fabricated.
+- Manual channel checks execute Provider adapter probes. Provider Worker
+  ChatGPT probing uses a real quota refresh; unsupported Worker Provider types
+  report that limitation.
+
+Final Proxy validation:
+
+- root `193/193`;
+- Gateway `173/173`;
+- Admin `35/35`;
+- Gateway coverage `86.44 / 71.41 / 92.80 / 88.84`;
+- syntax/type/build/Provider Worker boundary/audit/diff checks: PASS;
+- browser seven-module navigation, account compact/full switch, edit modal,
+  central safety hiding, Chinese brand and console error scan: PASS.
+
+`build/ai-editor-proxy/release.json` is pinned to this commit while retaining
+`productTarget: legacy-standalone` until the formal HTTPS Gateway domain is
+available. Do not switch the product target or stop shared `47892` merely to
+test this revision.
+
+## 2026-07-23 domain-independent product closure
+
+The Windows product has now been rebuilt with the authoritative Proxy payload:
+
+```text
+codex_proxy 2.4.1
+commit 83f0ad8f2d81e0b9592268b1b4e07a1648a8c622
+target legacy-standalone
+payload files 296
+```
+
+Automated acceptance passed:
+
+- `npm run compile`;
+- `npm run core-ci`;
+- `vscode-win32-x64-min-ci`;
+- Windows product release verification with Workbench checksums `10/10`;
+- clean product startup and bundled Proxy survival after Code exit;
+- PA Plaza/PA Creator development UI `6/6`;
+- PA Plaza/PA Creator Windows product UI `6/6`.
+
+Visual evidence and machine-readable reports are under:
+
+```text
+.build/ai-editor-release/
+.build/ai-editor-pa-creator/
+```
+
+The PA UI verifier's Workbench visibility timeout is now 45 seconds. Another
+development Code window can delay the isolated renderer while Electron
+negotiates its global mutex; the old 20-second limit produced a false failure
+even though the CDP target had started. The verifier still requires the real
+Workbench, checks the complete creator flow, preserves shared Proxy PID `10976`
+and releases its own debugging port.
+
+Do not change `productTarget` from `legacy-standalone` yet. The only remaining
+release transition requiring the user's purchase/configuration is the stable
+formal HTTPS Gateway domain. After it exists, pin the origin, switch the
+payload to `edge`, rebuild, then complete T116/T117 and the final Windows/macOS
+Edge-product acceptance. Production KMS, PostgreSQL/off-host backup and
+T137/T138 infrastructure soak remain separate external gates.

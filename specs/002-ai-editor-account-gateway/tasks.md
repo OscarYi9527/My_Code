@@ -419,6 +419,11 @@ Turn 可结算为负积分。
 - [x] T140 [PW4] Add a fail-safe automated preproduction closure runner with `PASS`/`BLOCKED`/`FAIL`,
   sanitized evidence, repository/build/product/UI/SSE gates, shared Proxy invariants and explicit
   non-automatable production blockers in `D:\AI_prejoct\My_code\scripts\verify-ai-editor-preproduction-closure.ps1`
+- [x] T141 [PW3/PW6] Reuse the exact standalone TORVYE full console at Gateway `/admin/full`,
+  add Level-1 central compatibility APIs, strict-CSP event delegation, write-only credentials and
+  fail-closed standalone-only operations
+- [x] T142 [PW3/PW6] Add active Provider adapter probes plus real `usage_records` aggregation by
+  model and Asia/Shanghai natural day for the central full console
 
 **Checkpoint**: T121–T132 can be completed without purchasing a domain, cloud host, Provider quota
 or production certificate. T133 may use only dedicated test credentials after explicit confirmation.
@@ -508,7 +513,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 
 ## Task Summary
 
-- Total tasks: **140**
+- Total tasks: **142**
 - Setup/Foundation: **22**
 - US1: **15**
 - US2: **11**
@@ -519,7 +524,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 - US7: **9**
 - US8: **9**
 - Polish/validation: **12**
-- Provider Worker/public evolution: **20**
+- Provider Worker/public evolution: **22**
 
 All tasks use the required checkbox, sequential ID, optional `[P]`, user-story label and explicit
 file path format.

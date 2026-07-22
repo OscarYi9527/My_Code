@@ -3662,3 +3662,75 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   independently, and the already-running real topology passed both management
   UI and model SSE acceptance. The preview stack and shared `47892` were not
   stopped or restarted.
+
+## 2026-07-23 shared TORVYE full console and central telemetry
+
+- Proxy branch `codex/subscription-account-management` now contains the shared
+  standalone/Gateway full console at commit
+  `83f0ad8f2d81e0b9592268b1b4e07a1648a8c622`.
+- Gateway `/admin` remains the compact React surface used inside Code.
+  `/admin#browser?ticket=...&route=...` redirects to `/admin/full`, which loads
+  the exact standalone `src/admin.html`, `src/admin_app.js` and
+  `src/admin_modules/*` sources.
+- The browser full console is Level-1 only, uses an HttpOnly same-origin
+  management session, never returns complete credentials and never reads or
+  controls shared `127.0.0.1:47892`.
+- A real browser regression found that strict `script-src 'self'` blocked the
+  legacy inline event attributes even though the page rendered normally. All
+  inline HTML event handlers were removed and replaced with external,
+  allowlisted `data-admin-on*` event delegation without `eval`/`Function`.
+- Central model statistics now come from real `usage_records`, aggregated by
+  provider/model and by Asia/Shanghai natural day for the last 370 days. Zero
+  request models are no longer shown as recent calls.
+- “Detect” and “Detect all” now invoke the Provider adapter. Standalone uses
+  real upstream probes; Provider Worker ChatGPT probing performs a real quota
+  refresh. A Provider not carried by the current Worker reports unsupported
+  instead of reusing historical health as a false success.
+- Validation after the final changes:
+  - Proxy root: `193/193`;
+  - Gateway: `173/173`;
+  - Admin React: `35/35`;
+  - Gateway coverage: `86.44%` statements / `71.41%` branches /
+    `92.80%` functions / `88.84%` lines;
+  - TypeScript/syntax checks, Gateway/Admin production builds, Provider Worker
+    release boundary, `npm audit` and `git diff --check`: PASS;
+  - browser: all seven modules, compact/full account view switching, edit
+    modal open/cancel, central dangerous-operation hiding, Chinese brand and
+    zero console warnings/errors: PASS.
+- Tasks T141 and T142 are complete. Formal public domain, production KMS,
+  production PostgreSQL/off-host backup and T137/T138 infrastructure acceptance
+  remain external blockers.
+
+## 2026-07-23 domain-independent Windows release closure
+
+- The independently checksummed Proxy payload was regenerated from clean
+  `codex/subscription-account-management@83f0ad8f2d81e0b9592268b1b4e07a1648a8c622`.
+  Its release manifest contains 296 files and remains on
+  `legacy-standalone`; no temporary Tunnel origin was embedded in the product.
+- `vscode-win32-x64-min-ci` completed with the Windows SDK x64 `signtool.exe`.
+  The unpacked product at `D:\AI_prejoct\VSCode-win32-x64` and both installer
+  variants were regenerated from the synchronized `out-vscode-min` surface.
+- Windows release acceptance: PASS.
+  - Workbench checksums: `10/10`;
+  - packaged Proxy revision: `83f0ad8f2d81e0b9592268b1b4e07a1648a8c622`;
+  - clean first start: PASS;
+  - bundled Proxy survived Code exit: PASS;
+  - packaged admin source contains `TORVYE AI Gateway · 统一管理平台`.
+- Development and product PA Plaza/PA Creator UI acceptance each passed all
+  six checks. Both opened the Plaza, discovered the built-in creator, rendered
+  nine AA steps, crossed the mandatory confirmation boundary, captured visual
+  evidence and released their isolated debugging ports.
+- The development UI verifier now allows 45 seconds for the Workbench renderer
+  to become visible. This removes a repeatable false failure when another
+  development Code window holds the global Electron mutex; the verifier still
+  requires a real CDP Workbench target and performs isolated cleanup.
+- Final Code checks:
+  - `npm run compile`: PASS;
+  - `npm run core-ci`: PASS;
+  - development PA UI: PASS;
+  - Windows product PA UI: PASS.
+- Shared Proxy `127.0.0.1:47892` remained PID `10976` with `/live=ok` throughout
+  all packaging and UI runs. It was not stopped, restarted or modified.
+- The remaining product switch is intentionally blocked on a stable formal
+  HTTPS Gateway domain. T116/T117 final Edge-product acceptance, production
+  KMS/PostgreSQL/off-host backup and T137/T138 are not claimed by this closure.
