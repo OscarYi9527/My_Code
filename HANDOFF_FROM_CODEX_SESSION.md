@@ -943,3 +943,68 @@ the existing subscription credential, refresh quota, and send a new Turn.
 Do not push the Ubuntu `codex/provider-worker-mvp` worktree with force: it is
 ahead of and diverged from its remote branch. The source branch
 `origin/codex/vpn-egress-openvpn@ba0bc0b` is the authoritative pushed history.
+
+## 2026-07-23 real subscription and Worker reliability closure
+
+The previous human gate is complete. A real ChatGPT subscription Turn now
+travels through the isolated Windows Edge, Ubuntu Gateway and Provider Worker,
+returns a completed SSE response, settles its Level-1 exempt usage and receives
+the matching Worker acknowledgement.
+
+Authoritative pushed Proxy delivery:
+
+- branch: `codex/subscription-account-management`;
+- remote HEAD: `6965c1f`;
+- exempt settlement: `751311c`;
+- safe upstream diagnostics: `adf8c4b`;
+- Worker restart recovery: `6965c1f`.
+
+Ubuntu preview remains intentionally divergent and was not pushed. Its local
+equivalent commits are:
+
+- `02f1458` — exempt settlement;
+- `9ea08ed` — safe upstream diagnostics;
+- `d4ba9cd` — automatic Worker runtime restoration.
+
+The Ubuntu CRLF issue was corrected only in the 11 named delivery files.
+`git diff --check` passed and the branch is clean after the two new local
+commits.
+
+Final real acceptance:
+
+```text
+account state: ready
+catalog: 6 models
+model: gpt-5.4-mini
+Turn: turn_a90590b340304183b82f73a41000264b
+SSE: response.completed
+Gateway: settled, input=13, output=11
+settlement: usage_exempt_8f2ad1ef643d45fc2a891df5a03b1783
+Worker acknowledgement: matching settlement ID
+```
+
+The verifier in
+`scripts/verify-ai-editor-account-real-model-sse.ts` now:
+
+1. sends the Codex Responses message-array request with `store:false`;
+2. accepts only the explicit fail-closed loopback SSH forward used for the
+   VMware Gateway tunnel, while retaining repository ownership checks for a
+   local Gateway.
+
+Validation:
+
+- `npm run compile`: PASS;
+- development Workbench from `scripts\code.bat`: PASS with an isolated profile;
+- `npm run core-ci`: PASS;
+- Windows product release acceptance: PASS;
+- product checksums: `10/10`;
+- clean product first start: PASS;
+- no recent outbox-unsettleable or runtime-recovery-failed warnings.
+
+Reports:
+
+- `.build/ai-editor-account-gateway/real-model-sse-acceptance.json`;
+- `.build/ai-editor-release/windows-x64-release-report.json`.
+
+Shared Proxy `127.0.0.1:47892` stayed healthy at PID `10976` and was never
+restarted or modified during this work.

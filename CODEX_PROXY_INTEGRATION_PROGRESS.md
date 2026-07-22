@@ -3473,3 +3473,47 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - The Ubuntu deployment branch has diverged from its remote branch, so no
   force push or rewrite was attempted. The authoritative source fixes are
   pushed on `origin/codex/vpn-egress-openvpn`.
+
+## 2026-07-23 real subscription, exempt settlement and Worker recovery closure
+
+- The authoritative Proxy source branch is synchronized at
+  `origin/codex/subscription-account-management@6965c1f`:
+  - `751311c` records and acknowledges Level-1 exempt Turn usage without
+    reserving or deducting credits;
+  - `adf8c4b` logs only allow-listed upstream rejection diagnostics;
+  - `6965c1f` restores persisted ChatGPT subscription runtime configuration
+    automatically after a Worker-only restart.
+- The divergent Ubuntu preview branch was not reset, force-pushed or rewritten.
+  Equivalent local commits are:
+  - `02f1458` — Level-1 exempt settlement;
+  - `9ea08ed` — safe upstream diagnostics;
+  - `d4ba9cd` — Worker runtime recovery.
+- A pre-existing CRLF copy problem in the 11 explicit Ubuntu delivery files
+  was normalized to LF. `git diff --check` passed before both local commits.
+- Real isolated Edge acceptance passed against the Ubuntu Gateway/Worker:
+  - account state: `ready`;
+  - authorized model catalog: 6 entries;
+  - model: `gpt-5.4-mini`;
+  - `/v1/responses`: SSE emitted `response.completed`;
+  - verification Turn: `turn_a90590b340304183b82f73a41000264b`;
+  - Gateway settlement: `settled`, 13 input Tokens and 11 output Tokens;
+  - Worker acknowledgement uses the same
+    `usage_exempt_8f2ad1ef643d45fc2a891df5a03b1783` settlement ID.
+- The real-model verifier now sends the internal Codex Responses message-array
+  shape with `store:false`, and recognizes the fail-closed loopback SSH forward
+  used by the VMware preview topology instead of misclassifying it as a local
+  Gateway process.
+- No `provider_worker_outbox_turn_not_settleable` or
+  `provider_worker_runtime_recovery_failed` event appeared after the final
+  acceptance.
+- Code validation:
+  - `npm run compile`: PASS;
+  - isolated `scripts\code.bat` Workbench startup: PASS;
+  - `npm run core-ci`: PASS;
+  - Windows product release acceptance: PASS, checksums `10/10`, clean first
+    start PASS.
+- Evidence:
+  - `.build/ai-editor-account-gateway/real-model-sse-acceptance.json`;
+  - `.build/ai-editor-release/windows-x64-release-report.json`.
+- Shared Proxy `127.0.0.1:47892` remained PID `10976` with `/live=ok` for the
+  entire closure and was not restarted or modified.

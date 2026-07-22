@@ -49,8 +49,10 @@ async function main(): Promise<void> {
 			throw new Error('Real model/SSE verification only trusts the isolated loopback Edge on port 47921.');
 		}
 		assertIsolatedService(47921, resolvedDataRoot, 'Edge');
-		const gatewayRunning = listenerProcessId(47920) !== undefined;
-		if (gatewayRunning) {
+		const gatewayProcessId = listenerProcessId(47920);
+		const gatewayCommandLine = gatewayProcessId === undefined ? '' : processCommandLine(gatewayProcessId);
+		const gatewayIsSshForward = gatewayProcessId !== undefined && isLoopbackGatewaySshForward(gatewayCommandLine);
+		if (gatewayProcessId !== undefined && !gatewayIsSshForward) {
 			assertIsolatedService(47920, resolvedDataRoot, 'Gateway');
 		}
 		const live = await fetchJson(`${edgeOrigin}/live`) as { status?: unknown; mode?: unknown };
@@ -60,9 +62,11 @@ async function main(): Promise<void> {
 		checks.push({
 			name: 'isolated-edge-topology',
 			result: 'PASS',
-			detail: gatewayRunning
-				? 'Verified the repository-owned local Gateway and Edge.'
-				: 'Verified the repository-owned local Edge with an external Gateway.'
+			detail: gatewayProcessId === undefined
+				? 'Verified the repository-owned local Edge with an external Gateway.'
+				: (gatewayIsSshForward
+					? 'Verified the repository-owned local Edge with a fail-closed loopback SSH Gateway forward.'
+					: 'Verified the repository-owned local Gateway and Edge.')
 		});
 
 		const noncePath = path.resolve(configuredNonceFile ?? path.join(resolvedDataRoot, 'edge-local-nonce.secret'));
@@ -102,7 +106,16 @@ async function main(): Promise<void> {
 		const response = await fetch(`${edgeOrigin}/v1/responses`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-			body: JSON.stringify({ model, input: prompt, stream: true }),
+			body: JSON.stringify({
+				model,
+				input: [{
+					type: 'message',
+					role: 'user',
+					content: [{ type: 'input_text', text: prompt }]
+				}],
+				stream: true,
+				store: false
+			}),
 			signal: AbortSignal.timeout(responseTimeoutMs)
 		});
 		if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream') || !response.body) {
@@ -271,11 +284,24 @@ function assertIsolatedService(port: number, dataRoot: string, name: string): vo
 	if (recorded.pid !== processId) {
 		throw new Error(`${name} is not the requested isolated Black service.`);
 	}
-	const command = `(Get-CimInstance Win32_Process -Filter 'ProcessId = ${processId}').CommandLine`;
-	const commandLine = spawnSync('powershell.exe', ['-NoProfile', '-Command', command], { encoding: 'utf8', windowsHide: true }).stdout;
+	const commandLine = processCommandLine(processId);
 	if (!commandLine.includes(blackRepository)) {
 		throw new Error(`${name} is not the requested isolated Black service.`);
 	}
+}
+
+function processCommandLine(processId: number): string {
+	const command = `(Get-CimInstance Win32_Process -Filter 'ProcessId = ${processId}').CommandLine`;
+	return spawnSync('powershell.exe', ['-NoProfile', '-Command', command], { encoding: 'utf8', windowsHide: true }).stdout.trim();
+}
+
+function isLoopbackGatewaySshForward(commandLine: string): boolean {
+	const normalized = commandLine.replace(/\s+/g, ' ').trim();
+	return /(?:^|[\\/"\s])ssh(?:\.exe)?(?=["\s]|$)/i.test(normalized) &&
+		/(?:^|\s)-N(?:\s|$)/.test(normalized) &&
+		/(?:^|\s)-o\s+BatchMode=yes(?:\s|$)/i.test(normalized) &&
+		/(?:^|\s)-o\s+ExitOnForwardFailure=yes(?:\s|$)/i.test(normalized) &&
+		/(?:^|\s)-L\s+(?:127\.0\.0\.1:)?47920:127\.0\.0\.1:47920(?:\s|$)/.test(normalized);
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
