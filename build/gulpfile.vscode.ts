@@ -36,7 +36,7 @@ import globCallback from 'glob';
 import rceditCallback from 'rcedit';
 import { spawnTsgo } from './lib/tsgo.ts';
 import { runEsbuildTranspile, runEsbuildBundle } from './lib/esbuild.ts';
-import { validateAiEditorProxyArtifact } from './lib/aiEditorProxyArtifact.ts';
+import { isAiEditorProxyProductPath, validateAiEditorProxyArtifact } from './lib/aiEditorProxyArtifact.ts';
 import { assertAiEditorProxyReleaseIdentity, readAiEditorProxyReleaseSource } from './lib/aiEditorProxyRelease.ts';
 
 
@@ -633,7 +633,12 @@ function patchWin32DependenciesTask(destinationFolderName: string) {
 			glob('**/rg.exe', { cwd }),
 			glob('**/tgrep.exe', { cwd }),
 			glob('**/*explorer_command*.dll', { cwd }),
-		])).flatMap(o => o);
+		]))
+			.flatMap(o => o)
+			// The bundled Proxy is a separately checksummed release artifact.
+			// Keep its native dependencies byte-for-byte identical to
+			// release-manifest.json instead of rewriting them with rcedit.
+			.filter(dep => !isAiEditorProxyProductPath(dep));
 		const packageJson = JSON.parse(await fs.promises.readFile(path.join(cwd, versionedResourcesFolder, 'resources', 'app', 'package.json'), 'utf8'));
 		const product = JSON.parse(await fs.promises.readFile(path.join(cwd, versionedResourcesFolder, 'resources', 'app', 'product.json'), 'utf8'));
 		const baseVersion = packageJson.version.replace(/-.*$/, '');

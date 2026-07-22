@@ -73,6 +73,13 @@ const forbiddenEdgePrefixes = [
 	'src/routes/'
 ];
 
+export function isAiEditorProxyProductPath(relativePath: string): boolean {
+	const normalized = relativePath.replaceAll('\\', '/').toLowerCase();
+	return normalized === 'resources/app/ai-editor-proxy' ||
+		normalized.startsWith('resources/app/ai-editor-proxy/') ||
+		normalized.includes('/resources/app/ai-editor-proxy/');
+}
+
 function sha256(filePath: string): string {
 	return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }

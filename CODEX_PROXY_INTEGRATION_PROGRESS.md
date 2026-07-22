@@ -3605,3 +3605,60 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   remains: serve the same complete console source in standalone and central
   Gateway modes, with Gateway adapters backed by central data and Level-1
   authorization. It does not authorize importing local `47892` data.
+
+## 2026-07-23 TORVYE management-platform full regression
+
+- A complete regression was run after the TORVYE brand change. Evidence is in:
+  `.build/torvye-management-regression/20260723-021555/`.
+- Proxy/Gateway/Admin results after all fixes:
+  - root Proxy: `192/192`;
+  - Gateway: `164/164`;
+  - Admin: `35/35`;
+  - Gateway coverage: `85.51%` statements / `70.90%` branches /
+    `92.08%` functions / `88.09%` lines;
+  - Admin coverage: `71.54%` statements / `66.97%` branches /
+    `62.75%` functions / `75.00%` lines;
+  - workspace checks, Provider Worker release boundary and Gateway/Admin
+    production builds: PASS.
+- UI regression:
+  - the isolated standalone console rendered the TORVYE title and all seven
+    modules: overview, models, relays, account pool, analytics, settings and
+    tutorial;
+  - every module loaded without an error toast or browser-console warning;
+  - refresh and light/dark theme switching passed;
+  - the Gateway production bundle loaded its JavaScript/CSS and rendered
+    `TORVYE AI Gateway / 统一管理平台` without Chinese corruption;
+  - the real Code account status and authenticated management BrowserView
+    passed `7` checks;
+  - a real `gpt-5.4-mini` Responses SSE passed `5` checks and emitted
+    `response.completed`.
+- The audit found high-severity `GHSA-v2hh-gcrm-f6hx` in transitive
+  `fast-uri` versions `3.1.3` and `4.1.0`. Proxy commit
+  `40943595371513af499c054bfe2cbd17c91546f4` upgrades them to `3.1.4` and
+  `4.1.1`; `npm audit` now reports zero vulnerabilities and all suites were
+  rerun after the upgrade.
+- Windows packaging exposed a separate integrity bug: the normal dependency
+  patch step used `rcedit` on `rg.exe` inside the independently checksummed
+  bundled Proxy, invalidating its release manifest. The package step now
+  excludes every `resources/app/ai-editor-proxy` native file from Windows
+  dependency rewriting, with a build-script unit regression test.
+- Code validation after the fixes:
+  - `npm run compile`: PASS;
+  - `npm run core-ci`: PASS;
+  - `vscode-win32-x64-min-ci`: PASS;
+  - Windows product release: PASS, Workbench checksums `10/10`;
+  - clean product start and bundled Proxy survival after Code exit: PASS;
+  - packaged Proxy commit:
+    `40943595371513af499c054bfe2cbd17c91546f4`;
+  - packaged standalone admin title:
+    `TORVYE AI Gateway · 统一管理平台`.
+- The real UI verifier also received dedicated extension-host and Agent Host
+  inspector ports. This prevents another open development Code window on the
+  default `5870/5878` ports from causing a false management BrowserView
+  timeout.
+- The aggregate Proxy release command cannot own its fixed `47920/47921`
+  lifecycle ports while the intentional preview stack is running. Everything
+  before that lifecycle gate passed, every remaining release command was run
+  independently, and the already-running real topology passed both management
+  UI and model SSE acceptance. The preview stack and shared `47892` were not
+  stopped or restarted.

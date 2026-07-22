@@ -27,6 +27,8 @@ const edgeOrigin = process.env['AI_EDITOR_VERIFY_EDGE_ORIGIN'] || localEdgeOrigi
 const gatewayOrigin = process.env['AI_EDITOR_VERIFY_GATEWAY_ORIGIN'] || localGatewayOrigin;
 const sharedProxyOrigin = 'http://127.0.0.1:47892';
 const codeRemoteDebuggingPort = 49232;
+const codeExtensionHostDebuggingPort = 49233;
+const codeAgentHostDebuggingPort = 49234;
 
 interface ISharedProxySnapshot {
 	readonly processId: number | undefined;
@@ -59,6 +61,8 @@ interface IReport {
 
 async function main(): Promise<void> {
 	await assertPortAvailable(codeRemoteDebuggingPort, 'Code remote debugging');
+	await assertPortAvailable(codeExtensionHostDebuggingPort, 'Code extension host debugging');
+	await assertPortAvailable(codeAgentHostDebuggingPort, 'Code Agent Host debugging');
 	const localGatewayProcessId = getListenerProcessId(47920);
 	const localGatewayIsSshForward = localGatewayProcessId !== undefined &&
 		isLoopbackGatewaySshForward(getProcessCommandLine(localGatewayProcessId));
@@ -290,6 +294,8 @@ function startCode(
 		'--extensions-dir', `"${extensionsDirectory}"`,
 		'--shared-data-dir', `"${sharedDataDirectory}"`,
 		`--remote-debugging-port=${codeRemoteDebuggingPort}`,
+		`--inspect-extensions=${codeExtensionHostDebuggingPort}`,
+		`--inspect-agenthost=${codeAgentHostDebuggingPort}`,
 		'--disable-workspace-trust',
 		'--new-window',
 		`"${repositoryRoot}"`

@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { suite, test } from 'node:test';
-import { validateAiEditorProxyArtifact } from '../aiEditorProxyArtifact.ts';
+import { isAiEditorProxyProductPath, validateAiEditorProxyArtifact } from '../aiEditorProxyArtifact.ts';
 import type { AiEditorProxyReleaseTargetName } from '../aiEditorProxyRelease.ts';
 
 function createArtifact(
@@ -179,5 +179,24 @@ suite('AI Editor Proxy release artifact', () => {
 
 		assert.ok(installer.includes(proxyCleanup), 'installer must replace the bundled Proxy program directory');
 		assert.ok(!/\\.claude[\\/]proxy/i.test(installer), 'installer must not reference the Proxy user-data directory');
+	});
+
+	test('keeps bundled Proxy native files outside Windows dependency patching', () => {
+		assert.strictEqual(
+			isAiEditorProxyProductPath('resources/app/ai-editor-proxy/node_modules/native.node'),
+			true
+		);
+		assert.strictEqual(
+			isAiEditorProxyProductPath('commit/resources/app/ai-editor-proxy/node_modules/rg.exe'),
+			true
+		);
+		assert.strictEqual(
+			isAiEditorProxyProductPath('resources\\app\\ai-editor-proxy\\node_modules\\rg.exe'),
+			true
+		);
+		assert.strictEqual(
+			isAiEditorProxyProductPath('resources/app/node_modules/@vscode/ripgrep/bin/rg.exe'),
+			false
+		);
 	});
 });

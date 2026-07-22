@@ -1135,3 +1135,64 @@ with the confirmed design: standalone and central Gateway must load one shared
 complete console frontend; central mode uses Level-1 authorization, central
 Gateway/Worker data and write-only masked credentials, and never imports or
 controls the user's local `47892` runtime.
+
+## 2026-07-23 TORVYE full regression and packaging closure
+
+The post-brand regression is complete. The full evidence set is:
+
+```text
+D:\AI_prejoct\My_code\.build\torvye-management-regression\20260723-021555\
+```
+
+Final automated results:
+
+- Proxy `192/192`;
+- Gateway `164/164`;
+- Admin `35/35`;
+- Gateway coverage `85.51% / 70.90% / 92.08% / 88.09%`;
+- Admin coverage `71.54% / 66.97% / 62.75% / 75.00%`;
+- workspace checks, Provider Worker boundary and production builds PASS;
+- `npm audit`: zero vulnerabilities.
+
+The browser regression loaded every standalone management module, refresh and
+theme switching without an error toast or browser-console warning. The Gateway
+production bundle loaded its script and stylesheet and displayed:
+
+```text
+TORVYE AI Gateway
+统一管理平台
+```
+
+The real Code account status plus authenticated management BrowserView passed
+seven checks. A real `gpt-5.4-mini` Responses request passed five checks and
+emitted `response.completed`.
+
+Three issues were found and closed:
+
+1. Proxy commit `40943595371513af499c054bfe2cbd17c91546f4` upgrades vulnerable
+   transitive `fast-uri` `3.1.3/4.1.0` to fixed `3.1.4/4.1.1`.
+2. Windows packaging no longer rewrites native files inside the separately
+   checksummed `resources/app/ai-editor-proxy` artifact with `rcedit`; a unit
+   test prevents recurrence.
+3. The real UI verifier uses dedicated extension-host and Agent Host inspector
+   ports so another open development Code window on `5870/5878` cannot cause a
+   false timeout.
+
+Final Code/product validation:
+
+- `npm run compile`: PASS;
+- `npm run core-ci`: PASS;
+- `vscode-win32-x64-min-ci`: PASS;
+- Windows Workbench checksums: `10/10`;
+- clean product start: PASS;
+- bundled Proxy survives Code exit: PASS;
+- packaged Proxy commit:
+  `40943595371513af499c054bfe2cbd17c91546f4`;
+- packaged standalone title:
+  `TORVYE AI Gateway · 统一管理平台`.
+
+The fixed-port Proxy lifecycle subtest was not allowed to displace the active
+`47920/47921` preview. All preceding release steps and every remaining command
+passed independently, and the active real topology passed both management UI
+and SSE acceptance. Shared Proxy `47892` stayed at PID `10976` and was never
+stopped or restarted.
