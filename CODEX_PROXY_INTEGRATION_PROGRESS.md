@@ -3571,3 +3571,9 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - Manual preview startup must use `launch-ai-editor-preview.ps1` with the
   current public HTTPS Gateway origin. Setting the Code Gateway origin to the
   local SSH forwarding address is no longer a valid management-page test.
+- Follow-up startup regression: when no Edge outbound proxy was configured,
+  the launcher still emitted a bare `-EdgeOutboundProxy` argument and stopped
+  the old Edge before PowerShell rejected the missing value. The launcher now
+  appends that argument pair only for a non-empty proxy origin. The stopped
+  Edge was restored against the public HTTPS Gateway, and both authenticated
+  management UI and real model SSE acceptance passed again.

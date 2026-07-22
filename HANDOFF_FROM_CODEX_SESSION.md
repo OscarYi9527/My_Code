@@ -1096,3 +1096,10 @@ without logging Tickets, cookies, prompts or account secrets.
 For manual preview, use `scripts\launch-ai-editor-preview.ps1` with the current
 public HTTPS Gateway origin. Do not manually set
 `VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN` to the local SSH forward.
+
+Follow-up correction: the launcher originally passed `-EdgeOutboundProxy`
+without a value when no proxy was configured. PowerShell rejected the child
+start after the existing Edge had already stopped. The argument is now omitted
+entirely for an empty proxy setting. Edge `47921` was restored with the public
+HTTPS Gateway origin, management Ticket/bootstrap acceptance passed, and a
+real `gpt-5.4-mini` SSE Turn passed without changing shared Proxy PID `10976`.

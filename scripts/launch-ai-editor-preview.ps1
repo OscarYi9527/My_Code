@@ -156,9 +156,11 @@ if (-not $edgeProcessId) {
 		'-Mode', 'edge',
 		'-AuthenticationMode', 'real',
 		'-GatewayOrigin', $GatewayOrigin,
-		'-EdgeOutboundProxy', $EdgeOutboundProxy,
 		'-DataRoot', $EdgeDataRoot
 	)
+	if (-not [string]::IsNullOrWhiteSpace($EdgeOutboundProxy)) {
+		$startArguments += @('-EdgeOutboundProxy', $EdgeOutboundProxy)
+	}
 	& powershell -NoProfile -ExecutionPolicy Bypass -File $startScript @startArguments
 	if ($LASTEXITCODE -ne 0) {
 		throw "Preview Edge start failed with exit code $LASTEXITCODE."
