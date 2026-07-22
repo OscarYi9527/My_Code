@@ -3517,3 +3517,28 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   - `.build/ai-editor-release/windows-x64-release-report.json`.
 - Shared Proxy `127.0.0.1:47892` remained PID `10976` with `/live=ok` for the
   entire closure and was not restarted or modified.
+
+## 2026-07-23 product-preview account diagnosis correction
+
+- A manual command incorrectly attempted to validate the temporary VMware
+  account stack through the packaged Windows product by setting process
+  environment overrides.
+- Evidence from that run showed the Agent Host did use Edge `47921`, but the
+  packaged account contribution was intentionally inactive:
+  - packaged `product.json` has no `aiEditorAccountGatewayOrigin`;
+  - the bundled Proxy target is still `legacy-standalone`;
+  - built products intentionally ignore development account-origin and nonce
+    environment overrides.
+- The account was not lost. The Edge safe status remained `ready` for the
+  Level-1 account, and the same Edge/Gateway topology passed the development
+  Workbench UI acceptance:
+  - ready account status visible;
+  - management BrowserView opened;
+  - shared Proxy PID `10976` unchanged.
+- The real UI verifier now recognizes the fail-closed loopback SSH Gateway
+  forward, removes inherited `ELECTRON_RUN_AS_NODE` before launching Code, and
+  accepts safe same-origin `/admin` route normalization.
+- Until the stable production HTTPS Gateway origin is pinned and
+  `productTarget` is switched to `edge`, manual account verification must use
+  `scripts\code.bat`. The packaged product must remain fail-closed rather than
+  accepting temporary environment overrides.

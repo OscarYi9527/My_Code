@@ -59,14 +59,17 @@ interface IReport {
 
 async function main(): Promise<void> {
 	await assertPortAvailable(codeRemoteDebuggingPort, 'Code remote debugging');
-	const localGatewayWasRunning = isPortListening(47920);
+	const localGatewayProcessId = getListenerProcessId(47920);
+	const localGatewayIsSshForward = localGatewayProcessId !== undefined &&
+		isLoopbackGatewaySshForward(getProcessCommandLine(localGatewayProcessId));
+	const localGatewayWasRunning = localGatewayProcessId !== undefined && !localGatewayIsSshForward;
 	const localEdgeWasRunning = isPortListening(47921);
 	if (localGatewayWasRunning && !localEdgeWasRunning) {
 		throw new Error('The local Gateway is running without its Edge; the verifier will not modify it.');
 	}
 	const externalEdgeOnly = localEdgeWasRunning && !localGatewayWasRunning;
-	const isolatedStackWasRunning = localGatewayWasRunning || localEdgeWasRunning;
-	if (externalEdgeOnly && gatewayOrigin === localGatewayOrigin) {
+	const isolatedStackWasRunning = localGatewayProcessId !== undefined || localEdgeWasRunning;
+	if (externalEdgeOnly && gatewayOrigin === localGatewayOrigin && !localGatewayIsSshForward) {
 		throw new Error('A pre-started Edge requires AI_EDITOR_VERIFY_GATEWAY_ORIGIN when the local Gateway is not running.');
 	}
 
@@ -92,7 +95,12 @@ async function main(): Promise<void> {
 		let nonceFile: string | undefined;
 		if (externalEdgeOnly) {
 			nonceFile = process.env['AI_EDITOR_VERIFY_EDGE_NONCE_FILE'];
-			checks.push(pass('external-edge-reuse', `Reused the pre-started Edge with Gateway ${new URL(gatewayOrigin).origin}.`));
+			checks.push(pass(
+				'external-edge-reuse',
+				localGatewayIsSshForward
+					? `Reused the pre-started Edge with a fail-closed loopback SSH forward to ${new URL(gatewayOrigin).origin}.`
+					: `Reused the pre-started Edge with Gateway ${new URL(gatewayOrigin).origin}.`
+			));
 		} else {
 			const connector = runConnector(['-AuthenticationMode', 'real']);
 			startedIsolatedStack = !isolatedStackWasRunning;
@@ -148,6 +156,7 @@ async function main(): Promise<void> {
 		} else if (statusText.includes('账号不可用')) {
 			checks.push(pass('account-unavailable-visible', 'The real Edge exposed the safe account-unavailable status without opening administration routes.'));
 		} else if (statusText.includes('AI 服务正常')) {
+			checks.push(pass('ready-account-status-visible', 'The development Workbench displayed the ready AI Editor account status.'));
 			const statusAction = page.locator('.chat-input-status-container').getByText(/AI 服务正常/).first();
 			// Startup notifications (for example an extension-host recovery
 			// toast) can overlap the lower-right status action without changing
@@ -156,7 +165,7 @@ async function main(): Promise<void> {
 			await statusAction.click({ force: true });
 			await waitFor(
 				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
-				value => Array.isArray(value) && value.some((target: { url?: unknown }) => target.url === `${gatewayOrigin}/admin#account`),
+				value => Array.isArray(value) && value.some((target: { url?: unknown }) => isManagementTarget(target.url, gatewayOrigin)),
 				'AI Editor management BrowserView'
 			);
 			checks.push(pass('ready-management-route', 'The ready account status opened the fixed-origin management BrowserView.'));
@@ -165,7 +174,7 @@ async function main(): Promise<void> {
 			await statusAction.click({ force: true });
 			await waitFor(
 				() => fetchJson(`http://127.0.0.1:${codeRemoteDebuggingPort}/json/list`),
-				value => Array.isArray(value) && value.some((target: { url?: unknown }) => target.url === `${gatewayOrigin}/admin#security`),
+				value => Array.isArray(value) && value.some((target: { url?: unknown }) => isManagementTarget(target.url, gatewayOrigin)),
 				'AI Editor password-change management BrowserView'
 			);
 			checks.push(pass('password-change-management-route', 'The password-change-required status opened the fixed-origin security BrowserView.'));
@@ -283,17 +292,19 @@ function startCode(
 		`"${repositoryRoot}"`
 	].join(' ');
 	fs.writeFileSync(launcherPath, `@echo off\r\n${command}\r\n`, 'utf8');
+	const codeEnvironment = {
+		...process.env,
+		VSCODE_SKIP_PRELAUNCH: '1',
+		VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN: edgeOrigin,
+		VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN: gatewayOrigin,
+		VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE: nonceFile,
+		VSCODE_AGENT_HOST_CODEX_PROXY_MODE: 'external-local-proxy',
+		VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL: edgeOrigin
+	};
+	delete codeEnvironment['ELECTRON_RUN_AS_NODE'];
 	spawn('cmd.exe', ['/d', '/c', launcherPath], {
 		cwd: repositoryRoot,
-		env: {
-			...process.env,
-			VSCODE_SKIP_PRELAUNCH: '1',
-			VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN: edgeOrigin,
-			VSCODE_AI_EDITOR_ACCOUNT_GATEWAY_ORIGIN: gatewayOrigin,
-			VSCODE_AI_EDITOR_ACCOUNT_EDGE_NONCE_FILE: nonceFile,
-			VSCODE_AGENT_HOST_CODEX_PROXY_MODE: 'external-local-proxy',
-			VSCODE_AGENT_HOST_CODEX_PROXY_BASE_URL: edgeOrigin
-		},
+		env: codeEnvironment,
 		windowsHide: true,
 		stdio: ['ignore', fs.openSync(path.join(runDirectory, 'code.stdout.log'), 'w'), fs.openSync(path.join(runDirectory, 'code.stderr.log'), 'w')]
 	});
@@ -315,6 +326,20 @@ function getListenerProcessId(port: number): number | undefined {
 	const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', command], { encoding: 'utf8', windowsHide: true });
 	const value = result.stdout.trim();
 	return /^\d+$/.test(value) ? Number(value) : undefined;
+}
+
+function getProcessCommandLine(processId: number): string {
+	const command = `(Get-CimInstance Win32_Process -Filter 'ProcessId = ${processId}').CommandLine`;
+	return spawnSync('powershell.exe', ['-NoProfile', '-Command', command], { encoding: 'utf8', windowsHide: true }).stdout.trim();
+}
+
+function isLoopbackGatewaySshForward(commandLine: string): boolean {
+	const normalized = commandLine.replace(/\s+/g, ' ').trim();
+	return /(?:^|[\\/"\s])ssh(?:\.exe)?(?=["\s]|$)/i.test(normalized) &&
+		/(?:^|\s)-N(?:\s|$)/.test(normalized) &&
+		/(?:^|\s)-o\s+BatchMode=yes(?:\s|$)/i.test(normalized) &&
+		/(?:^|\s)-o\s+ExitOnForwardFailure=yes(?:\s|$)/i.test(normalized) &&
+		/(?:^|\s)-L\s+(?:127\.0\.0\.1:)?47920:127\.0\.0\.1:47920(?:\s|$)/.test(normalized);
 }
 
 function isPortListening(port: number): boolean {
@@ -361,6 +386,19 @@ function isEdgeLive(value: unknown): value is { status: 'ok'; mode: 'edge' } {
 		typeof value === 'object' &&
 		(value as { status?: unknown }).status === 'ok' &&
 		(value as { mode?: unknown }).mode === 'edge';
+}
+
+function isManagementTarget(value: unknown, expectedOrigin: string): boolean {
+	if (typeof value !== 'string') {
+		return false;
+	}
+	try {
+		const url = new URL(value);
+		return url.origin === new URL(expectedOrigin).origin &&
+			(url.pathname === '/admin' || url.pathname.startsWith('/admin/'));
+	} catch {
+		return false;
+	}
 }
 
 async function stopRunCodeProcesses(runDirectory: string): Promise<void> {

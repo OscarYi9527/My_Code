@@ -1008,3 +1008,47 @@ Reports:
 
 Shared Proxy `127.0.0.1:47892` stayed healthy at PID `10976` and was never
 restarted or modified during this work.
+
+## 2026-07-23 packaged-product account verification correction
+
+Do not use process environment overrides to test the temporary VMware account
+stack in `D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe`.
+
+The packaged product is still a migration build:
+
+```text
+aiEditorAccountGatewayOrigin: not set
+bundled target: legacy-standalone
+```
+
+This means its account menu is intentionally disabled. Built products ignore
+the development Edge/Gateway/nonce environment variables by design, so a
+temporary local or Quick Tunnel endpoint cannot silently activate product
+account enforcement. The observed empty account menu was therefore not an
+account-data loss.
+
+The same logged-in Edge was verified automatically through the development
+Workbench:
+
+```text
+Edge state: ready
+role: level1
+AI Editor account status: visible
+management BrowserView: opened
+real UI acceptance: PASS
+shared Proxy: PID 10976, unchanged
+```
+
+The verifier `scripts/verify-ai-editor-account-real-ui.ts` now supports the
+current fail-closed loopback SSH Gateway forward, clears inherited
+`ELECTRON_RUN_AS_NODE`, and validates the normalized same-origin `/admin`
+management target.
+
+Use `scripts\code.bat` for current preproduction UI verification. Product
+account verification becomes valid only after all three release conditions
+are met:
+
+1. a stable non-loopback HTTPS Gateway origin is selected;
+2. `product.json` pins that origin;
+3. the bundled release target is switched from `legacy-standalone` to `edge`
+   and the Windows product is rebuilt.
