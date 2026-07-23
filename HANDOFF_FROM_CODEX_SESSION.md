@@ -1397,3 +1397,46 @@ Do not promote the Quick Tunnel. Formal DNS/TLS for
 `https://gateway.torvye.com` is still absent, so `product.json` is unchanged,
 `productTarget` remains `legacy-standalone`, and final T116/T117 Edge-product
 acceptance remains pending.
+
+## 2026-07-23 Singapore Provider Worker split preproduction
+
+The preproduction route has been deployed and validated:
+
+```text
+AI Editor -> 114.132.161.56 Gateway
+          -> mTLS + signed request
+          -> 43.156.27.252 Singapore Provider Worker
+          -> ChatGPT
+```
+
+Proxy revision:
+
+```text
+origin/codex/subscription-account-management
+3aa1d40df65b7ba22a643c3e0636046d7470c7a8
+```
+
+Current temporary Gateway origin:
+
+```text
+https://manager-oak-carmen-despite.trycloudflare.com
+```
+
+Acceptance:
+
+- Singapore Worker `/live` with Gateway client mTLS: PASS;
+- unsigned Worker client rejection: PASS;
+- Gateway local/public/Worker liveness: PASS;
+- Edge account state: `ready`;
+- authorized model catalog: 6 models;
+- real `gpt-5.4-mini` SSE: `response.completed`;
+- completed Turn settlement persisted as `settled`;
+- shared Windows Proxy `47892`: not stopped or modified.
+
+The current Windows Codex auth credential was imported into the preproduction
+Gateway's encrypted credential store because the migrated VMware subscription
+credentials had expired. The old VMware US VPN deployment remains intact for
+rollback, but the validated Edge route now uses the Singapore Worker.
+
+Detailed deployment record:
+`D:\AI_prejoct\My_code\.proxy-subscription-worktree\docs\PREPRODUCTION_SPLIT_DEPLOYMENT_20260723.md`

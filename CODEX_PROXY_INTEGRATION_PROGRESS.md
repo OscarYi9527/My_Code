@@ -3839,3 +3839,29 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - The formal product switch is still blocked on routable DNS/TLS for
   `https://gateway.torvye.com`. `productTarget` intentionally remains
   `legacy-standalone`; T116/T117 final Edge-product acceptance is not claimed.
+
+## 2026-07-23 Singapore split preproduction route
+
+- The China Gateway (`114.132.161.56`) and Singapore Provider Worker
+  (`43.156.27.252`) are deployed from Proxy revision
+  `3aa1d40df65b7ba22a643c3e0636046d7470c7a8`.
+- Gateway-to-Worker traffic uses HTTPS, mTLS and the existing signed internal
+  protocol. The Singapore security group permits only TCP `47930` from
+  `114.132.161.56/32`.
+- The temporary public origin is
+  `https://manager-oak-carmen-despite.trycloudflare.com`; this remains
+  preproduction-only and is not a product origin.
+- The VMware SQLite database was copied through an online backup. A current
+  Codex subscription credential was imported into the Gateway envelope store
+  after the older migrated Provider credentials required re-login.
+- Acceptance passed:
+  - Worker mTLS and unsigned-client rejection;
+  - Gateway local/public/Worker liveness;
+  - Edge `ready` state;
+  - 6 authorized models;
+  - real `gpt-5.4-mini` SSE with `response.completed`;
+  - completed Turn settlement persisted as `settled`.
+- The old VMware US VPN preview remains available only as rollback. The
+  validated Windows Edge route now targets the Singapore Worker chain.
+- Formal `gateway.torvye.com` DNS/TLS, production PostgreSQL/KMS and the final
+  product `edge` switch remain pending.
