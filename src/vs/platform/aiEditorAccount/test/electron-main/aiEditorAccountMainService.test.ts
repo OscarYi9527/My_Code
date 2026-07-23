@@ -7,6 +7,7 @@ import * as assert from 'assert';
 import { DeferredPromise } from '../../../../base/common/async.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import {
+	AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT,
 	AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
 	AiEditorAccountState,
 	AiEditorManagementRoute,
@@ -100,6 +101,50 @@ suite('AI Editor Account main service', () => {
 		assert.strictEqual(result.allowed, false);
 		assert.strictEqual(result.status.state, AiEditorAccountState.ServiceUnavailable);
 		assert.strictEqual(result.status.errorId, 'account_edge_unreachable');
+	});
+
+	test('allows a slow but healthy status response within the Turn gate deadline', async () => {
+		const service = store.add(new AiEditorAccountMainServiceCore({
+			client: createClient({
+				getStatus: async () => {
+					await new Promise(resolve => setTimeout(resolve, 10));
+					return readyStatus();
+				}
+			}),
+			login: async () => readyStatus(),
+			turnGateTimeoutMs: 50
+		}));
+
+		const result = await service.canStartTurn({
+			modelId: 'mock-gpt',
+			sessionId: 'session',
+			clientTurnId: 'turn'
+		});
+		assert.strictEqual(result.allowed, true);
+		assert.strictEqual(result.status.state, AiEditorAccountState.Ready);
+	});
+
+	test('fails closed only after the configured Turn gate deadline', async () => {
+		const service = store.add(new AiEditorAccountMainServiceCore({
+			client: createClient({
+				getStatus: () => new Promise<IAiEditorSafeStatus>(() => undefined)
+			}),
+			login: async () => readyStatus(),
+			turnGateTimeoutMs: 10,
+			now: () => 100
+		}));
+
+		const result = await service.canStartTurn({
+			modelId: 'mock-gpt',
+			sessionId: 'session',
+			clientTurnId: 'turn'
+		});
+		assert.strictEqual(result.allowed, false);
+		assert.strictEqual(result.status.errorId, 'account_turn_gate_timeout');
+	});
+
+	test('keeps the production Turn gate above the account request timeout', () => {
+		assert.ok(AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT >= 12_000);
 	});
 
 	test('coalesces duplicate login clicks', async () => {

@@ -10,7 +10,13 @@ export const AI_EDITOR_ACCOUNT_DEFAULT_EDGE_URL = 'http://127.0.0.1:47892';
 export const AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL = 'http://127.0.0.1:47921';
 export const AI_EDITOR_ACCOUNT_DEVELOPMENT_GATEWAY_URL = 'http://127.0.0.1:47920';
 export const AI_EDITOR_ACCOUNT_STATUS_REFRESH_INTERVAL = 30_000;
-export const AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT = 5_000;
+/**
+ * The account status request is made through the product-managed Edge and
+ * may cross a public Gateway/Worker route. Keep the gate deadline above the
+ * HTTP client's 10-second request timeout so a slow-but-healthy Edge response
+ * does not fail closed before the request itself has completed.
+ */
+export const AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT = 12_000;
 export const AI_EDITOR_ACCOUNT_OPEN_MANAGEMENT_COMMAND_ID = 'aiEditor.account.openManagement';
 export const AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID = 'ai-editor-management';
 

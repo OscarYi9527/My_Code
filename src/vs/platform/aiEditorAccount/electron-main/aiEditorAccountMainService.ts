@@ -70,6 +70,11 @@ export interface IAiEditorAccountMainServiceDependencies {
 	readonly login: (kind: 'login' | 'register') => Promise<IAiEditorSafeStatus>;
 	readonly prepareManagementView?: (viewId: string, route: AiEditorManagementRoute) => Promise<void>;
 	readonly disposeManagementView?: (viewId: string) => Promise<void>;
+	/**
+	 * Test seam for the Turn gate deadline. Production uses the public
+	 * 12-second deadline from the shared account contract.
+	 */
+	readonly turnGateTimeoutMs?: number;
 	readonly now?: () => number;
 	readonly logSafeError?: (errorId: string) => void;
 }
@@ -86,6 +91,7 @@ export class AiEditorAccountMainServiceCore extends Disposable implements IAiEdi
 	readonly onDidChangeStatus = this._onDidChangeStatus.event;
 
 	private readonly now: () => number;
+	private readonly turnGateTimeoutMs: number;
 	private status: IAiEditorSafeStatus;
 	private statusOperation: Promise<IAiEditorSafeStatus> | undefined;
 	private loginOperation: Promise<IAiEditorSafeStatus> | undefined;
@@ -93,6 +99,7 @@ export class AiEditorAccountMainServiceCore extends Disposable implements IAiEdi
 	constructor(private readonly dependencies: IAiEditorAccountMainServiceDependencies) {
 		super();
 		this.now = dependencies.now ?? Date.now;
+		this.turnGateTimeoutMs = dependencies.turnGateTimeoutMs ?? AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT;
 		this.status = createAiEditorAccountUnavailableStatus(
 			AiEditorAccountState.ServiceUnavailable,
 			0,
@@ -138,7 +145,7 @@ export class AiEditorAccountMainServiceCore extends Disposable implements IAiEdi
 
 		const status = await raceTimeout(
 			this.getStatus({ force: true }),
-			AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT
+			this.turnGateTimeoutMs
 		);
 		if (!status) {
 			return createAiEditorTurnGateResult(this.updateStatus(createAiEditorAccountUnavailableStatus(

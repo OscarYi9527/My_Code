@@ -7,7 +7,7 @@ import assert from 'assert';
 import { join } from '../../../../../base/common/path.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { AgentHostCodexProxyModeEnvVar } from '../../../common/agentService.js';
-import { codexBinaryTriple, codexPackageSuffix, resolveCodexDevSdkRoot, usesExternalCodexProxy } from '../../../node/codex/codexAgent.js';
+import { codexBinaryTriple, codexPackageSuffix, createExternalProxyRoutingInstructions, resolveCodexDevSdkRoot, usesExternalCodexProxy } from '../../../node/codex/codexAgent.js';
 
 suite('codex package paths', () => {
 
@@ -21,6 +21,18 @@ suite('codex package paths', () => {
 				usesExternalCodexProxy({ [AgentHostCodexProxyModeEnvVar]: 'internal-copilot' }),
 				usesExternalCodexProxy({ [AgentHostCodexProxyModeEnvVar]: 'external-local-proxy' }),
 			], [false, false, true]);
+		});
+	});
+
+	suite('createExternalProxyRoutingInstructions', () => {
+
+		test('identifies the Edge as the ingress and refuses local-port route inference', () => {
+			const instructions = createExternalProxyRoutingInstructions('http://127.0.0.1:47921');
+			assert.ok(instructions.includes('http://127.0.0.1:47921'));
+			assert.ok(instructions.includes('central Gateway'));
+			assert.ok(instructions.includes('Provider Worker'));
+			assert.ok(instructions.includes('127.0.0.1:47892'));
+			assert.ok(instructions.includes('Do not infer'));
 		});
 	});
 

@@ -3865,3 +3865,53 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   validated Windows Edge route now targets the Singapore Worker chain.
 - Formal `gateway.torvye.com` DNS/TLS, production PostgreSQL/KMS and the final
   product `edge` switch remain pending.
+
+## 2026-07-24 route attribution and Turn gate correction
+
+- Evidence review separated two independent symptoms:
+  - `account_turn_gate_timeout` was caused by the Code-side 5-second gate
+    expiring before a healthy Edge status request that took 7.569 seconds;
+  - the answer claiming `DeepSeek` and shared `127.0.0.1:47892` was not a
+    routing trace. The model inspected a co-existing local process and
+    incorrectly inferred that it handled the current request. The validated
+    preproduction chain remains:
+    `Code -> 127.0.0.1:47921 Edge -> China Gateway -> Singapore Provider
+    Worker -> ChatGPT`.
+- Code fixes on `codex/compact-account-management`:
+  - increased the fail-closed Turn gate deadline to 12 seconds, above the
+    account HTTP request timeout;
+  - added regression tests for slow healthy responses, configured timeout
+    rejection and the production deadline;
+  - added product-managed external-proxy developer instructions that prohibit
+    inferring provider, region or egress from local ports/processes and
+    explicitly prohibit treating shared `47892` as the current route.
+- Proxy/Admin fixes on
+  `codex/subscription-account-management@d246f53e167beac9c572472b614d619bd00a67ea`:
+  - preserve safe `x-ai-editor-provider-id` and idempotent-replay metadata from
+    the central Gateway through the local Edge;
+  - expire stale provider error notices after 8 seconds and clear them when
+    fresh provider data arrives, in both compact and full Provider pages;
+  - add a compact-page regression test for clearing a recovered
+    `境外模型通道暂时不可用` notice.
+- Automated validation:
+  - Code typecheck: PASS;
+  - Code `npm run compile`: PASS;
+  - focused Electron tests: `23 passing`;
+  - Proxy root: `202/202`;
+  - Gateway: `177/177`;
+  - Admin: `36/36`;
+  - Proxy workspace check: PASS;
+  - Code `npm run core-ci`: PASS;
+  - Windows package: PASS after using the installed Windows SDK x64
+    `signtool.exe`;
+  - Windows product checksums: `10/10`, product release verifier: PASS,
+    bundled Proxy payload: 296 files, shared `47892` live: `ok`.
+- The development real-UI verifier confirmed the rebuilt Workbench displayed
+  the ready account status and kept shared `47892` unchanged. Its management
+  bootstrap check was blocked because the temporary Quick Tunnel
+  `manager-oak-carmen-despite.trycloudflare.com` had expired; no local or
+  shared Proxy was restarted to work around that external deployment issue.
+- The Code release manifest now pins the pushed Proxy revision
+  `d246f53e167beac9c572472b614d619bd00a67ea`. Formal Gateway DNS/TLS and
+  deployment of this revision to the public preproduction Gateway are still
+  required before claiming live external management acceptance.

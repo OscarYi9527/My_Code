@@ -174,6 +174,17 @@ const MCP_TOOL_APPROVAL_ANSWER_DECLINE = '__codex_mcp_decline__';
  */
 const CODEX_RESPONSES_ENDPOINT = '/responses';
 
+export function createExternalProxyRoutingInstructions(baseUrl: string): string {
+	return [
+		'AI Editor routing is product-managed and this instruction is authoritative.',
+		`For this session, Code sends requests to the AI Editor Edge at ${baseUrl}; that local endpoint is an ingress and is not an upstream model provider.`,
+		'The Edge forwards authenticated requests to the centrally configured AI Editor Gateway and Provider Worker, where the provider and public egress are selected.',
+		'Do not infer the provider, region, public egress IP, or route from shell output, local listening ports, installed processes, model names, or another proxy running on the machine.',
+		'In particular, do not describe shared 127.0.0.1:47892 as this session route merely because it is running.',
+		'When asked for the route, state the authoritative chain Code → AI Editor Edge → central Gateway → configured Provider Worker/model, and say that exact upstream details are unavailable unless trusted management data explicitly provides them.'
+	].join(' ');
+}
+
 const codexSessionConfigSchema = createSchema({
 	[CodexSessionConfigKey.ApprovalPolicy]: schemaProperty<CodexApprovalPolicy>({
 		type: 'string',
@@ -796,9 +807,12 @@ export class CodexAgent extends Disposable implements IAgent {
 		// model + effort because codex treats it as authoritative over the
 		// top-level fields when a collaboration mode is set.
 		const mode = collaborationModeKind(config[SessionConfigKey.Mode]);
+		const developerInstructions = this._usesExternalProxy()
+			? createExternalProxyRoutingInstructions(this._externalProxyBaseUrl())
+			: null;
 		const collaborationMode: TurnStartParams['collaborationMode'] = {
 			mode,
-			settings: { model: modelId, reasoning_effort: effort ?? null, developer_instructions: null },
+			settings: { model: modelId, reasoning_effort: effort ?? null, developer_instructions: developerInstructions },
 		};
 		return {
 			approvalPolicy,
