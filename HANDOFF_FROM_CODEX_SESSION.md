@@ -1324,3 +1324,76 @@ Next manual input: the domestic Gateway cloud, region and fixed public IP.
 After that selection, create the DNSPod `gateway` A record, provision
 SafeLine/ACME, require the origin preflight to pass, and only then pin
 `product.json` and switch the release payload to `edge`.
+
+## 2026-07-23 VMware public preview is operational
+
+Current Proxy revision:
+
+```text
+origin/codex/subscription-account-management
+b412929a4837f35826aba382e9484501ecb0a307
+```
+
+Ubuntu:
+
+```text
+host:       192.168.149.128
+repository: /home/oscaryi/codex_proxy
+branch:     codex/torvye-preprod-migration-fix-20260723
+preview:    https://lasting-showtimes-arm-slope.trycloudflare.com
+```
+
+The original Ubuntu branch and
+`backup/ubuntu-preprod-20260723-d4ba9cd` were preserved. Before migration
+repair, the preview SQLite database was backed up through
+`sqlite3.Connection.backup()` into the ignored preview state tree with mode
+`0600`.
+
+Two defects were found and fixed:
+
+1. An old preview branch had executed migration 005 before migration 004
+   existed. Revision `02bcac0` repairs only that exact non-production history;
+   production and unknown divergence remain fail-closed.
+2. The ChatGPT subscription Responses upstream now requires an explicit
+   `store` boolean. Revision `b412929` adds the safe default `store=false`.
+
+Acceptance:
+
+```text
+Proxy root tests                 198/198
+Gateway tests                    176/176
+Admin tests                      35/35
+Migration focused tests          3/3
+npm audit                        0 vulnerabilities
+Ubuntu verify-preview            PASS
+Edge safe status                 ready
+Authorized models                6
+Real gpt-5.4-mini SSE            PASS / response.completed
+Settlement acknowledgement       PASS
+Development Code account UI      PASS
+TORVYE management bootstrap      PASS
+npm run compile                  PASS
+npm run core-ci                  PASS
+Windows package                  PASS
+Windows Workbench checksums      10/10
+Windows clean start              PASS
+Packaged Proxy                   b412929 / 296 / legacy-standalone
+Shared Proxy in UI/SSE checks    PID 10976 / unchanged per verifier
+Shared Proxy current             PID 35276 / live=ok
+```
+
+The Code real-UI verifier now checks the current `TORVYE AI GATEWAY` title,
+not the retired `AI Editor 管理` title.
+
+After the real UI/SSE verifiers completed and before the packaging audit, the
+existing Code auto-recovery path replaced shared Proxy PID `10976` with
+`35276`. No explicit restart command was issued in this work and `/live`
+remained healthy. Do not summarize the entire interval as one unchanged-PID
+invariant; only the individual verifier windows proved that invariant.
+Post-transition real UI and real SSE reruns both passed and each confirmed
+PID `35276` stayed unchanged during that verifier.
+
+Do not promote the Quick Tunnel. Formal DNS/TLS for
+`https://gateway.torvye.com` is still absent, so `product.json` is unchanged,
+`productTarget` remains `legacy-standalone`, and final T116/T117 Edge-product
+acceptance remains pending.

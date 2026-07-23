@@ -3777,3 +3777,65 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   fixed public IP. Only then create the DNSPod `gateway` A record, configure
   SafeLine/ACME and rerun the origin gate. Shared Proxy `47892` remained PID
   `10976` with `/live=ok` and was not restarted or modified.
+
+## 2026-07-23 VMware public-preview end-to-end closure
+
+- Ubuntu preview repository:
+  - path: `/home/oscaryi/codex_proxy`;
+  - safety branch: `codex/torvye-preprod-migration-fix-20260723`;
+  - revision: `b412929a4837f35826aba382e9484501ecb0a307`.
+- The pre-existing preview SQLite database had executed migration
+  `005_exempt_turn_settlements` before `004_public_mvp_capacity` existed on
+  its old branch. Proxy revision `02bcac0` now repairs only that exact
+  non-production history, inside one transaction. Production remains strict
+  and unknown migration divergence remains fail-closed.
+- Before applying the repair, an online SQLite backup was created under the
+  ignored preview state directory with mode `0600`. The repaired database now
+  records migrations `001` through `005`, and the public MVP capacity row
+  remains `hard_limit=30`.
+- The current disposable preview origin is
+  `https://lasting-showtimes-arm-slope.trycloudflare.com`. It is a temporary
+  Quick Tunnel only and is not written to `product.json` or a release
+  manifest.
+- Real preview acceptance passed:
+  - Ubuntu `verify-preview.sh`: PASS;
+  - Gateway `/live` and `/ready`: PASS;
+  - Windows Edge account state: `ready`;
+  - authorized model catalog: 6 entries;
+  - real `gpt-5.4-mini` Responses SSE: HTTP 200 and
+    `response.completed`;
+  - completed level-1-admin Turn settlement: `chatgpt-sub`, with the
+    Provider Worker acknowledgement persisted;
+  - Code development Workbench account status and fixed-origin management
+    BrowserView: PASS;
+  - authenticated TORVYE management bootstrap: PASS.
+- The real upstream run identified a second compatibility defect: ChatGPT
+  subscription Responses now requires an explicit `store` boolean. Revision
+  `b412929` defaults omitted values to `store=false`, preserves an explicitly
+  supplied boolean and includes regression coverage.
+- The real UI verifier was updated to assert the current
+  `TORVYE AI GATEWAY` brand instead of the retired `AI Editor 管理` page title.
+- Regression and release results:
+  - Proxy root: `198/198`;
+  - Gateway: `176/176`;
+  - Admin: `35/35`;
+  - migration compatibility focused tests: `3/3`;
+  - npm audit: zero vulnerabilities;
+  - `npm run compile`: PASS;
+  - `npm run core-ci`: PASS;
+  - Windows x64 package: PASS with Windows SDK x64 `signtool.exe`;
+  - Windows release verification: PASS, Workbench checksums `10/10`;
+  - packaged Proxy: `b412929`, 296 files, `legacy-standalone`;
+  - clean Windows product startup: PASS.
+- The real Edge UI/SSE verifiers each captured shared Proxy PID `10976` and
+  confirmed it remained unchanged during their runs. Between those completed
+  verifier windows and the packaging audit, the existing Code auto-recovery
+  path replaced the shared process with PID `35276`; `/live` remained `ok`.
+  No explicit Proxy restart command was issued by this work, and no shared
+  Proxy files or data were migrated or modified. The PID transition is
+  recorded instead of being misreported as an end-to-end unchanged invariant.
+  Post-transition real UI and real SSE reruns both passed while confirming PID
+  `35276` stayed unchanged inside each verifier window.
+- The formal product switch is still blocked on routable DNS/TLS for
+  `https://gateway.torvye.com`. `productTarget` intentionally remains
+  `legacy-standalone`; T116/T117 final Edge-product acceptance is not claimed.
