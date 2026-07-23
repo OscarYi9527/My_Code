@@ -3734,3 +3734,46 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
 - The remaining product switch is intentionally blocked on a stable formal
   HTTPS Gateway domain. T116/T117 final Edge-product acceptance, production
   KMS/PostgreSQL/off-host backup and T137/T138 are not claimed by this closure.
+
+## 2026-07-23 TORVYE production-origin freeze
+
+- The user registered `torvye.com` and accepted the production Gateway origin
+  `https://gateway.torvye.com`. The same-origin management UI remains
+  `/admin`; the restricted Worker endpoint is reserved as
+  `https://worker.torvye.com`.
+- Authoritative public DNS currently returns NXDOMAIN for
+  `gateway.torvye.com`. Registration is therefore recorded without writing the
+  origin into `product.json` or changing the bundled target from
+  `legacy-standalone`.
+- Proxy commit `d95170b5b29d6356e4b21bd614e0180e8a770a5b`:
+  - replaces the retired `cocoduck.live` deployment examples with
+    `torvye.com`;
+  - adds `production:origin-preflight`;
+  - rejects localhost, IP, port, path, credentials and Quick Tunnel origins;
+  - treats missing DNS/TLS as `BLOCKED`;
+  - requires routable DNS, authorized TLS with at least 14 days remaining and
+    HTTP 200 JSON `status=ok` from `/live`;
+  - emits only sanitized DNS family/CNAME, TLS lifetime and safe health
+    evidence.
+- Validation:
+  - origin/readiness focused tests: `9/9`;
+  - Proxy root: `198/198`;
+  - Gateway: `173/173`;
+  - workspace TypeScript/syntax checks: PASS;
+  - `npm audit --omit=dev`: zero vulnerabilities;
+  - real origin report: `BLOCKED`, `0 FAIL`, as expected before DNS/TLS.
+- Code/product synchronization:
+  - `npm run compile`: PASS;
+  - `npm run core-ci`: PASS;
+  - Windows package: PASS;
+  - Workbench checksums: `10/10`;
+  - packaged Proxy: `d95170b5b29d6356e4b21bd614e0180e8a770a5b`,
+    296 files, `legacy-standalone`;
+  - development PA UI: `6/6`;
+  - Windows product PA UI: `6/6`.
+- The Code preproduction closure now records this origin report independently
+  of the temporary preview Gateway. T143 is complete.
+- Next manual gate: select the domestic Gateway cloud/region and obtain its
+  fixed public IP. Only then create the DNSPod `gateway` A record, configure
+  SafeLine/ACME and rerun the origin gate. Shared Proxy `47892` remained PID
+  `10976` with `/live=ok` and was not restarted or modified.

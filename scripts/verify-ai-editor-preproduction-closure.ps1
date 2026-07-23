@@ -3,6 +3,7 @@ param(
 	[string]$ProxyRepository,
 	[string]$ProductRoot,
 	[string]$GatewayOrigin,
+	[string]$ProductionGatewayOrigin = 'https://gateway.torvye.com',
 	[string]$EdgeOutboundProxy,
 	[string]$EdgeOrigin = 'http://127.0.0.1:47921',
 	[string]$EdgeDataRoot,
@@ -653,6 +654,7 @@ Assert-Directory $ProxyRepository 'Proxy repository'
 Assert-Directory $ProductRoot 'Windows product'
 Assert-File $ProductionDecisionFile 'Production decision file'
 Assert-File (Join-Path $ProxyRepository 'scripts\check-production-readiness.mjs') 'Production preflight'
+Assert-File (Join-Path $ProxyRepository 'scripts\check-public-origin.mjs') 'Production Gateway origin preflight'
 Assert-File (Join-Path $ProxyRepository 'tools\start-ai-editor-dev.ps1') 'Preview Edge start script'
 Assert-File (Join-Path $ProxyRepository 'tools\stop-ai-editor-dev.ps1') 'Preview Edge stop script'
 Assert-File (Join-Path $repositoryRoot 'scripts\verify-ai-editor-windows-release.ps1') 'Windows release verifier'
@@ -680,6 +682,7 @@ $edgeStartedByRunner = $false
 $edgeRestored = $false
 $repositories = [ordered]@{}
 $productionReport = $null
+$productionOriginReport = $null
 $productionBlockers = @()
 $serverReleasePassed = $false
 $secretScanPassed = $false
@@ -703,6 +706,32 @@ try {
 	$codeSecretsPassed = Invoke-HighConfidenceSecretScan 'code-secret-scan' $repositoryRoot 'code'
 	$proxySecretsPassed = Invoke-HighConfidenceSecretScan 'proxy-secret-scan' $ProxyRepository 'proxy'
 	$secretScanPassed = $codeSecretsPassed -and $proxySecretsPassed
+
+	$productionOriginReportPath = Join-Path $artifactsDirectory 'gateway-origin-readiness.json'
+	$productionOriginUri = [Uri]$ProductionGatewayOrigin
+	$productionOriginResult = Invoke-LoggedCommand 'production-gateway-origin' 'node.exe' @(
+		(Join-Path $ProxyRepository 'scripts\check-public-origin.mjs'),
+		'--origin', $ProductionGatewayOrigin,
+		'--expected-host', $productionOriginUri.DnsSafeHost,
+		'--report', $productionOriginReportPath,
+		'--report-only'
+	) $ProxyRepository
+	if ($productionOriginResult.exitCode -ne 0 -or -not (Test-Path -LiteralPath $productionOriginReportPath -PathType Leaf)) {
+		Add-Check 'production-gateway-origin' 'production' 'FAIL' 'Production Gateway origin preflight could not produce a report.' $productionOriginResult.log
+	} else {
+		$productionOriginReport = Get-Content -Raw -LiteralPath $productionOriginReportPath -Encoding UTF8 | ConvertFrom-Json
+		switch ([string]$productionOriginReport.result) {
+			'PASS' {
+				Add-Check 'production-gateway-origin' 'production' 'PASS' "DNS, TLS and /live passed for $ProductionGatewayOrigin." $productionOriginReportPath
+			}
+			'BLOCKED' {
+				Add-Check 'production-gateway-origin' 'production' 'BLOCKED' "DNS, TLS or /live provisioning remains incomplete for $ProductionGatewayOrigin." $productionOriginReportPath
+			}
+			default {
+				Add-Check 'production-gateway-origin' 'production' 'FAIL' "Production origin validation failed for $ProductionGatewayOrigin." $productionOriginReportPath
+			}
+		}
+	}
 
 	if ($SkipServerReleaseCheck) {
 		Add-Check 'server-release-check' 'server' 'BLOCKED' 'Server release check was explicitly skipped.'
@@ -1024,6 +1053,10 @@ $report = [ordered]@{
 	}
 	production = [ordered]@{
 		result = if ($productionReport) { [string]$productionReport.result } else { 'unavailable' }
+		gatewayOrigin = [ordered]@{
+			origin = $ProductionGatewayOrigin
+			result = if ($productionOriginReport) { [string]$productionOriginReport.result } else { 'unavailable' }
+		}
 		blockers = @($productionBlockers | ForEach-Object {
 			[ordered]@{
 				id = [string]$_.id

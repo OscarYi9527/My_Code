@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 2,
 	"repository": "OscarYi9527/codex_proxy",
-	"commit": "83f0ad8f2d81e0b9592268b1b4e07a1648a8c622",
+	"commit": "d95170b5b29d6356e4b21bd614e0180e8a770a5b",
 	"version": "2.4.1",
 	"productTarget": "legacy-standalone",
 	"targets": {

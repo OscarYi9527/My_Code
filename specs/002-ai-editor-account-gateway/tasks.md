@@ -424,6 +424,9 @@ Turn 可结算为负积分。
   fail-closed standalone-only operations
 - [x] T142 [PW3/PW6] Add active Provider adapter probes plus real `usage_records` aggregation by
   model and Asia/Shanghai natural day for the central full console
+- [x] T143 [PW4] Freeze `gateway.torvye.com` and `worker.torvye.com`, add a fail-safe public
+  origin preflight for routable DNS, authorized TLS lifetime and Gateway `/live`, and keep the
+  final Code Edge switch blocked until it passes
 
 **Checkpoint**: T121–T132 can be completed without purchasing a domain, cloud host, Provider quota
 or production certificate. T133 may use only dedicated test credentials after explicit confirmation.
@@ -513,7 +516,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 
 ## Task Summary
 
-- Total tasks: **142**
+- Total tasks: **143**
 - Setup/Foundation: **22**
 - US1: **15**
 - US2: **11**
@@ -524,7 +527,7 @@ US3、US6、US7 可在其依赖满足后与关键路径并行。
 - US7: **9**
 - US8: **9**
 - Polish/validation: **12**
-- Provider Worker/public evolution: **22**
+- Provider Worker/public evolution: **23**
 
 All tasks use the required checkbox, sequential ID, optional `[P]`, user-story label and explicit
 file path format.

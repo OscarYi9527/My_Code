@@ -1278,3 +1278,49 @@ formal HTTPS Gateway domain. After it exists, pin the origin, switch the
 payload to `edge`, rebuild, then complete T116/T117 and the final Windows/macOS
 Edge-product acceptance. Production KMS, PostgreSQL/off-host backup and
 T137/T138 infrastructure soak remain separate external gates.
+
+## 2026-07-23 TORVYE production origin selected
+
+The user owns `torvye.com` and selected:
+
+```text
+Gateway / management: https://gateway.torvye.com
+Provider Worker:      https://worker.torvye.com
+Preview only:         https://preview.torvye.com
+```
+
+Proxy revision:
+
+```text
+origin/codex/subscription-account-management
+d95170b5b29d6356e4b21bd614e0180e8a770a5b
+```
+
+This revision adds a production-origin preflight covering exact-origin syntax,
+routable DNS, hostname-authorized TLS lifetime and Gateway `/live`. Root tests
+are `198/198`, Gateway tests are `173/173`, checks pass and npm audit reports
+zero vulnerabilities.
+
+The synchronized Code closure also passed:
+
+```text
+npm run compile                         PASS
+npm run core-ci                         PASS
+vscode-win32-x64-min-ci                 PASS
+Windows Workbench checksums             10/10
+Development PA UI                       6/6
+Windows product PA UI                   6/6
+Packaged Proxy                          d95170b / 296 files / legacy-standalone
+Shared 47892                            PID 10976, unchanged
+```
+
+The current real report is correctly `BLOCKED` with zero failures because
+`gateway.torvye.com` has no authoritative DNS record or TLS endpoint yet.
+`product.json` remains unchanged and `productTarget` remains
+`legacy-standalone`. Do not create a placeholder/fake A record and do not use a
+Quick Tunnel as the final target.
+
+Next manual input: the domestic Gateway cloud, region and fixed public IP.
+After that selection, create the DNSPod `gateway` A record, provision
+SafeLine/ACME, require the origin preflight to pass, and only then pin
+`product.json` and switch the release payload to `edge`.
