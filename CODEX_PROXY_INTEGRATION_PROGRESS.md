@@ -3921,8 +3921,9 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   lifecycle scripts, restored the existing logged-in binding and returned
   `state=ready`. Shared `47892` remained PID `35276`.
 - Post-deployment acceptance:
-  - real `gpt-5.4-mini` SSE: PASS;
-  - Edge response metadata: `x-ai-editor-provider-id=chatgpt-sub`;
+  - real `gpt-5.4-mini` and the user-selected `gpt-5.6-terra` SSE: PASS;
+  - `gpt-5.6-terra` returned HTTP 200 with Edge response metadata
+    `x-ai-editor-provider-id=chatgpt-sub`;
   - SSE terminal event: `response.completed`;
   - real development management UI: `7/7` PASS;
   - shared `47892`: PID `35276`, unchanged in each verifier.
