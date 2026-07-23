@@ -429,7 +429,7 @@ async function waitForManagementBootstrap(
 				lastText = page ? await page.locator('body').innerText() : '';
 				return lastText;
 			},
-			value => value.includes('AI Editor 管理') && value.includes('我的账号'),
+			value => value.includes('TORVYE AI GATEWAY') && value.includes('我的账号'),
 			'authenticated AI Editor management bootstrap',
 			60_000
 		);
