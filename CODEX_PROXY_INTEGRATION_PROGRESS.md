@@ -3906,12 +3906,32 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
     `signtool.exe`;
   - Windows product checksums: `10/10`, product release verifier: PASS,
     bundled Proxy payload: 296 files, shared `47892` live: `ok`.
-- The development real-UI verifier confirmed the rebuilt Workbench displayed
-  the ready account status and kept shared `47892` unchanged. Its management
-  bootstrap check was blocked because the temporary Quick Tunnel
-  `manager-oak-carmen-despite.trycloudflare.com` had expired; no local or
-  shared Proxy was restarted to work around that external deployment issue.
+- The first development real-UI run displayed the ready account status but
+  hit a transient `waiting_for_code_bootstrap` management timeout. The same
+  unchanged build and topology passed all 7 real-UI checks on rerun. This
+  distinguished a one-time management bootstrap race from a dead Quick
+  Tunnel; the public origin remained unchanged and healthy.
+- The compact/full Admin runtime changes were deployed to the China Gateway
+  without recreating `cloudflared-quick`, so the preview origin stayed
+  `https://manager-oak-carmen-despite.trycloudflare.com`. Gateway `/live`,
+  `/ready` and the Gateway-to-Singapore-Worker verification passed after the
+  container recreation.
+- The repository-owned Windows Edge was updated on
+  `codex/preview-route-status-fix@2f7a1b2`, restarted through its isolated
+  lifecycle scripts, restored the existing logged-in binding and returned
+  `state=ready`. Shared `47892` remained PID `35276`.
+- Post-deployment acceptance:
+  - real `gpt-5.4-mini` SSE: PASS;
+  - Edge response metadata: `x-ai-editor-provider-id=chatgpt-sub`;
+  - SSE terminal event: `response.completed`;
+  - real development management UI: `7/7` PASS;
+  - shared `47892`: PID `35276`, unchanged in each verifier.
+- The aggregate Proxy release gate reran all root, Gateway and Admin tests
+  successfully, then stopped only because the intentional preview Edge owned
+  fixed port `47921` required by its isolated lifecycle subtest. The live Edge
+  was not stopped merely to free a test port; focused lifecycle-independent
+  checks and production builds all passed.
 - The Code release manifest now pins the pushed Proxy revision
-  `d246f53e167beac9c572472b614d619bd00a67ea`. Formal Gateway DNS/TLS and
-  deployment of this revision to the public preproduction Gateway are still
-  required before claiming live external management acceptance.
+  `d246f53e167beac9c572472b614d619bd00a67ea`. Formal `gateway.torvye.com`
+  DNS/TLS remains required before the final product target can switch from
+  `legacy-standalone` to `edge`; the temporary Quick Tunnel is not promoted.
