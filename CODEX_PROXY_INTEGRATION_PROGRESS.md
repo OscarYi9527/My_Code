@@ -4031,6 +4031,12 @@ and central Singapore route are verified.
   external timeout within seconds and a second run proved automatic rollback:
   the Quick Tunnel origin was restored, Caddy stopped and both local/public
   Gateway `/live` returned `status=ok`.
+- After the rollback fixes, the complete Proxy `npm run release:check`
+  passed. The repository-owned Edge was stopped/restored only through its
+  lifecycle scripts; shared `47892` remained PID `35276`.
+- Post-restore `gpt-5.6-terra` real SSE acceptance passed again with
+  `response.completed`, confirming account, model and Singapore routing
+  continuity.
 - T137 remains open. Required operator actions:
   1. allow inbound TCP 80 and 443 in `sg-qv7wiiud`;
   2. add `gateway.torvye.com A 114.132.161.56` in DNSPod.
