@@ -87,8 +87,9 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 		const shellEnv = await this._resolveShellEnv();
 
 		// Forward the Claude/Codex SDK overrides + codex home/args from
-		// workbench settings to the agent host process. Parent env wins on
-		// collision — see `buildAgentSdkEnv` for the precedence rule.
+		// workbench settings to the agent host process. The product-managed
+		// Proxy route is forced below so a parent Code/Codex process cannot
+		// silently send this product Turn to shared 47892.
 		const sdkEnv = buildAgentSdkEnv({
 			codexSdkRoot: this._configurationService.getValue<string>(AgentHostCodexAgentSdkRootSettingId),
 			codexHome: this._configurationService.getValue<string>(AgentHostCodexAgentCodexHomeSettingId),
@@ -100,6 +101,7 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 				this._configurationService.getValue<string>(AI_EDITOR_PROXY_BASE_URL_SETTING_ID),
 				this._environmentMainService.isBuilt ? undefined : process.env['VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN']
 			),
+			forceCodexProxy: true,
 		}, process.env);
 
 		// Translate `chat.agentHost.otel.*` settings into the env vars consumed by

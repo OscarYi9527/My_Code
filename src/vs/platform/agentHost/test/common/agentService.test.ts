@@ -90,6 +90,20 @@ suite('buildAgentSdkEnv', () => {
 			[AgentHostCodexProxyModeEnvVar]: 'external-local-proxy',
 		});
 	});
+
+	test('forces the product-managed Edge route over an inherited standalone Proxy', () => {
+		assert.deepStrictEqual(buildAgentSdkEnv({
+			codexProxyMode: 'external-local-proxy',
+			codexProxyBaseUrl: 'http://127.0.0.1:47921',
+			forceCodexProxy: true,
+		}, {
+			[AgentHostCodexProxyModeEnvVar]: 'external-local-proxy',
+			[AgentHostCodexProxyBaseUrlEnvVar]: 'http://127.0.0.1:47892',
+		}), {
+			[AgentHostCodexProxyModeEnvVar]: 'external-local-proxy',
+			[AgentHostCodexProxyBaseUrlEnvVar]: 'http://127.0.0.1:47921',
+		});
+	});
 });
 
 suite('buildAgentHostOTelEnv', () => {

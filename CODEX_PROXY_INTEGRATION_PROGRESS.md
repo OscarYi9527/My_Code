@@ -3936,3 +3936,69 @@ Windows 运行验证：实际环境状态 IPC 通过；隔离测试环境仍缺 
   `d246f53e167beac9c572472b614d619bd00a67ea`. Formal `gateway.torvye.com`
   DNS/TLS remains required before the final product target can switch from
   `legacy-standalone` to `edge`; the temporary Quick Tunnel is not promoted.
+
+## 2026-07-24 route attribution correction rerun
+
+The previous route-attribution fixes were rebuilt against the actually
+delivered Proxy revision:
+
+- Code branch: `codex/compact-account-management`;
+- Proxy worktree: `codex/subscription-account-management`;
+- bundled Proxy revision: `8f822a78ce9813fe3df422f1e0fb75e87caa77e0`;
+- preproduction Gateway: `https://manager-oak-carmen-despite.trycloudflare.com`;
+- local Edge: `http://127.0.0.1:47921`;
+- Singapore Provider Worker: `worker-preprod-sg` / `ap-singapore`.
+
+### Build and product artifact
+
+- `npm run compile`: PASS;
+- `npm run core-ci`: PASS;
+- `npm run prepare-ai-editor-proxy`: PASS, 296 files;
+- Windows `vscode-win32-x64-min-ci`: PASS with Windows SDK x64
+  `signtool.exe`;
+- Windows release verifier: PASS;
+- Workbench checksums: `10/10`;
+- Windows product report:
+  `.build/ai-editor-account-gateway/rerun-20260724/windows-release.json`.
+
+The packaged Windows product now contains the Proxy payload for commit
+`8f822a78...`, not the stale `d246f53...` payload. The product target remains
+`legacy-standalone` because the formal `gateway.torvye.com` DNS/TLS origin has
+not been purchased and configured; this is intentionally not claimed as the
+final Edge product release.
+
+### Real preproduction acceptance
+
+- Real development UI acceptance: `7/7 PASS`;
+- account status rendered as ready;
+- the account status opened the fixed-origin management BrowserView;
+- one-time Webview ticket exchange and authenticated management bootstrap
+  passed;
+- real `gpt-5.6-terra` Responses SSE: PASS;
+- model catalog: 6 authorized Singapore-backed models;
+- SSE terminal event: `response.completed`;
+- response headers proved the route:
+  `x-ai-editor-provider-id=chatgpt-sub`,
+  `x-ai-editor-worker-id=worker-preprod-sg`,
+  `x-ai-editor-worker-region=ap-singapore`;
+- shared Proxy `127.0.0.1:47892` remained PID `35276` and `/live=ok`.
+
+This confirms that the reported DeepSeek/`47892` answer was a model
+misattribution, not the actual route. Code now forces the product-managed Edge
+environment over inherited Proxy variables and injects the selected model and
+the authoritative route semantics into each Turn's developer instructions.
+The management-page “境外模型通道暂时不可用” notice is cleared by fresh
+provider data and no longer implies a fallback to the shared local Proxy.
+
+### Focused regression tests
+
+- `agentService.test.js`: `35 passing`;
+- `codexPackagePaths.test.js`: `10 passing`;
+- real model/SSE report:
+  `.build/ai-editor-account-gateway/real-model-sse-acceptance.json`;
+- real UI report:
+  `.build/ai-editor-account-gateway/real-ui-prelogin-acceptance.json`.
+
+Final product Edge acceptance remains pending until the formal HTTPS Gateway
+origin is available. T116/T117 therefore remain open; the preproduction Code
+and central Singapore route are verified.

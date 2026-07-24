@@ -27,12 +27,15 @@ suite('codex package paths', () => {
 	suite('createExternalProxyRoutingInstructions', () => {
 
 		test('identifies the Edge as the ingress and refuses local-port route inference', () => {
-			const instructions = createExternalProxyRoutingInstructions('http://127.0.0.1:47921');
+			const instructions = createExternalProxyRoutingInstructions('http://127.0.0.1:47921', 'gpt-5.6-terra');
 			assert.ok(instructions.includes('http://127.0.0.1:47921'));
 			assert.ok(instructions.includes('central Gateway'));
 			assert.ok(instructions.includes('Provider Worker'));
 			assert.ok(instructions.includes('127.0.0.1:47892'));
 			assert.ok(instructions.includes('Do not infer'));
+			assert.ok(instructions.includes('gpt-5.6-terra'));
+			assert.ok(instructions.includes('ChatGPT subscription route'));
+			assert.ok(instructions.includes('not DeepSeek'));
 		});
 	});
 

@@ -379,7 +379,7 @@ Turn 可结算为负积分。
 - [ ] T116 Verify Windows product Workbench checksums and confirm the installer contains Edge but excludes Gateway/admin/database resources in `D:\AI_prejoct\My_code\scripts\verify-ai-editor-windows-release.ps1`
 - [ ] T117 Validate login, status, management Webview, model refresh and real responses in `D:\AI_prejoct\VSCode-win32-x64\Code - OSS.exe`
 - [ ] T118 [P] Run macOS source/type/package static checks for Keychain, fixed Gateway origin and Edge-only release rules in `D:\AI_prejoct\My_code\build\darwin\`
-- [ ] T119 Update implementation status and test evidence in `D:\AI_prejoct\My_code\CODEX_PROXY_INTEGRATION_PROGRESS.md` and `DEVELOPMENT-PLAN.md`
+- [x] T119 Update implementation status and test evidence in `D:\AI_prejoct\My_code\CODEX_PROXY_INTEGRATION_PROGRESS.md` and `DEVELOPMENT-PLAN.md`
 - [ ] T120 Update the Proxy architecture/security/deployment documentation in `D:\AI_prejoct\codex_proxy-dev\ARCHITECTURE.md`, `SECURITY.md`, and `README.md`
 
 **Completion Gate**: 不切换共享 `47892`。只有全部任务通过且用户再次明确批准后，才允许

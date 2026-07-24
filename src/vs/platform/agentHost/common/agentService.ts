@@ -532,10 +532,12 @@ export function buildAgentHostOTelEnv(
  * (`nodeAgentHostStarter.ts`, `electronAgentHostStarter.ts`) so they don't
  * drift the next time someone adds a setting.
  *
- * The shape mirrors {@link buildAgentHostOTelEnv}: only set a key when the
- * underlying setting has a non-empty value AND the inherited env doesn't
- * already define it (developer override wins). Returns a partial env map
- * the caller spreads into the spawned child's environment.
+ * The shape mirrors {@link buildAgentHostOTelEnv}: SDK settings normally only
+ * set a key when the underlying setting has a non-empty value AND the
+ * inherited env doesn't already define it (developer override wins). The
+ * product-managed Codex Proxy route is the exception: callers can explicitly
+ * force it so a parent Code/Codex process cannot silently redirect a product
+ * Turn to the shared standalone Proxy on 47892.
  */
 export interface IAgentSdkStarterSettings {
 	readonly codexSdkRoot?: string;
@@ -545,6 +547,12 @@ export interface IAgentSdkStarterSettings {
 	readonly codexAgentEnabled?: boolean;
 	readonly codexProxyMode?: 'internal-copilot' | 'external-local-proxy';
 	readonly codexProxyBaseUrl?: string;
+	/**
+	 * Product-managed routing must win over inherited process variables. This
+	 * is intentionally separate from the general SDK overrides so external
+	 * developer tooling can keep its existing precedence for unrelated values.
+	 */
+	readonly forceCodexProxy?: boolean;
 }
 
 export function buildAgentSdkEnv(
@@ -569,8 +577,15 @@ export function buildAgentSdkEnv(
 	if (settings.codexAgentEnabled !== undefined) {
 		setIfMissing(AgentHostCodexAgentEnabledEnvVar, settings.codexAgentEnabled ? 'true' : 'false');
 	}
-	setIfMissing(AgentHostCodexProxyModeEnvVar, settings.codexProxyMode);
-	setIfMissing(AgentHostCodexProxyBaseUrlEnvVar, settings.codexProxyBaseUrl);
+	const setCodexProxy = settings.forceCodexProxy
+		? (key: string, value: string | undefined): void => {
+			if (value !== undefined && value !== '') {
+				out[key] = value;
+			}
+		}
+		: setIfMissing;
+	setCodexProxy(AgentHostCodexProxyModeEnvVar, settings.codexProxyMode);
+	setCodexProxy(AgentHostCodexProxyBaseUrlEnvVar, settings.codexProxyBaseUrl);
 	return out;
 }
 
