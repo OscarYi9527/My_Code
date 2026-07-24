@@ -96,8 +96,12 @@ export function normalizeAiEditorProxyBaseUrl(value: string | undefined): string
 export function resolveAiEditorAgentHostProxyBaseUrl(
 	configuredBaseUrl: string | undefined,
 	developmentEdgeOrigin: string | undefined,
-	useDevelopmentDefault: boolean
+	useDevelopmentDefault: boolean,
+	productEdgeOrigin?: string
 ): string {
+	if (productEdgeOrigin?.trim()) {
+		return normalizeAiEditorProxyBaseUrl(productEdgeOrigin);
+	}
 	// In development, the account service and Agent Host must share the
 	// repository-owned Edge. Falling back to the user-facing shared Proxy
 	// default (47892) would silently bypass the isolated Gateway/Worker route

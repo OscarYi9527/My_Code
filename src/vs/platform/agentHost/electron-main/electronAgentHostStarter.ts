@@ -14,6 +14,7 @@ import { IEnvironmentMainService } from '../../environment/electron-main/environ
 import { parseAgentHostDebugPort } from '../../environment/node/environmentService.js';
 import { ILifecycleMainService } from '../../lifecycle/electron-main/lifecycleMainService.js';
 import { ILogService } from '../../log/common/log.js';
+import { IProductService } from '../../product/common/productService.js';
 import { Schemas } from '../../../base/common/network.js';
 import { getResolvedShellEnv } from '../../shell/node/shellEnv.js';
 import { NullTelemetryService } from '../../telemetry/common/telemetryUtils.js';
@@ -49,6 +50,7 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 		@IEnvironmentMainService private readonly _environmentMainService: IEnvironmentMainService,
 		@ILifecycleMainService private readonly _lifecycleMainService: ILifecycleMainService,
 		@ILogService private readonly _logService: ILogService,
+		@IProductService private readonly _productService: IProductService,
 	) {
 		super();
 
@@ -100,7 +102,8 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 			codexProxyBaseUrl: resolveAiEditorAgentHostProxyBaseUrl(
 				this._configurationService.getValue<string>(AI_EDITOR_PROXY_BASE_URL_SETTING_ID),
 				this._environmentMainService.isBuilt ? undefined : process.env['VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN'],
-				!this._environmentMainService.isBuilt
+				!this._environmentMainService.isBuilt,
+				this._environmentMainService.isBuilt ? this._productService.aiEditorAccountEdgeOrigin : undefined
 			),
 			forceCodexProxy: true,
 		}, process.env);

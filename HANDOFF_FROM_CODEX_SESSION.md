@@ -1440,3 +1440,55 @@ rollback, but the validated Edge route now uses the Singapore Worker.
 
 Detailed deployment record:
 `D:\AI_prejoct\My_code\.proxy-subscription-worktree\docs\PREPRODUCTION_SPLIT_DEPLOYMENT_20260723.md`
+
+## 2026-07-24 ICP rollback and final Edge-routing preparation
+
+Current usable preproduction route:
+
+```text
+Code -> local Edge 127.0.0.1:47921
+     -> https://peace-flashers-forum-mas.trycloudflare.com
+     -> domestic Gateway 114.132.161.56
+     -> mTLS Singapore Worker 43.156.27.252
+     -> ChatGPT subscription pool
+```
+
+Formal `https://gateway.torvye.com` completed DNS, TCP 80/443, Caddy,
+Let's Encrypt TLS and HSTS validation, but Tencent Cloud intercepts the
+unfiled mainland domain. Complete the `torvye.com` ICP filing before trying
+the direct cutover again. Do not embed the Quick Tunnel in `product.json`.
+
+Proxy:
+
+```text
+branch codex/subscription-account-management
+runtime/release commit 88e1e49bdb4ca64d319655ec99b832e7eaeb42d0
+documentation HEAD d44b19b
+root tests 203/203
+Gateway 179/179
+Admin 36/36
+release:check PASS
+```
+
+The domestic server has the latest `start-gateway.sh` propagation wait. It was
+updated without restarting Gateway or the active Quick Tunnel.
+
+Code P0 correction:
+
+- final built products can force both Agent Host and the Proxy lifecycle
+  service to the product-owned loopback Edge `47921`;
+- focused Electron tests passed `6/6` and `8/8`;
+- `npm run compile`, `npm run core-ci`, Windows packaging and Windows release
+  verification passed;
+- Windows checksums are `10/10`, clean start passed, and the packaged Proxy is
+  `88e1e49`, 296 files, `legacy-standalone`;
+- real management UI passed `7/7`; real SSE passed `6/6` with
+  `chatgpt-sub -> worker-preprod-sg -> ap-singapore`;
+- shared `47892` stayed PID `38640` with `/live=ok`.
+
+The checked-in product intentionally remains `legacy-standalone` and has no
+formal Gateway origin until ICP completes. T116/T117 remain open. After ICP:
+enable direct Caddy, verify externally, stop Quick Tunnel, add the fixed
+product origins, switch `productTarget=edge`, rebuild, and run final
+Windows/macOS login, restart recovery, model catalog, management and real
+response acceptance.

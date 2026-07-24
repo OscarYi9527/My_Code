@@ -81,14 +81,16 @@ export function parseAiEditorBundledProxyRuntimeManifest(raw: string): Omit<IAiE
 export function resolveAiEditorProxyMainBaseUrl(
 	configuredBaseUrl: string | undefined,
 	isBuilt: boolean,
-	env: NodeJS.ProcessEnv = process.env
+	env: NodeJS.ProcessEnv = process.env,
+	productEdgeOrigin?: string
 ): string {
 	return resolveAiEditorAgentHostProxyBaseUrl(
 		configuredBaseUrl,
 		!isBuilt && isExternalLocalAiEditorProxyMode(env)
 			? env[AgentHostCodexProxyBaseUrlEnvVar]
 			: undefined,
-		!isBuilt
+		!isBuilt,
+		isBuilt ? productEdgeOrigin : undefined
 	);
 }
 
@@ -405,7 +407,9 @@ export class AiEditorProxyMainService extends Disposable implements IAiEditorPro
 	private readBaseUrl(): string {
 		return resolveAiEditorProxyMainBaseUrl(
 			this.configurationService.getValue<string>(AI_EDITOR_PROXY_BASE_URL_SETTING_ID),
-			this.environmentMainService.isBuilt
+			this.environmentMainService.isBuilt,
+			process.env,
+			this.productService.aiEditorAccountEdgeOrigin
 		);
 	}
 

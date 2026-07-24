@@ -412,14 +412,20 @@ Turn 可结算为负积分。
   - `T136b production checkpoint: PENDING` — selected KMS/Secret Manager providers, PostgreSQL TLS/least privilege, off-host backup, certificate rotation and production recovery gates.
 - [ ] T137 [PW4] Deploy an isolated domestic Gateway and authorized-region Worker after manual infrastructure approval
   - `2026-07-24 direct-ingress checkpoint: PARTIAL` — domestic Gateway
-    `114.132.161.56` and Singapore Worker `43.156.27.252` are healthy; stable
-    Caddy/TLS cutover, bounded audit, Tencent registry fallback and automatic
-    rollback are implemented on Proxy branch
-    `codex/subscription-account-management@9d2bec9`.
-  - Remaining external gate: security group `sg-qv7wiiud` must allow inbound
-    TCP 80/443 and DNSPod must publish
-    `gateway.torvye.com A 114.132.161.56`; keep T137 open until trusted TLS,
-    Code real Turn and final Edge product acceptance pass.
+    `114.132.161.56` and Singapore Worker `43.156.27.252` are healthy.
+    DNSPod publishes `gateway.torvye.com A 114.132.161.56`, TCP 80/443,
+    Caddy/Let's Encrypt TLS, HSTS and Gateway-to-Worker mTLS have all passed.
+  - Tencent Cloud now intercepts the unfiled mainland domain (HTTP webblock
+    redirect / HTTPS reset). The preproduction route therefore rolled back to
+    `https://peace-flashers-forum-mas.trycloudflare.com`; the tunnel remains
+    temporary and is not embedded in the product.
+  - Proxy `codex/subscription-account-management@88e1e49` adds interruption
+    rollback and a 240-second Quick Tunnel propagation wait. The latest
+    `start-gateway.sh` is deployed without restarting Gateway or shared
+    `47892`.
+  - Remaining external gate: complete the ICP filing for `torvye.com`, then
+    repeat direct TLS, Code real Turn and final Edge-product T116/T117
+    acceptance before closing T137.
 - [ ] T138 [PW4] Complete the 72-hour, three-network, 20-SSE and 30-minute connection acceptance
 - [x] T139 [PW5/PW6] Enforce 30-user short-term cap and require long-term core architecture before user 31
   - `COMPLETE 2026-07-21` — database-atomic 30-account admission gate, bootstrap/admin counting,

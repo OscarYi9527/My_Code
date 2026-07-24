@@ -4095,3 +4095,58 @@ and central Singapore route are verified.
   route observation. The authoritative route is the Edge response metadata
   above; the AI response must not infer provider or egress from local process
   names.
+
+## 2026-07-24 ICP rollback and product Edge-routing closure
+
+- Formal direct ingress reached the technical acceptance point:
+  - `gateway.torvye.com` resolves to domestic Gateway `114.132.161.56`;
+  - TCP 80/443, Caddy, Let's Encrypt TLS, HSTS and Gateway-to-Singapore-Worker
+    mTLS passed;
+  - Tencent Cloud then intercepted the unfiled mainland domain. External
+    evidence showed the DNSPod webblock redirect on HTTP and a reset after the
+    HTTPS handshake.
+- This is an ICP filing prerequisite, not a Code, Gateway, Caddy, certificate,
+  security-group, Worker or subscription-account defect. Direct Caddy was
+  stopped and preproduction was restored to:
+  `https://peace-flashers-forum-mas.trycloudflare.com`.
+- The distributable Proxy runtime is pinned at
+  `88e1e49bdb4ca64d319655ec99b832e7eaeb42d0`; the branch documentation
+  checkpoint is `d44b19b`.
+  - `start-gateway-direct.sh` rolls back on interruption;
+  - `start-gateway.sh` waits up to 240 seconds for a new Quick Tunnel to
+    propagate before publishing its origin;
+  - the latest `start-gateway.sh` was installed on the domestic server without
+    restarting Gateway, the Quick Tunnel or shared Windows Proxy `47892`;
+  - Windows, domestic-host and Singapore-host `/live` probes passed.
+- Code P0 routing correction:
+  - `ElectronAgentHostStarter` receives `IProductService`;
+  - when a final product defines `aiEditorAccountEdgeOrigin`, Agent Host and
+    `AiEditorProxyMainService` both prefer that product-owned loopback Edge
+    over a stale configured standalone address;
+  - unsafe remote values are still rejected by the loopback normalizer;
+  - focused Electron suites passed `6/6` and `8/8`.
+- The unavailable formal origin and temporary Quick Tunnel are deliberately
+  absent from `product.json`. The distributable remains fail-safe at
+  `productTarget=legacy-standalone` until ICP completes, while the final
+  `47921` product-routing implementation remains ready for the later Edge
+  switch. T116/T117 remain open.
+- Validation:
+  - Proxy root `203/203`, Gateway `179/179`, Admin `36/36`;
+  - complete Proxy `release:check`: PASS after temporarily stopping and
+    restoring only the repository-owned Edge;
+  - restored Edge: `/ready=ready`, account state `ready`;
+  - `npm run compile` and `npm run core-ci`: PASS;
+  - Windows `vscode-win32-x64-min-ci`: PASS with Windows SDK `signtool.exe`;
+  - Windows release verifier: PASS, Workbench checksums `10/10`, clean start
+    PASS, Proxy payload 296 files at `88e1e49`, target `legacy-standalone`;
+  - development management UI: `7/7 PASS` on rerun after one cold-start
+    BrowserView timeout;
+  - real Responses SSE: `6/6 PASS`, `response.completed`,
+    `provider=chatgpt-sub`, `worker=worker-preprod-sg`,
+    `region=ap-singapore`;
+  - shared `47892` remained PID `38640` and `/live=ok` through packaging,
+    product verification, UI and SSE checks.
+- Current external blocker for the final Edge-product switch: complete the ICP
+  filing for `torvye.com`. After filing, restart direct Caddy through the
+  deployment script, stop Quick Tunnel, set the fixed product origins, switch
+  `productTarget=edge`, rebuild Windows/macOS and complete T116/T117.

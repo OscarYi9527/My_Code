@@ -50,6 +50,21 @@ suite('AI Editor Proxy', () => {
 			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', undefined, false),
 			'http://127.0.0.1:47892'
 		);
+		assert.strictEqual(
+			resolveAiEditorAgentHostProxyBaseUrl(
+				'http://127.0.0.1:47892',
+				undefined,
+				false,
+				'http://127.0.0.1:47921'
+			),
+			'http://127.0.0.1:47921'
+		);
+		assert.throws(() => resolveAiEditorAgentHostProxyBaseUrl(
+			'http://127.0.0.1:47892',
+			undefined,
+			false,
+			'https://gateway.example.test'
+		));
 		assert.throws(() => resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'https://gateway.example.test', true));
 	});
 

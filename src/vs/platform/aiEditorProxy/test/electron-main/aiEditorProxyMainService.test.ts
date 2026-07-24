@@ -109,6 +109,15 @@ suite('AiEditorProxyMainService restart safety', () => {
 			resolveAiEditorProxyMainBaseUrl('http://127.0.0.1:47892', true, externalEdgeEnvironment),
 			'http://127.0.0.1:47892'
 		);
+		assert.strictEqual(
+			resolveAiEditorProxyMainBaseUrl(
+				'http://127.0.0.1:47892',
+				true,
+				externalEdgeEnvironment,
+				'http://127.0.0.1:47921'
+			),
+			'http://127.0.0.1:47921'
+		);
 		assert.strictEqual(shouldAutoStartAiEditorProxy(true, true, externalEdgeEnvironment), true);
 	});
 
