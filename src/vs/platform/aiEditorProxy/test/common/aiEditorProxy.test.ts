@@ -31,18 +31,26 @@ suite('AI Editor Proxy', () => {
 
 	test('uses the isolated development Edge for Agent Host routing', () => {
 		assert.strictEqual(
-			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'http://127.0.0.1:47921/'),
+			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'http://127.0.0.1:47921/', true),
 			'http://127.0.0.1:47921'
 		);
 		assert.strictEqual(
-			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', undefined),
-			'http://127.0.0.1:47892'
+			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', undefined, true),
+			'http://127.0.0.1:47921'
 		);
 		assert.strictEqual(
-			resolveAiEditorAgentHostProxyBaseUrl('http://localhost:47892', '  '),
-			'http://localhost:47892'
+			resolveAiEditorAgentHostProxyBaseUrl('http://localhost:47892', '  ', true),
+			'http://127.0.0.1:47921'
 		);
-		assert.throws(() => resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'https://gateway.example.test'));
+		assert.strictEqual(
+			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47921', 'http://127.0.0.1:47892', true),
+			'http://127.0.0.1:47921'
+		);
+		assert.strictEqual(
+			resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', undefined, false),
+			'http://127.0.0.1:47892'
+		);
+		assert.throws(() => resolveAiEditorAgentHostProxyBaseUrl('http://127.0.0.1:47892', 'https://gateway.example.test', true));
 	});
 
 	test('parses provider availability', () => {

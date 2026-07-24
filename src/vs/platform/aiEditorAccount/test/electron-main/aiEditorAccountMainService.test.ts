@@ -7,6 +7,7 @@ import * as assert from 'assert';
 import { DeferredPromise } from '../../../../base/common/async.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import {
+	AI_EDITOR_ACCOUNT_HTTP_REQUEST_TIMEOUT,
 	AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT,
 	AI_EDITOR_ACCOUNT_MANAGEMENT_VIEW_ID,
 	AiEditorAccountState,
@@ -144,7 +145,7 @@ suite('AI Editor Account main service', () => {
 	});
 
 	test('keeps the production Turn gate above the account request timeout', () => {
-		assert.ok(AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT >= 12_000);
+		assert.ok(AI_EDITOR_ACCOUNT_TURN_GATE_TIMEOUT >= AI_EDITOR_ACCOUNT_HTTP_REQUEST_TIMEOUT * 2 + 1_000);
 	});
 
 	test('coalesces duplicate login clicks', async () => {

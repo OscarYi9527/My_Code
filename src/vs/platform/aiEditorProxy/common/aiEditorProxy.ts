@@ -5,6 +5,7 @@
 
 import { Event } from '../../../base/common/event.js';
 import { createDecorator } from '../../instantiation/common/instantiation.js';
+import { AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL } from '../../aiEditorAccount/common/aiEditorAccount.js';
 
 export const AI_EDITOR_PROXY_CHANNEL_NAME = 'aiEditorProxy';
 export const AI_EDITOR_PROXY_BASE_URL_SETTING_ID = 'aiEditor.proxy.baseUrl';
@@ -92,13 +93,37 @@ export function normalizeAiEditorProxyBaseUrl(value: string | undefined): string
  * Edge as the account service. Production deliberately omits this override:
  * its proxy address remains controlled by the product release configuration.
  */
-export function resolveAiEditorAgentHostProxyBaseUrl(configuredBaseUrl: string | undefined, developmentEdgeOrigin: string | undefined): string {
-	return normalizeAiEditorProxyBaseUrl(developmentEdgeOrigin?.trim() || configuredBaseUrl);
+export function resolveAiEditorAgentHostProxyBaseUrl(
+	configuredBaseUrl: string | undefined,
+	developmentEdgeOrigin: string | undefined,
+	useDevelopmentDefault: boolean
+): string {
+	// In development, the account service and Agent Host must share the
+	// repository-owned Edge. Falling back to the user-facing shared Proxy
+	// default (47892) would silently bypass the isolated Gateway/Worker route
+	// whenever Code was started without the preview helper script.
+	const candidate = normalizeAiEditorProxyBaseUrl(
+		developmentEdgeOrigin?.trim()
+			|| (useDevelopmentDefault ? AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL : configuredBaseUrl)
+	);
+	if (useDevelopmentDefault && isSharedProxyBaseUrl(candidate)) {
+		return AI_EDITOR_ACCOUNT_DEVELOPMENT_EDGE_URL;
+	}
+	return candidate;
 }
 
 export function isLoopbackHostname(hostname: string): boolean {
 	const normalized = hostname.toLowerCase();
 	return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]';
+}
+
+function isSharedProxyBaseUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return isLoopbackHostname(url.hostname) && url.port === '47892';
+	} catch {
+		return false;
+	}
 }
 
 export function parseAiEditorProxyProviderStatus(value: IAiEditorProxyHealthResponse | undefined): IAiEditorProxyProviderStatus {

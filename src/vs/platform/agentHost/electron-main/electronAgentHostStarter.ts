@@ -99,7 +99,8 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 			codexProxyMode: 'external-local-proxy',
 			codexProxyBaseUrl: resolveAiEditorAgentHostProxyBaseUrl(
 				this._configurationService.getValue<string>(AI_EDITOR_PROXY_BASE_URL_SETTING_ID),
-				this._environmentMainService.isBuilt ? undefined : process.env['VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN']
+				this._environmentMainService.isBuilt ? undefined : process.env['VSCODE_AI_EDITOR_ACCOUNT_EDGE_ORIGIN'],
+				!this._environmentMainService.isBuilt
 			),
 			forceCodexProxy: true,
 		}, process.env);

@@ -87,7 +87,8 @@ export function resolveAiEditorProxyMainBaseUrl(
 		configuredBaseUrl,
 		!isBuilt && isExternalLocalAiEditorProxyMode(env)
 			? env[AgentHostCodexProxyBaseUrlEnvVar]
-			: undefined
+			: undefined,
+		!isBuilt
 	);
 }
 

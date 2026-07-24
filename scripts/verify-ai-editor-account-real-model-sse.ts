@@ -17,6 +17,9 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const blackRepository = resolveBlackRepository(getOption('--black-repository'));
 const dataRoot = getOption('--data-root') ?? path.join(blackRepository, '.ai-editor-dev', 'oscar-login-verify');
 const expectedModel = getOption('--model');
+const expectedProviderId = getOption('--expected-provider-id');
+const expectedWorkerId = getOption('--expected-worker-id');
+const expectedWorkerRegion = getOption('--expected-worker-region');
 const prompt = getOption('--prompt') ?? 'Reply only with: AI_EDITOR_SSE_OK';
 const responseTimeoutMs = getIntegerOption('--timeout-ms', 180_000, 1_000, 600_000);
 const reportRoot = path.join(repositoryRoot, '.build', 'ai-editor-account-gateway');
@@ -42,6 +45,11 @@ async function main(): Promise<void> {
 	const sharedBefore = await sharedSnapshot();
 	let result: 'PASS' | 'BLOCKED' | 'FAIL' = 'FAIL';
 	let error: string | undefined;
+	let trustedRoute: {
+		readonly providerId: string | null;
+		readonly workerId: string | null;
+		readonly workerRegion: string | null;
+	} | undefined;
 
 	try {
 		const edgeUrl = new URL(edgeOrigin);
@@ -126,6 +134,21 @@ async function main(): Promise<void> {
 			});
 			throw new Error('The real Responses request did not return an SSE stream.');
 		}
+		trustedRoute = {
+			providerId: safeRouteHeader(response, 'x-ai-editor-provider-id'),
+			workerId: safeRouteHeader(response, 'x-ai-editor-worker-id'),
+			workerRegion: safeRouteHeader(response, 'x-ai-editor-worker-region')
+		};
+		assertExpectedRoute(trustedRoute);
+		checks.push({
+			name: 'trusted-route-metadata',
+			result: 'PASS',
+			detail: [
+				`Provider ${trustedRoute.providerId ?? 'not-disclosed'}`,
+				`Worker ${trustedRoute.workerId ?? 'not-disclosed'}`,
+				`region ${trustedRoute.workerRegion ?? 'not-disclosed'}`
+			].join(', ') + '.'
+		});
 		let bytesRead = 0;
 		let sawCompleted = false;
 		const reader = response.body.getReader();
@@ -174,6 +197,7 @@ async function main(): Promise<void> {
 		generatedAt: new Date().toISOString(),
 		result,
 		checks,
+		trustedRoute,
 		sharedProxy: { before: sharedBefore, after: sharedAfter, unchanged },
 		error: error ? 'Real model/SSE acceptance did not complete. No prompt, reply, nonce, ticket, or token was written to this report.' : undefined
 	};
@@ -195,6 +219,28 @@ async function main(): Promise<void> {
 		process.exitCode = 2;
 	} else if (result === 'FAIL') {
 		process.exitCode = 1;
+	}
+}
+
+function safeRouteHeader(response: Response, name: string): string | null {
+	const value = response.headers.get(name)?.trim() ?? '';
+	return /^[A-Za-z0-9._:-]{1,128}$/.test(value) ? value : null;
+}
+
+function assertExpectedRoute(route: {
+	readonly providerId: string | null;
+	readonly workerId: string | null;
+	readonly workerRegion: string | null;
+}): void {
+	const expected = [
+		['Provider', expectedProviderId, route.providerId],
+		['Worker', expectedWorkerId, route.workerId],
+		['Worker region', expectedWorkerRegion, route.workerRegion]
+	] as const;
+	for (const [label, expectedValue, actualValue] of expected) {
+		if (expectedValue && actualValue !== expectedValue) {
+			throw new Error(`${label} route mismatch: expected ${expectedValue}, found ${actualValue ?? 'not-disclosed'}.`);
+		}
 	}
 }
 

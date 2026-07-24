@@ -136,7 +136,8 @@ async function main(): Promise<void> {
 		let statusText = await waitFor(
 			() => page.locator('body').innerText(),
 			value => value.includes('AI 服务'),
-			'AI Editor Chat input status'
+			'AI Editor Chat input status',
+			60_000
 		);
 		if (statusText.includes('AI 服务：暂不可用')) {
 			// The renderer starts fail-closed before its first main-process
@@ -152,7 +153,8 @@ async function main(): Promise<void> {
 					|| value.includes('AI 服务正常')
 					|| value.includes('AI 服务：需要修改密码')
 					|| value.includes('AI 服务：账号不可用'),
-				'AI Editor account status after retry'
+				'AI Editor account status after retry',
+				60_000
 			);
 		}
 		if (statusText.includes('需要登录')) {

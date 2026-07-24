@@ -24,11 +24,17 @@ suite('AI Editor Account HTTP client', () => {
 		readonly localNonce: string | undefined;
 	}>;
 	let statusFailure = false;
+	let statusTransportFailuresRemaining = 0;
+	let statusRetryableFailuresRemaining = 0;
+	let retryStatusTransportFailuresRemaining = 0;
 	let accountState: 'ready' | 'login_required';
 
 	setup(async () => {
 		requests = [];
 		statusFailure = false;
+		statusTransportFailuresRemaining = 0;
+		statusRetryableFailuresRemaining = 0;
+		retryStatusTransportFailuresRemaining = 0;
 		accountState = 'login_required';
 		const httpModule = await import('http');
 		server = httpModule.createServer(async (request, response) => {
@@ -42,6 +48,21 @@ suite('AI Editor Account HTTP client', () => {
 			});
 
 			if (request.url === '/ai-editor/status') {
+				if (statusTransportFailuresRemaining > 0) {
+					statusTransportFailuresRemaining -= 1;
+					response.destroy();
+					return;
+				}
+				if (statusRetryableFailuresRemaining > 0) {
+					statusRetryableFailuresRemaining -= 1;
+					return sendJson(response, 503, {
+						error: {
+							code: 'account_service_unavailable',
+							message: 'temporary ingress failure',
+							retryable: true
+						}
+					});
+				}
 				if (statusFailure) {
 					return sendJson(response, 502, {
 						error: {
@@ -53,6 +74,11 @@ suite('AI Editor Account HTTP client', () => {
 				return sendJson(response, 200, safeStatus(accountState));
 			}
 			if (request.url === '/ai-editor/status/retry') {
+				if (retryStatusTransportFailuresRemaining > 0) {
+					retryStatusTransportFailuresRemaining -= 1;
+					response.destroy();
+					return;
+				}
 				return sendJson(response, 200, safeStatus('ready'));
 			}
 			if (request.url === '/ai-editor/handoff/start') {
@@ -163,6 +189,43 @@ suite('AI Editor Account HTTP client', () => {
 			error instanceof AiEditorAccountHttpError &&
 			error.errorId === 'provider_unavailable' &&
 			!error.message.includes('secret upstream')
+		);
+		assert.strictEqual(
+			requests.filter(request => request.path === '/ai-editor/status').length,
+			1
+		);
+	});
+
+	test('retries one transient status transport failure and then returns fresh status', async () => {
+		statusTransportFailuresRemaining = 1;
+		const client = new AiEditorAccountHttpClient(origin, origin);
+
+		assert.strictEqual((await client.getStatus()).state, AiEditorAccountState.LoginRequired);
+		assert.strictEqual(
+			requests.filter(request => request.path === '/ai-editor/status').length,
+			2
+		);
+	});
+
+	test('retries one explicitly retryable status 5xx and then returns fresh status', async () => {
+		statusRetryableFailuresRemaining = 1;
+		const client = new AiEditorAccountHttpClient(origin, origin);
+
+		assert.strictEqual((await client.getStatus()).state, AiEditorAccountState.LoginRequired);
+		assert.strictEqual(
+			requests.filter(request => request.path === '/ai-editor/status').length,
+			2
+		);
+	});
+
+	test('retries the user status action after one transient transport failure', async () => {
+		retryStatusTransportFailuresRemaining = 1;
+		const client = new AiEditorAccountHttpClient(origin, origin);
+
+		assert.strictEqual((await client.retryStatus()).state, AiEditorAccountState.Ready);
+		assert.strictEqual(
+			requests.filter(request => request.path === '/ai-editor/status/retry').length,
+			2
 		);
 	});
 

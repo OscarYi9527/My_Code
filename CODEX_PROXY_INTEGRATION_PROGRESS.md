@@ -4045,3 +4045,53 @@ and central Singapore route are verified.
   the deployment scripts. Do not expose 47920/47930 on the domestic host.
 - Detailed evidence:
   `codex_proxy/docs/DOMESTIC_GATEWAY_DIRECT_CUTOVER_20260724.md`.
+
+## 2026-07-24 route-fix final verification
+
+- Code development routing now fails closed to the repository-owned Edge
+  `http://127.0.0.1:47921` when no preview environment override is present;
+  it no longer silently falls back to the shared `127.0.0.1:47892`.
+- Account status requests now use a 20-second bounded timeout and retry one
+  transport failure or an explicitly retryable server 5xx. The Turn gate
+  remains fail-closed at 45 seconds, so a transient public-ingress reset does
+  not create `account_turn_gate_timeout`, while authentication and
+  non-retryable business errors are never retried.
+- Build and focused validation:
+  - `npm run compile`: PASS;
+  - `npm run core-ci`: PASS;
+  - Windows `vscode-win32-x64-min-ci`: PASS;
+  - Windows release verifier: PASS, Workbench checksums `10/10`;
+  - Code account Electron tests: `34 passing`;
+  - Code Proxy/Edge Electron tests: `16 passing`.
+- Packaged Windows artifact:
+  - Proxy payload: 296 files, commit
+    `8f822a78ce9813fe3df422f1e0fb75e87caa77e0`;
+  - current product target remains intentionally
+    `legacy-standalone` until formal `gateway.torvye.com` DNS/TLS is ready;
+  - report:
+    `.build/ai-editor-account-gateway/route-fix-windows-release-final.json`.
+- Real preproduction route acceptance:
+  - model catalog: 6 authorized entries;
+  - Responses SSE: HTTP success with `response.completed`;
+  - trusted route metadata:
+    `provider=chatgpt-sub`,
+    `worker=worker-preprod-sg`,
+    `region=ap-singapore`;
+  - shared Proxy PID `35276` and `/live=ok` unchanged;
+  - report:
+    `.build/ai-editor-account-gateway/real-model-sse-acceptance.json`.
+- Real management UI acceptance: `7/7 PASS`; management BrowserView
+  bootstrap and fixed-origin navigation passed again. The current live Admin
+  asset contains the new transient quota/provider error handling and does not
+  contain the old “境外模型通道暂时不可用” text. A previously opened
+  BrowserView can retain its already-loaded hashed JavaScript until that tab
+  is closed/reopened; this is a stale UI cache, not evidence of a local
+  `47892` fallback.
+- A final-build UI rerun reproduced one explicitly retryable Gateway 5xx
+  followed by one bounded status timeout while the Edge PID stayed live.
+  After adding the bounded retry policy above, the same isolated UI scenario
+  passed `7/7`; repeated raw status sampling also returned `ready`.
+- The screenshot's DeepSeek/`47892` explanation is therefore not a trusted
+  route observation. The authoritative route is the Edge response metadata
+  above; the AI response must not infer provider or egress from local process
+  names.

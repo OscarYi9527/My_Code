@@ -5,6 +5,7 @@
 
 import type { IncomingMessage } from 'http';
 import {
+	AI_EDITOR_ACCOUNT_HTTP_REQUEST_TIMEOUT,
 	IAiEditorSafeStatus,
 	IAiEditorWebviewTicket
 } from '../common/aiEditorAccount.js';
@@ -12,7 +13,10 @@ import { AI_EDITOR_ACCOUNT_ENDPOINTS, parseAiEditorSafeStatus } from '../common/
 
 const GATEWAY_API_BASE_PATH = '/api/v1';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
-const REQUEST_TIMEOUT = 10_000;
+// Account status and ticket calls may cross the domestic Gateway and the
+// public ingress. Two bounded attempts tolerate a transient reset without
+// making a new Turn wait indefinitely when the account service is offline.
+const REQUEST_TIMEOUT = AI_EDITOR_ACCOUNT_HTTP_REQUEST_TIMEOUT;
 
 export interface IAiEditorPkce {
 	readonly state: string;
@@ -90,7 +94,8 @@ export interface IAiEditorAccountHttpClient {
 export class AiEditorAccountHttpError extends Error {
 	constructor(
 		readonly errorId: string,
-		readonly statusCode?: number
+		readonly statusCode?: number,
+		readonly retryable = false
 	) {
 		super(errorId);
 		this.name = 'AiEditorAccountHttpError';
@@ -105,7 +110,7 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 	) { }
 
 	async getStatus(): Promise<IAiEditorSafeStatus> {
-		return parseAiEditorSafeStatus(await this.requestEdgeJson(
+		return parseAiEditorSafeStatus(await this.requestEdgeJsonWithTransientRetry(
 			AI_EDITOR_ACCOUNT_ENDPOINTS.status,
 			'GET',
 			undefined
@@ -113,7 +118,7 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 	}
 
 	async retryStatus(): Promise<IAiEditorSafeStatus> {
-		return parseAiEditorSafeStatus(await this.requestEdgeJson(
+		return parseAiEditorSafeStatus(await this.requestEdgeJsonWithTransientRetry(
 			AI_EDITOR_ACCOUNT_ENDPOINTS.retryStatus,
 			'POST',
 			{}
@@ -221,6 +226,22 @@ export class AiEditorAccountHttpClient implements IAiEditorAccountHttpClient {
 		);
 	}
 
+	private async requestEdgeJsonWithTransientRetry(path: string, method: 'GET' | 'POST', body: object | undefined): Promise<unknown> {
+		try {
+			return await this.requestEdgeJson(path, method, body);
+		} catch (error) {
+			// A public ingress can reset one TCP connection or explicitly report
+			// a retryable 5xx without the account, Gateway, or Worker being
+			// unhealthy. Never retry authentication or non-retryable business
+			// errors.
+			if (!isTransientEdgeStatusError(error)) {
+				throw error;
+			}
+			await new Promise(resolve => setTimeout(resolve, 250));
+			return this.requestEdgeJson(path, method, body);
+		}
+	}
+
 	private async getValidatedLocalNonce(): Promise<string | undefined> {
 		let localNonce: string | undefined;
 		try {
@@ -318,7 +339,8 @@ function readJsonResponse(response: IncomingMessage, resolve: (value: unknown) =
 
 			const statusCode = response.statusCode ?? 0;
 			if (statusCode < 200 || statusCode >= 300) {
-				throw new AiEditorAccountHttpError(readSafeServerErrorId(value, statusCode), statusCode);
+				const serverError = readSafeServerError(value, statusCode);
+				throw new AiEditorAccountHttpError(serverError.errorId, statusCode, serverError.retryable);
 			}
 			resolve(value);
 		} catch (error) {
@@ -332,17 +354,27 @@ function readJsonResponse(response: IncomingMessage, resolve: (value: unknown) =
 	});
 }
 
-function readSafeServerErrorId(value: unknown, statusCode: number): string {
+function isTransientEdgeStatusError(error: unknown): boolean {
+	return error instanceof AiEditorAccountHttpError
+		&& (error.errorId === 'account_edge_unreachable'
+			|| error.errorId === 'account_http_response_failed'
+			|| (error.retryable && (error.statusCode ?? 0) >= 500));
+}
+
+function readSafeServerError(value: unknown, statusCode: number): { readonly errorId: string; readonly retryable: boolean } {
 	if (value && typeof value === 'object' && !Array.isArray(value)) {
 		const error = (value as Record<string, unknown>)['error'];
 		if (error && typeof error === 'object' && !Array.isArray(error)) {
 			const code = (error as Record<string, unknown>)['code'];
 			if (typeof code === 'string' && /^[a-z0-9_]{1,64}$/.test(code)) {
-				return code;
+				return {
+					errorId: code,
+					retryable: (error as Record<string, unknown>)['retryable'] === true
+				};
 			}
 		}
 	}
-	return `account_http_${statusCode}`;
+	return { errorId: `account_http_${statusCode}`, retryable: false };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
