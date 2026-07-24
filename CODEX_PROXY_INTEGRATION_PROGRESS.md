@@ -4002,3 +4002,40 @@ provider data and no longer implies a fallback to the shared local Proxy.
 Final product Edge acceptance remains pending until the formal HTTPS Gateway
 origin is available. T116/T117 therefore remain open; the preproduction Code
 and central Singapore route are verified.
+
+## 2026-07-24 domestic Gateway direct-ingress implementation
+
+- Audited the registered Tencent Cloud host:
+  - instance `ins-05jlq40e`, `torvye-gateway-cn-01`;
+  - Guangzhou, public IPv4 `114.132.161.56`;
+  - Ubuntu 24.04.4, 2 vCPU, 3.6 GiB RAM, 50 GiB disk, 5 Mbps;
+  - security group `sg-qv7wiiud`.
+- The domestic host already runs the isolated Gateway on
+  `127.0.0.1:47920`; the existing Singapore Worker remains
+  `43.156.27.252:47930` with mTLS and signed requests.
+- Proxy branch `codex/subscription-account-management` now contains:
+  - stable Caddy TLS ingress;
+  - DNS/capacity/listener audit;
+  - Tencent Cloud Docker mirror fallback;
+  - bounded ACME diagnostics;
+  - mode-0600 runtime backups;
+  - automatic rollback;
+  - TLS hostname/expiry, HSTS, Gateway and Worker verification.
+- Validation:
+  - deployment tests `4/4`;
+  - Proxy root tests `203/203`;
+  - workspace checks PASS;
+  - real-host Docker Compose and Caddy validation PASS.
+- A real temporary-DNS ACME attempt proved that the current effective cloud
+  rules do not permit inbound TCP 80/443. The new script diagnosed the
+  external timeout within seconds and a second run proved automatic rollback:
+  the Quick Tunnel origin was restored, Caddy stopped and both local/public
+  Gateway `/live` returned `status=ok`.
+- T137 remains open. Required operator actions:
+  1. allow inbound TCP 80 and 443 in `sg-qv7wiiud`;
+  2. add `gateway.torvye.com A 114.132.161.56` in DNSPod.
+- The domestic server has no CAM role and this workstation has no DNSPod API
+  credential, so those two cloud-control-plane changes cannot be performed by
+  the deployment scripts. Do not expose 47920/47930 on the domestic host.
+- Detailed evidence:
+  `codex_proxy/docs/DOMESTIC_GATEWAY_DIRECT_CUTOVER_20260724.md`.
